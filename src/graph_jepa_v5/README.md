@@ -1,5 +1,8 @@
 # `graph_jepa_v5` source map
 
+For the beginner-oriented input, architecture, objective, and execution
+walkthrough, read the [full v5 model guide](../../models/v5_without_note/README.md).
+
 - `config.py`: checkpoint-compatible model, training, and scoring dataclasses.
 - `data.py`: raw graph normalization, confidence/artifact features, and PyG conversion.
 - `model.py`: v5 confidence supervision and hidden-edge candidate ranking.

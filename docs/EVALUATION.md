@@ -27,3 +27,25 @@ match the saved checkpoint because they determine layer dimensions.
 Results from the three models are not directly comparable unless the graph
 records, split, candidate construction, note availability, and query cap are
 identical.
+
+## Project-reported snapshot
+
+| Model | MRR | Hits@1 | Hits@3 | Hits@10 |
+| --- | ---: | ---: | ---: | ---: |
+| Modular v6 | 0.865 | 0.779 | 0.950 | 1.000 |
+| Paper-v16 | 0.571 | 0.429 | 0.626 | 0.872 |
+
+These values were supplied from the project evaluation and are recorded here
+separately from the metrics printed in the paper. The underlying result files
+were not present when this table was added, so the dataset path, split, query
+count, candidate mode, and runtime configuration cannot yet be audited from the
+repository.
+
+For a reproducible result, retain the evaluator's output JSON together with:
+
+- checkpoint checksum;
+- dataset checksum and split;
+- note/provenance availability;
+- candidate mode and filtering rules;
+- random seed and query cap; and
+- command line plus environment flags.

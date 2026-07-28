@@ -41,24 +41,32 @@ world-model encoder frozen during relation readout.
 
 ## Method at a glance
 
-```mermaid
-flowchart LR
-    A["MIMIC-IV admission"] --> B["Typed patient-state graph"]
-    N["Clinical note"] --> C["Clinical-ModernBERT"]
-    C --> D["Entity-localized note context"]
-    B --> E["Typed GNN encoder"]
-    D --> E
-    E --> F["Masked latent prediction"]
-    F --> G["Frozen patient-state encoder"]
-    G --> H["Relation recovery / graph revision"]
-    H --> I["KEEP · REVIEW · PRUNE · ADD"]
-```
+![Clinical Graph-JEPA architecture from Figure 1 of the paper](docs/assets/clinical_graph_jepa_overview.png)
 
-Each admission graph combines deterministic relations from structured records
-with clinically meaningful cross-links inferred from narrative text. Graph-JEPA
-pretraining predicts masked graph regions in latent space through an online
-encoder and an exponential-moving-average target encoder. A lightweight
-relation readout then evaluates what belongs in the graph.
+*Figure 1 from the paper. See the [full PDF](paper/clinical_jepa.pdf) for its
+caption and surrounding discussion.*
+
+The figure has three stages:
+
+1. **Admission record to patient-state KG.** Structured MIMIC-IV tables provide
+   high-confidence backbone edges. The clinical narrative provides cross-links
+   such as a medication being managed for a diagnosis or a procedure confirming
+   a diagnosis. Nodes and relations are normalized into a typed graph.
+2. **Graph-JEPA world-model learning.** A GNN converts node features and typed
+   edges into patient-state latents. The modular models partition the graph into
+   balanced local patches; an online branch predicts masked target-patch latents
+   produced by a slowly updated EMA target branch. The standalone paper-v16
+   implementation follows the same predictive principle at node level.
+3. **Graph revision and recovery.** Learned latents score observed and candidate
+   relations. Schema rules reject clinically invalid type combinations, while
+   leave-one-out evaluation measures whether a hidden true target is recovered
+   above type-compatible alternatives.
+
+The important JEPA idea is that the model predicts a **latent representation**
+of missing graph state, not raw node text. The target encoder is not optimized
+directly by backpropagation; its weights track the online encoder by an
+exponential moving average. This supplies a stable learning target without
+requiring a manually labeled target for every masked region.
 
 ## Included implementations
 
@@ -72,6 +80,48 @@ The modular `v5`/`v6` models and standalone paper `v16` model come from two
 related development lineages. `v16` is not a direct architectural successor of
 modular `v6`, and their checkpoints are not interchangeable. See the
 [paper-to-code map](docs/PAPER_CODE_MAP.md) for the exact correspondence.
+
+### Architecture comparison
+
+| Stage | Raw v5 | Modular v6 | Paper-v16 |
+| --- | --- | --- | --- |
+| Raw node signal | `TYPE: normalized_name` | `TYPE: normalized_name` plus admission note embedding | Node type, hashed normalized name, demographics, optional note embedding |
+| Initial representation | Frozen SapBERT CLS embedding, 768-d | SapBERT 768-d + localized note 768-d = 1536-d | Three 128-d terms are added: learned type, learned hash bucket, projected numeric/note branch |
+| GNN | 2-layer relation-aware GINE | Same as v5 | 2-layer, 4-head `TransformerConv` |
+| Graph unit predicted by JEPA | Balanced BFS patch | Balanced BFS patch | Masked node latent |
+| Latent width | 160 | 160 | 128 |
+| Target branch | EMA node encoder + EMA patch transformer | Same as v5 | EMA copy of the graph encoder |
+| Downstream objective | Schema-aware revision BCE + hard candidate ranking | Same, with confidence/artifact metadata | Frozen-encoder DistMult with InfoNCE and 8 type-matched negatives |
+| Intended role | Note-free baseline and deployment option | Modular note-localization experiment | Direct standalone paper experiment/checkpoint |
+
+For a full tensor-by-tensor walkthrough, use the model guides:
+
+- [Raw Graph-JEPA v5 explained](models/v5_without_note/README.md)
+- [MIMIC Graph-JEPA v6 explained](models/v6_with_note/README.md)
+- [Paper entity-note v16 explained](models/paper_v16/README.md)
+
+## Project evaluation snapshot
+
+The latest supplied leave-one-out edge-recovery results are:
+
+| Model | MRR | Hits@1 | Hits@3 | Hits@10 |
+| --- | ---: | ---: | ---: | ---: |
+| **Modular v6** | **0.865** | **0.779** | **0.950** | **1.000** |
+| Paper-v16 | 0.571 | 0.429 | 0.626 | 0.872 |
+
+MRR rewards placing the true target near the top of the candidate ranking.
+Hits@K is the fraction of queries for which the true target appears among the
+top K candidates. In this evaluation snapshot, modular v6 ranks the true target
+first for 77.9% of queries and within its top ten for every evaluated query.
+
+> [!NOTE]
+> These are project-supplied evaluation results, separate from the paper's
+> reported Option A/Option B experiment above. A model comparison is strictly
+> valid only when both rows use the same graph records, held-out queries,
+> candidate construction, note availability, filtering rules, and query cap.
+> Until the corresponding result JSON/configuration is committed, treat this
+> table as a reported evaluation snapshot rather than an independently
+> reproducible paper result.
 
 ## Repository contents
 

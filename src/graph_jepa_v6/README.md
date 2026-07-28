@@ -1,5 +1,9 @@
 # `graph_jepa_v6` source map
 
+For the beginner-oriented note-localization, tensor-shape, architecture,
+objective, and execution walkthrough, read the
+[full v6 model guide](../../models/v6_with_note/README.md).
+
 - `config.py`: v6 note, confidence, ranking, and scoring configuration.
 - `data.py`: v5-compatible graph conversion plus localized note features.
 - `model.py`: trusted/uncertain/weak LLM supervision and candidate ranking.
