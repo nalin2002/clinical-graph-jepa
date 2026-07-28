@@ -127,21 +127,98 @@ first for 77.9% of queries and within its top ten for every evaluated query.
 
 ```text
 clinical-graph-jepa/
-├── data/                     Packaged graph JSONL and compatibility notes
-├── docs/                     Architecture, data, evaluation, and paper mapping
-├── models/                   Checkpoints, configs, and model-specific guides
-├── paper/                    Repository copy of the paper
-├── scripts/                  Dataset audit and checkpoint smoke checks
+├── README.md                           Project overview and runnable examples
+├── pyproject.toml                     Python package and dependency definition
+├── uv.lock                            Reproducible dependency lockfile
+│
+├── data/
+│   ├── README.md                       Dataset contract, audit, and privacy notes
+│   └── fawkes_1k_patients/
+│       └── fawkes_1k_patients_graphs_260615.jsonl
+│                                      400 admission-level patient graphs
+│
+├── docs/
+│   ├── ARCHITECTURE.md                  Cross-model architecture walkthrough
+│   ├── DATA.md                          JSONL fields and model compatibility
+│   ├── EVALUATION.md                    LOO protocol, metrics, and result snapshot
+│   ├── PAPER_CODE_MAP.md                Paper concepts mapped to code symbols
+│   └── assets/
+│       └── clinical_graph_jepa_overview.png
+│                                      Figure 1 extracted from the paper
+│
+├── models/
+│   ├── MANIFEST.json                    Paths, sizes, and SHA-256 checksums
+│   ├── v5_without_note/
+│   │   ├── README.md                   Complete v5 model guide
+│   │   ├── config_v5_pretrain.json    Pretraining configuration
+│   │   ├── config_v5.json             Final configuration
+│   │   ├── graph_jepa_v5_pretrain.pt  Pretrained checkpoint
+│   │   └── graph_jepa_v5.pt           Final checkpoint
+│   ├── v6_with_note/
+│   │   ├── README.md                   Complete v6 model guide
+│   │   ├── config_v6_pretrain.json    Pretraining configuration
+│   │   ├── config_v6.json             Final configuration
+│   │   ├── graph_jepa_v6_pretrain.pt  Pretrained checkpoint
+│   │   └── graph_jepa_v6.pt           Final checkpoint
+│   └── paper_v16/
+│       ├── README.md                   Complete paper-v16 model guide
+│       └── fawkes_trainer_jepa_entity_note_v16_260615.pt
+│                                      Encoder + DistMult checkpoint
+│
+├── paper/
+│   ├── clinical_jepa.pdf                Repository copy of the manuscript
+│   └── README.md                       Paper links and checksum
+│
+├── scripts/
+│   ├── audit_data.py                   Counts graphs/features and checks compatibility
+│   └── smoke_check.py                  Loads every checkpoint and validates dimensions
+│
 ├── src/
-│   ├── fawkes_core/          Version-neutral schema and model primitives
-│   ├── graph_jepa_v5/        Note-free modular Graph-JEPA
-│   ├── graph_jepa_v6/        Entity-note modular Graph-JEPA
-│   └── paper_v16/            Standalone paper trainer and evaluator
-└── tests/                    Independence, data, and checkpoint tests
+│   ├── fawkes_core/                    Shared, version-neutral implementation
+│   │   ├── schema.py                   Node/relation vocabularies and graph object
+│   │   ├── data.py                     JSONL adapters and schema normalization
+│   │   ├── encoders.py                 SapBERT, BGE, and deterministic mock encoders
+│   │   ├── patches.py                  Balanced BFS graph partitioning
+│   │   ├── model_base.py               GNN, patch transformer, EMA, and edge head
+│   │   ├── revision.py                 Schema-aware revision losses
+│   │   ├── training.py                 Shared training utilities
+│   │   └── score_revision.py           KEEP/REVIEW/PRUNE/ADD scoring workflow
+│   │
+│   ├── graph_jepa_v5/                  Note-free modular implementation
+│   │   ├── config.py, data.py, model.py Model definition and input pipeline
+│   │   ├── pretrain.py, finetune.py    Two-stage training CLIs
+│   │   ├── evaluate.py                 Native leave-one-out evaluator
+│   │   └── score.py                    Revision/candidate-scoring CLI
+│   │
+│   ├── graph_jepa_v6/                  Entity-localized-note implementation
+│   │   ├── config.py, data.py, model.py Note-aware definition and input pipeline
+│   │   ├── pretrain.py, finetune.py    Two-stage training CLIs
+│   │   ├── evaluate.py                 Native leave-one-out evaluator
+│   │   └── score.py                    Revision/candidate-scoring CLI
+│   │
+│   └── paper_v16/                      Standalone paper experiment
+│       ├── trainer.py                   Data conversion, JEPA, DistMult, and training
+│       └── evaluate.py                  Checkpoint-only local LOO evaluator
+│
+└── tests/
+    └── test_suite.py                   Package independence, data, and checkpoint tests
 ```
 
 The modular packages are self-contained: neither imports historical
 `graph_jepa_v2`, `graph_jepa_v3`, or `graph_jepa_v4` modules.
+
+### Where should a new reader start?
+
+| Goal | Start here | Then inspect |
+| --- | --- | --- |
+| Understand the research idea | [Paper](paper/clinical_jepa.pdf) | [Paper-to-code map](docs/PAPER_CODE_MAP.md) |
+| Compare all three architectures | [Architecture guide](docs/ARCHITECTURE.md) | The three model READMEs under `models/` |
+| Understand the JSONL | [Data contract](docs/DATA.md) | `fawkes_core/data.py` and the model's `data.py` |
+| Run the packaged dataset | [v5 guide](models/v5_without_note/README.md) | `graph_jepa_v5.evaluate` |
+| Understand localized notes | [v6 guide](models/v6_with_note/README.md) | `graph_jepa_v6/data.py` |
+| Reproduce the standalone paper model | [paper-v16 guide](models/paper_v16/README.md) | `paper_v16/trainer.py` |
+| Understand metrics/results | [Evaluation guide](docs/EVALUATION.md) | Each package's `evaluate.py` |
+| Verify downloaded/copied artifacts | `models/MANIFEST.json` | `scripts/smoke_check.py` |
 
 ## Quick start
 
