@@ -1,0 +1,44 @@
+{
+  "v5_without_note": {
+    "final": {
+      "path": "v5_without_note/graph_jepa_v5.pt",
+      "bytes": 6912191,
+      "sha256": "f9f1c0e5074bbab113f1679f1d051325083a16ce98a1b9050e2d03eeacdbdb49"
+    },
+    "pretrain": {
+      "path": "v5_without_note/graph_jepa_v5_pretrain.pt",
+      "bytes": 6913316,
+      "sha256": "787d61b322674c288355bda0d84e05899a98398cb4050c3be9db077532490733"
+    }
+  },
+  "v6_with_note": {
+    "final": {
+      "path": "v6_with_note/graph_jepa_v6.pt",
+      "bytes": 7895359,
+      "sha256": "0a345ddb693e31863206d3d0315b1b201d61d2a9a759496c29141d7457377555"
+    },
+    "pretrain": {
+      "path": "v6_with_note/graph_jepa_v6_pretrain.pt",
+      "bytes": 7896484,
+      "sha256": "01994475ace54cef05c4f279be9e489a6b23688a3851a41286b28a53457038be"
+    }
+  },
+  "paper_v16": {
+    "final": {
+      "path": "paper_v16/fawkes_trainer_jepa_entity_note_v16_260615.pt",
+      "bytes": 5204898,
+      "sha256": "fc8c494afcde681a6cac9846ac9b76f936b493b1a360924ae847c5f0214166ff"
+    }
+  },
+  "data": {
+    "path": "../data/fawkes_1k_patients/fawkes_1k_patients_graphs_260615.jsonl",
+    "bytes": 5420960,
+    "sha256": "d343446917cb9d18ffc7e3de182ed8fbb27925af130714361d186e6c4c9719ab"
+  },
+  "paper": {
+    "path": "../paper/clinical_jepa.pdf",
+    "bytes": 425141,
+    "sha256": "eaeb3a637b7c30a755a704f26dfd9ebf265a0028511b3cb3a2b47af02d0b997f",
+    "openreview": "https://openreview.net/forum?id=HXsMPubPqE"
+  }
+}

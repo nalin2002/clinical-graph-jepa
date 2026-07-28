@@ -1,0 +1,14 @@
+.cache/
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+outputs/
+wandb/
+
+# --- MIMIC-IV / PhysioNet DUA-covered artifacts (see docs/DATA.md "Privacy") ---
+# Not redistributable without confirming applicable permissions.
+data/**/*.jsonl
+*.pt
+*.npz
+*.egg-info/
