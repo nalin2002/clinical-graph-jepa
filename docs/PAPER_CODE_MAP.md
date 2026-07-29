@@ -73,7 +73,9 @@ faithfully exercises all three released checkpoints — `fawkes-eval` on it
 reproduces the metrics stored inside the released checkpoint exactly.
 
 The 400-record raw JSONL whose checksum `models/MANIFEST.json` records
-(`data/fawkes_1k_patients/`) is not present in this working tree. It has no note
-embeddings, so it could faithfully exercise only the no-note variant and
-`fawkes` Option A. Running a note model on zero-filled vectors is structurally
-possible but is not a faithful reproduction of a note-augmented checkpoint.
+(`data/fawkes_1k_patients/`) is not present in this working tree and is not
+recoverable from its source. It had no note embeddings, so it could faithfully
+exercise only the no-note variant and `fawkes` Option A. Running a note model on
+zero-filled vectors is structurally possible but is not a faithful reproduction
+of a note-augmented checkpoint — which is why `--jsonl-path` now defaults to the
+embedded dataset, whose note embeddings make both variants faithful.

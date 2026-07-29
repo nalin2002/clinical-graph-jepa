@@ -448,7 +448,8 @@ nodes and 267,952 edges, every record carrying note text, a 768-dimensional
 | Fawkes entity-note (the paper) | Yes — reproduces the published metrics exactly |
 
 `models/MANIFEST.json` also records a checksum for a 400-record raw JSONL
-(`data/fawkes_1k_patients/`) that is **not** present here. See
+(`data/fawkes_1k_patients/`) that is **not** present here and is not recoverable
+from its source. `--jsonl-path` defaults to the embedded dataset instead. See
 [the data contract](docs/DATA.md).
 
 ### Three reproducibility facts worth knowing before you debug

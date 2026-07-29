@@ -19,11 +19,10 @@ ROOT = Path(__file__).resolve().parents[1]
 CKPT = ROOT / "models"
 BASELINE = ROOT / "baseline"
 
-# The 4,000-record embedded dataset. Note this is NOT the file that
-# clinical_jepa/train/loop.py defaults --jsonl-path to; that one
-# (data/fawkes_1k_patients/...) is absent from the working tree. Only the
-# fawkes/paper lineage reads this; the clinical_jepa gates use seeded synthetic
-# graphs and need no data file at all.
+# The 4,000-record embedded dataset. Both lineages now read it: the fawkes gates
+# use it directly, and it is what clinical_jepa/train/loop.py defaults
+# --jsonl-path to. The clinical_jepa gates themselves use seeded synthetic graphs
+# and need no data file at all.
 DATA = ROOT / "data/fawkes-training-graph-embedded-260615/fawkes_training_graph_full_embedded_260615.jsonl"
 
 requires_checkpoints = pytest.mark.skipif(

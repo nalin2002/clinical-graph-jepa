@@ -441,8 +441,11 @@ def add_data_args(p: argparse.ArgumentParser) -> None:
                    help="Limit number of adapted MIMIC sub-KGs loaded for training/smoke tests.")
     p.add_argument(
         "--jsonl-path",
-        default="data/fawkes_1k_patients/fawkes_1k_patients_graphs_260615.jsonl",
-        help="One clinical graph JSON object per line.",
+        default="data/fawkes-training-graph-embedded-260615/fawkes_training_graph_full_embedded_260615.jsonl",
+        help="One clinical graph JSON object per line. Defaults to the embedded "
+             "training dataset present in this repository (4,000 MIMIC "
+             "admissions, ~1.5s to load). This is NOT the fawkes_1k_patients "
+             "file the default named before; see docs/DATA.md.",
     )
     p.add_argument(
         "--jsonl-limit",

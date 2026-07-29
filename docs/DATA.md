@@ -60,13 +60,25 @@ It contains graph topology but no note text, note embeddings, or
 evidence-score vectors, so it can faithfully exercise only the no-note model and
 `fawkes` Option A.
 
-> [!WARNING]
-> `--jsonl-path` still defaults to this absent file. A bare `--data jsonl` run
-> therefore fails with a "JSONL graph file not found" error rather than silently
-> reading something else. Pass `--jsonl-path` explicitly. The default was left
-> pointing at the absent file deliberately: repointing it at the embedded
-> dataset would silently change which dataset an unqualified run reads, and the
-> two are different datasets.
+**It is not recoverable from that repository.** The Hugging Face dataset holds a
+file of the same name whose sha256 is `967ad6cc…` at 22,155,648 bytes — a
+different artifact, four times the size. The manifest entry is retained as the
+only record of the original, not as an invitation to fetch a substitute.
+
+> [!IMPORTANT]
+> `--jsonl-path` **used to default to this absent file** and now defaults to the
+> embedded dataset above. A bare `--data jsonl` therefore reads 4,000 MIMIC
+> admissions (~1.5 s, ~680 MB peak) instead of failing with "JSONL graph file
+> not found".
+>
+> These are **different datasets**, so any recorded result that predates this
+> change and does not name its `--jsonl-path` is ambiguous. Nothing in
+> `baseline/` is affected — every `clinical_jepa` gate uses seeded synthetic
+> graphs and reads no data file at all.
+>
+> The embedded dataset carries note text, 768-d note embeddings and
+> `labels.prov_in_note`, so unlike the file it replaces it can faithfully
+> exercise the localized-note variant as well as the no-note one.
 
 ## Compatibility
 
