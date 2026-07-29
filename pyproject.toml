@@ -27,4 +27,5 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["src", "old_src"]   # old_src removed in Phase 8
 addopts = "-q"
