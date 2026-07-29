@@ -156,7 +156,6 @@ gates on `state_dict` key-set equality against `baseline/*_keys.json`.
 | `models/v5_without_note/` | `models/clinical-jepa-no-note/` |
 | `models/v6_with_note/` | `models/clinical-jepa-localized-note/` |
 | `models/paper_v16/` | `models/fawkes-entity-note/` |
-| — | `models/fawkes-loo-baseline/` (benchmark input, not a released artifact) |
 | `config_v5.json`, `config_v6.json` | `config.json` (the directory already scopes it) |
 | `config_v5_pretrain.json`, `config_v6_pretrain.json` | `config_pretrain.json` |
 
@@ -168,8 +167,9 @@ legitimate provenance. Keeping the names also keeps every `sha256` in
 provably content-neutral. New checkpoints written by the new code use the naming
 convention in plan §5.3.
 
-These directory renames happen in Phase 7. Until then the old names are still on
-disk.
+These directory renames landed in Phase 7. `models/fawkes-loo-baseline/`, which
+plan §4.4 also listed, was **not** created: the v12 checkpoint it was to hold is
+no longer used by anything (see "the v12 LOO baseline" below).
 
 ---
 
@@ -185,7 +185,7 @@ served: the old three-way comparison's first arm had no weights to load.
 
 Phase 6b resolved that by substitution rather than by consolidation. **The
 baseline arm of `benchmarks/vs_fawkes.py` is now the v16 paper checkpoint**
-(`models/paper_v16/`, whose behaviour Phase 0 pinned exactly), loaded through
+(`models/fawkes-entity-note/`, whose behaviour Phase 0 pinned exactly), loaded through
 `fawkes` itself. `LooEncoder`, `LooDistMult`, `LooMLPScorer` and their `LOO_*`
 vocabularies are therefore deleted rather than ported — roughly 200 lines, and
 §2.3's third copy of the paper-lineage architecture. §7.1's outcome (one copy of
@@ -211,12 +211,12 @@ edge pruning, so each arm now runs its own pipeline over the same admissions and
 the comparison aligns on relation name only, with per-arm counts. See the
 `benchmarks/vs_fawkes.py` docstring for the measured population difference.
 
-### `models/paper_v16/`'s checkpoint hash differs from the manifest
+### The paper checkpoint hash differed from the manifest — corrected in Phase 7
 
-`MANIFEST.json` records sha256 `fc8c494a…` for
+`MANIFEST.json` recorded sha256 `fc8c494a…` for
 `fawkes_trainer_jepa_entity_note_v16_260615.pt`. The file on disk hashes
-`6c21abb2…`. The byte count matches the manifest exactly (5,204,898), and all
-four v5/v6 hashes match, so the manifest is not generally stale.
+`6c21abb2…`. The byte count matched the manifest exactly (5,204,898), and all
+four v5/v6 hashes matched, so the manifest was not generally stale.
 
 **Phase 0 established empirically that the file on disk is nonetheless the
 published artifact.** Re-running the trainer's test-split evaluation reproduces
@@ -225,6 +225,10 @@ all four metrics, with `n=8283` matching. The hash difference is a `torch.save`
 re-serialization, not different weights. See `baseline/README.md` for the
 invocation and `baseline/paper_loo_testsplit.json` for the numbers.
 
-`MANIFEST.json` is deliberately not corrected before Phase 7 — editing it earlier
-would destroy the evidence that this discrepancy was investigated rather than
-overlooked.
+`MANIFEST.json` was deliberately left uncorrected until Phase 7 — editing it
+earlier would have destroyed the evidence that this discrepancy was investigated
+rather than overlooked. **Phase 7 recorded the real hash** and kept the
+superseded value alongside it under `sha256_superseded`, with a `note` field
+pointing at the evidence, so the correction is auditable rather than silent.
+`tests/test_model_artifacts.py` pins both the corrected value and the retained
+evidence trail.

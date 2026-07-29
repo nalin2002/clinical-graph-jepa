@@ -11,10 +11,10 @@ not be installed. A package that does not exist yet is skipped, not failed —
 but ``test_scan_covers_every_module_under_src`` makes sure the suite cannot go
 green by quietly scanning nothing.
 
-This replaces ``scripts/smoke_check.py::check_independence`` and
+This replaced ``scripts/smoke_check.py::check_independence`` and
 ``test_suite.py::test_v5_v6_have_no_historical_package_imports``, which both
-walk for ``graph_jepa_v2/v3/v4`` — packages that do not exist in this
-repository, so they enforce nothing. Phase 7 deletes them.
+walked for ``graph_jepa_v2/v3/v4`` — packages that do not exist in this
+repository, so they enforced nothing. Phase 7 deleted both.
 """
 
 from __future__ import annotations

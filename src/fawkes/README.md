@@ -11,7 +11,7 @@ Paper references: [local PDF](../../paper/clinical_jepa.pdf),
 [paper-to-code map](../../docs/PAPER_CODE_MAP.md). For the beginner-oriented
 walkthrough of hashed entities, demographic/note input, the GNN, JEPA, DistMult
 and the evaluations, read the
-[full model guide](../../models/paper_v16/README.md).
+[full model guide](../../models/fawkes-entity-note/README.md).
 
 Was `paper_v16`. The v16 (260615) entity-grounded-note experiment: a JEPA world
 model over per-admission clinical knowledge graphs, with the Clinical-ModernBERT
@@ -39,9 +39,18 @@ names, defaults and parsing rules are unchanged, so the documented invocations
 still work exactly as before:
 
 ```bash
-USE_NOTE=1 GROUND_BY=prov EMBED_DIM=768 USE_SCORES=0 PRUNE_NO_EVIDENCE=1 \
-  python -m fawkes.train
+USE_NOTE=1 GROUND_BY=prov EMBED_DIM=768 USE_SCORES=0 PRUNE_NO_EVIDENCE=1 PUSH=0 \
+  fawkes-train
 ```
+
+> [!CAUTION]
+> `fawkes-train` accepts **no command-line options** — the experiment is
+> configured from the environment. `--help` prints usage and exits without
+> training, and an unrecognized flag is an error; both are guarded by
+> `build_arg_parser`. A **bare `fawkes-train` begins a full training run**, and
+> `PUSH` defaults to `1`, so on completion it uploads the checkpoint to the
+> Hugging Face repository named by `OUTPUT_REPO`. Set `PUSH=0` unless you intend
+> to publish.
 
 and so does building a config directly, which the env-global version could not do:
 
@@ -60,8 +69,8 @@ Importing this package reads no environment variables and has no side effects;
 
 ```bash
 USE_NOTE=1 GROUND_BY=prov EMBED_DIM=768 USE_SCORES=0 PRUNE_NO_EVIDENCE=1 \
-  python -m fawkes.evaluate \
-    --checkpoint models/paper_v16/fawkes_trainer_jepa_entity_note_v16_260615.pt \
+  fawkes-eval \
+    --checkpoint models/fawkes-entity-note/fawkes_trainer_jepa_entity_note_v16_260615.pt \
     --data data/fawkes-training-graph-embedded-260615/fawkes_training_graph_full_embedded_260615.jsonl \
     --device cpu
 ```

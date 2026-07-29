@@ -16,16 +16,18 @@ of a graph and learns a latent patient-state representation that helps recover a
 missing region or edge. The repository contains two implementation lineages:
 
 ```text
-modular lineage:       v5 without notes -> v6 with localized notes
-standalone lineage:    paper entity-note v16
+clinical_jepa lineage:  no-note variant  ->  localized-note variant
+fawkes lineage:         entity-note (the paper implementation)
 ```
 
-The standalone `v16` number is not later than modular `v6` in one shared version
-sequence.
+These are two lineages, not one sequence. `fawkes` is **the paper
+implementation**; `clinical_jepa` is not. The two `clinical_jepa` variants are
+one class under one config flag, not two models. `docs/LINEAGE.md` records why
+the old `v5`/`v6`/`v16` numbers were never a release history.
 
 ## Input comparison
 
-| Input component | Raw v5 | Modular v6 | Paper-v16 |
+| Input component | Clinical-JEPA, no note | Clinical-JEPA, localized note | Fawkes entity-note |
 | --- | --- | --- | --- |
 | Typed nodes and relations | Yes | Yes | Yes |
 | Entity text encoder | Frozen SapBERT | Frozen SapBERT | None |
@@ -43,7 +45,7 @@ note and assigns the note vector to their endpoints. Ungrounded nodes receive a
 zero vector of the same size. This preserves fixed tensor shapes while telling
 the model where narrative context is relevant.
 
-## Modular v5/v6 pipeline
+## The `clinical_jepa` pipeline
 
 ```mermaid
 flowchart LR
@@ -90,14 +92,17 @@ hard alternatives. Typed-invalid edges are blocked from message passing.
 The sole input-architecture difference is:
 
 ```text
-v5: SapBERT 768
-v6: SapBERT 768 + localized note 768 = 1536
+no note:        SapBERT 768
+localized note: SapBERT 768 + localized note 768 = 1536
 ```
 
-The released runs also use different fine-tuning durations: 90 epochs for v5
-and 50 for v6.
+Everything else is shared: the two released checkpoints have identical
+`state_dict` key sets, differing only in the input width of
+`context_node_encoder.input_proj` and `target_node_encoder.input_proj`. The
+released runs also use different fine-tuning durations: 90 epochs without notes
+and 50 with them.
 
-## Standalone paper-v16 pipeline
+## The `fawkes` pipeline (the paper implementation)
 
 ```mermaid
 flowchart LR
@@ -111,7 +116,7 @@ flowchart LR
     D --> L["InfoNCE with 8 same-type negatives"]
 ```
 
-Paper-v16 builds a learned type vector, a learned hashed-entity vector, and a
+`fawkes` builds a learned type vector, a learned hashed-entity vector, and a
 projected demographic/note vector for each node. These three 128-dimensional
 terms are added. Two four-head `TransformerConv` layers produce node latents.
 
@@ -127,9 +132,10 @@ the paper receive triple weight.
 
 ## Where to continue
 
-- [Raw v5: complete walkthrough](../models/v5_without_note/README.md)
-- [Modular v6: complete walkthrough](../models/v6_with_note/README.md)
-- [Paper-v16: complete walkthrough](../models/paper_v16/README.md)
+- [Clinical-JEPA without notes: complete walkthrough](../models/clinical-jepa-no-note/README.md)
+- [Clinical-JEPA with localized notes: complete walkthrough](../models/clinical-jepa-localized-note/README.md)
+- [Fawkes entity-note (the paper): complete walkthrough](../models/fawkes-entity-note/README.md)
+- [Lineage: old names to new names](LINEAGE.md)
 - [Data contract](DATA.md)
 - [Evaluation definitions](EVALUATION.md)
 - [Paper-to-code map](PAPER_CODE_MAP.md)

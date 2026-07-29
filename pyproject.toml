@@ -3,9 +3,9 @@ requires = ["setuptools>=69", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "fawkes-three-model-suite"
+name = "clinical-graph-jepa"
 version = "0.1.0"
-description = "Self-contained Graph-JEPA v5, Graph-JEPA v6, and paper-v16 implementations"
+description = "Clinical Graph-JEPA: the paper implementation (fawkes), the modular graph-revision pipeline (clinical_jepa), and their cross-lineage benchmarks"
 requires-python = ">=3.10"
 dependencies = [
   "huggingface-hub>=0.25",
@@ -21,6 +21,21 @@ dependencies = [
 bge = ["FlagEmbedding>=1.3"]
 tracking = ["wandb>=0.17"]
 test = ["pytest>=8"]
+# Imported by benchmarks/llm_ranker.py and benchmarks/vs_llm.py; previously
+# undeclared (plan section 2.7).
+llm = ["openai>=1.0", "python-dotenv>=1.0"]
+
+[project.scripts]
+# clinical-jepa-train is the fine-tuning stage, which produces the released
+# final checkpoints. Masked pretraining is the separate first stage and is run
+# as `python -m clinical_jepa.train.pretrain`.
+clinical-jepa-train = "clinical_jepa.train.finetune:main"
+clinical-jepa-eval = "clinical_jepa.evaluate:main"
+clinical-jepa-score = "clinical_jepa.score:main"
+fawkes-train = "fawkes.train:main"
+fawkes-eval = "fawkes.evaluate:main"
+benchmark-vs-llm = "benchmarks.vs_llm:main"
+benchmark-vs-fawkes = "benchmarks.vs_fawkes:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

@@ -9,7 +9,7 @@ The old script's first arm was a Hugging Face LOO baseline
 / ``LooDistMult`` / ``LooMLPScorer`` — plan §2.3's third copy of the
 paper-lineage architecture, living inside the modular packages. That checkpoint
 is not present in this repository and is not being obtained, so the arm could
-never run. ``models/paper_v16/`` *is* present and its behaviour is pinned
+never run. ``models/fawkes-entity-note/`` *is* present and its behaviour is pinned
 exactly by Phase 0, so the baseline arm is now ``fawkes`` itself and the
 comparison has a numeric gate it never had before. The three classes and their
 ``LOO_*`` vocabularies are deleted; plan §7.1 lands by this route rather than by
@@ -115,9 +115,9 @@ DEFAULT_DATA = (
     "fawkes_training_graph_full_embedded_260615.jsonl"
 )
 DEFAULT_FAWKES_CHECKPOINT = (
-    "models/paper_v16/fawkes_trainer_jepa_entity_note_v16_260615.pt"
+    "models/fawkes-entity-note/fawkes_trainer_jepa_entity_note_v16_260615.pt"
 )
-DEFAULT_CHECKPOINT = "models/v6_with_note/graph_jepa_v6.pt"
+DEFAULT_CHECKPOINT = "models/clinical-jepa-localized-note/graph_jepa_v6.pt"
 
 
 def paper_test_split(raw: list, demographics: dict, cfg: Config) -> tuple[list, list[int]]:

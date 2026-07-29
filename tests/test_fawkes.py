@@ -34,7 +34,7 @@ from fawkes.evaluate import (_load_graphs, cascade_evaluate, eir_uplift_eval, ev
 from fawkes.model import JEPA, DistMult, Encoder
 from fawkes.train import jepa_step, readout_step
 
-PAPER_CKPT = ROOT / "models/paper_v16/fawkes_trainer_jepa_entity_note_v16_260615.pt"
+PAPER_CKPT = ROOT / "models/fawkes-entity-note/fawkes_trainer_jepa_entity_note_v16_260615.pt"
 FAWKES_SRC = ROOT / "src/fawkes"
 
 requires_paper_checkpoint = pytest.mark.skipif(

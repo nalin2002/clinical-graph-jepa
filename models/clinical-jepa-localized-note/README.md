@@ -1,23 +1,29 @@
-# MIMIC Graph-JEPA v6 with entity-grounded notes
+# Clinical-JEPA with entity-localized notes
 
-v6 is the note-augmented version of the modular patch-based model. Its graph
-encoder, patch construction, JEPA objective, and revision heads are inherited
-from v5. The controlled architectural change is the node input: v6 concatenates
-a localized Clinical-ModernBERT note vector to each SapBERT entity vector.
+This is the note-augmented setting of the modular patch-based model. Its graph
+encoder, patch construction, JEPA objective, and revision heads are identical to
+the no-note variant — the two are one class under one config flag. The
+controlled architectural change is the node input: this variant concatenates a
+localized Clinical-ModernBERT note vector to each SapBERT entity vector.
+
+This is **not** the paper implementation — see
+[`models/fawkes-entity-note/`](../fawkes-entity-note/README.md) for that. Both
+localize a note vector onto grounded entities, but they are different
+architectures from different lineages.
 
 ## When to use this model
 
-Use v6 when:
+Use the localized-note variant when:
 
 - you have one 768-dimensional note embedding per admission;
 - your edges identify which entities are supported by that note;
 - you want note context in the modular patch-based architecture; or
-- you want a direct architectural comparison with raw v5.
+- you want a direct architectural comparison with the no-note variant.
 
-Do not use the released v6 checkpoint for a faithful experiment if your JSONL
-does not contain note embeddings and provenance. Missing vectors are replaced
-with zeros so the code can run, but that is not the data distribution on which
-the checkpoint was trained.
+Do not use this checkpoint for a faithful experiment if your JSONL does not
+contain note embeddings and provenance. Missing vectors are replaced with zeros
+so the code can run, but that is not the data distribution on which the
+checkpoint was trained.
 
 ## Artifacts
 
@@ -25,20 +31,27 @@ the checkpoint was trained.
 | --- | --- |
 | `graph_jepa_v6_pretrain.pt` | Model after masked patch pretraining |
 | `graph_jepa_v6.pt` | Final model after revision and ranking fine-tuning |
-| `config_v6_pretrain.json` | Exact pretraining architecture/configuration |
-| `config_v6.json` | Exact final checkpoint configuration |
+| `config_pretrain.json` | Exact pretraining architecture/configuration |
+| `config.json` | Exact final checkpoint configuration |
 
-Implementation entry points:
+The checkpoint filenames keep the names they were released under; only the
+directory was renamed. That is what makes `models/MANIFEST.json`'s checksums
+byte-stable across the rename.
 
-- `src/graph_jepa_v6/data.py` - note localization and edge metadata
-- `src/graph_jepa_v6/pretrain.py`
-- `src/graph_jepa_v6/finetune.py`
-- `src/graph_jepa_v6/evaluate.py`
-- `src/graph_jepa_v6/score.py`
+Implementation entry points — one set of modules serves both variants, and which
+one you get is read from the checkpoint's own config:
+
+| Module | Console script |
+| --- | --- |
+| `src/clinical_jepa/graph/tensors.py` | — (note localization and edge metadata) |
+| `src/clinical_jepa/train/pretrain.py` | — (`python -m clinical_jepa.train.pretrain`) |
+| `src/clinical_jepa/train/finetune.py` | `clinical-jepa-train` |
+| `src/clinical_jepa/evaluate.py` | `clinical-jepa-eval` |
+| `src/clinical_jepa/score.py` | `clinical-jepa-score` |
 
 ## Required input record
 
-v6 starts from the same typed nodes and edges as v5, then expects two additional
+This variant starts from the same typed nodes and edges as the no-note one, then expects two additional
 pieces of information:
 
 ```json
@@ -63,7 +76,7 @@ pieces of information:
   `note_ground_by="prov"` setting, both endpoints of every marked edge receive
   the admission note vector.
 
-The note text itself is not encoded during v6 training. The model consumes the
+The note text itself is not encoded during training. The model consumes the
 already-computed vector in the JSONL.
 
 ## Entity-localized note input
@@ -79,7 +92,7 @@ note_i = admission_note_embedding                  # 768 values, if grounded
 x_i = concat(entity_i, note_i)                     # 1536 values
 ```
 
-This is why v6 has `in_dim=1536` and `base_in_dim=768`. The note is not a second
+This is why this variant has `in_dim=1536` and `base_in_dim=768`. The note is not a second
 graph node and there is no `HAS_NOTE` edge. Localizing the vector prevents every
 entity in a large admission graph from receiving the same diffuse context.
 
@@ -125,7 +138,7 @@ flowchart LR
     H --> I["JEPA + revision + ranking"]
 ```
 
-After the widened input projection, v6 is structurally the same as v5:
+After the widened input projection, this variant is structurally identical to the no-note one:
 
 - two relation-aware GINE layers;
 - 160-dimensional node and patch latents;
@@ -163,11 +176,11 @@ The final checkpoint uses:
   microbiology entries.
 
 The shorter 50-epoch fine-tuning schedule is one checkpoint difference from
-v5's 90 epochs; note localization is not the only training-run difference.
+the no-note variant's 90 epochs; note localization is not the only training-run difference.
 
 ## What the model returns
 
-For an edge candidate `(source, relation, target)`, v6 combines the two
+For an edge candidate `(source, relation, target)`, the model combines the two
 160-dimensional node latents with a learned relation vector and produces an
 edge logit. The scoring workflow can:
 
@@ -179,20 +192,24 @@ edge logit. The scoring workflow can:
 ## Evaluate the released checkpoint
 
 ```bash
-uv run python -m graph_jepa_v6.evaluate \
-  --checkpoint models/v6_with_note/graph_jepa_v6.pt \
+clinical-jepa-eval \
+  --checkpoint models/clinical-jepa-localized-note/graph_jepa_v6.pt \
   --data jsonl \
-  --jsonl-path /path/to/fawkes_training_graph_full_embedded_260615.jsonl \
+  --jsonl-path data/fawkes-training-graph-embedded-260615/fawkes_training_graph_full_embedded_260615.jsonl \
+  --jsonl-limit 50 \
   --candidate-mode schema \
+  --cap 2000 \
   --device cpu \
-  --output outputs/v6_loo.json
+  --output outputs/localized_note_loo.json
 ```
+
+Drop `--jsonl-limit` and raise `--cap` for a full run.
 
 Before running, audit the file:
 
 ```bash
-uv run python scripts/audit_data.py \
-  --path /path/to/fawkes_training_graph_full_embedded_260615.jsonl
+python scripts/audit_data.py \
+  --path data/fawkes-training-graph-embedded-260615/fawkes_training_graph_full_embedded_260615.jsonl
 ```
 
 Confirm that records contain `note_embedding` and edges contain provenance
@@ -201,9 +218,9 @@ labels; a successful parser run alone does not establish faithful compatibility.
 ## Reproduce training
 
 ```bash
-uv run python -m graph_jepa_v6.pretrain \
+python -m clinical_jepa.train.pretrain \
   --data jsonl \
-  --jsonl-path /path/to/fawkes_training_graph_full_embedded_260615.jsonl \
+  --jsonl-path data/fawkes-training-graph-embedded-260615/fawkes_training_graph_full_embedded_260615.jsonl \
   --encoder sapbert \
   --note-embedding-dim 768 \
   --note-ground-by prov \
@@ -211,29 +228,33 @@ uv run python -m graph_jepa_v6.pretrain \
   --lr 0.0008 \
   --batch_size 16 \
   --device cuda \
-  --out outputs/v6_retrained
+  --out outputs/localized_note_retrained
 
-uv run python -m graph_jepa_v6.finetune \
-  --checkpoint outputs/v6_retrained/graph_jepa_v6_pretrain.pt \
+clinical-jepa-train \
+  --checkpoint outputs/localized_note_retrained/clinical_jepa_note_pretrain.pt \
   --data jsonl \
-  --jsonl-path /path/to/fawkes_training_graph_full_embedded_260615.jsonl \
+  --jsonl-path data/fawkes-training-graph-embedded-260615/fawkes_training_graph_full_embedded_260615.jsonl \
   --epochs 50 \
   --llm-confidence-negatives \
   --clinical-artifact-filters \
   --llm-negative-weight 0.6 \
   --device cuda \
-  --out outputs/v6_retrained
+  --out outputs/localized_note_retrained
 ```
 
-## v6 versus the other two models
+Checkpoints written by the current code are named from the variant, so
+pretraining produces `clinical_jepa_note_pretrain.pt` and fine-tuning produces
+`clinical_jepa_note.pt`, alongside `config_pretrain.json` and `config.json`.
+
+## This variant versus the other two models
 
 | Question | Answer |
 | --- | --- |
-| Is v6 simply v5 plus notes? | Architecturally yes after input construction, but the released fine-tuning schedule also differs. |
-| Does v6 use hashed entities? | No. Entity semantics come from frozen SapBERT. |
-| Is v6 the standalone paper-v16 checkpoint? | No. v6 uses patch-level GINE/transformer JEPA and a modular edge head. |
-| Can the packaged raw JSONL reproduce v6? | No. It has no note embeddings or provenance labels. |
+| Is this simply the no-note variant plus notes? | Architecturally yes after input construction, but the released fine-tuning schedule also differs. |
+| Does it use hashed entities? | No. Entity semantics come from frozen SapBERT. |
+| Is this the paper checkpoint? | No. The paper model is `fawkes`. This variant uses patch-level GINE/transformer JEPA and a modular edge head. |
+| Can the 400-record raw JSONL reproduce it? | No. That file has no note embeddings or provenance labels — and it is not present in this working tree. |
 
-Read [v5](../v5_without_note/README.md) for the shared modular architecture and
-[paper-v16](../paper_v16/README.md) for the separate TransformerConv/DistMult
-implementation.
+Read the [no-note variant](../clinical-jepa-no-note/README.md) for the shared
+architecture and [`fawkes`](../fawkes-entity-note/README.md) for the separate
+TransformerConv/DistMult implementation behind the paper.

@@ -59,9 +59,9 @@ from graph_jepa_v6.config import Config as OldV6Config
 from graph_jepa_v6.model import GraphJEPAv6
 from graph_jepa_v6 import score as old_v6_score
 
-# Phase 7 renames these directories; the checkpoint filenames do not change.
-V5_CHECKPOINT = CKPT / "v5_without_note/graph_jepa_v5.pt"
-V6_CHECKPOINT = CKPT / "v6_with_note/graph_jepa_v6.pt"
+# Phase 7 renamed these directories; the checkpoint filenames did not change.
+V5_CHECKPOINT = CKPT / "clinical-jepa-no-note/graph_jepa_v5.pt"
+V6_CHECKPOINT = CKPT / "clinical-jepa-localized-note/graph_jepa_v6.pt"
 
 SEED = 20260729
 

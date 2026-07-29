@@ -12,6 +12,7 @@ full version history that used to sit at the top of that file.
 
 from __future__ import annotations
 
+import argparse
 import copy
 import logging
 import math
@@ -175,7 +176,40 @@ def readout_step(enc, scorer, b, device, train, cfg, gen=None, mask_ratio=None):
     return loss, pos.squeeze(1).detach(), neg[:, 0].detach(), (nt[pu] != 0).detach(), (h.detach(), pu, pv, pr, nt, bt, qsig)
 
 
-def main():
+def build_arg_parser() -> argparse.ArgumentParser:
+    """A parser that accepts no options, only so ``--help`` cannot train.
+
+    This experiment is configured entirely from the environment — see
+    :meth:`Config.from_env` — so there are deliberately no flags to add. The
+    parser exists because ``main`` previously took no ``argv`` and ran
+    unconditionally, which meant ``fawkes-train --help`` completed a full
+    training run and, with ``PUSH=1``, uploaded the result. Parsing first makes
+    ``--help`` print usage and exit, and makes an unrecognized flag an error
+    instead of a 3-minute surprise.
+    """
+    return argparse.ArgumentParser(
+        prog="fawkes-train",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description="Train the fawkes entity-note Graph-JEPA (the paper implementation).",
+        epilog=(
+            "Takes no arguments. Configuration comes from environment variables;\n"
+            "Config.from_env in fawkes/config.py is the full list. Typical run:\n"
+            "\n"
+            "  USE_NOTE=1 GROUND_BY=prov EMBED_DIM=768 USE_SCORES=0 \\\n"
+            "    PRUNE_NO_EVIDENCE=1 PUSH=0 fawkes-train\n"
+            "\n"
+            "CAUTION: a bare `fawkes-train` runs the full two-phase training and,\n"
+            "because PUSH defaults to 1, uploads the checkpoint to OUTPUT_REPO on\n"
+            "Hugging Face. Set PUSH=0 to keep it local."
+        ),
+    )
+
+
+def main(argv=None):
+    # Parse before anything else: this is the guard that keeps --help and typos
+    # from starting a training run. See build_arg_parser.
+    build_arg_parser().parse_args(argv)
+
     # Deferred: evaluate.py imports readout_step/buckets/same_type_k from this
     # module, so importing it at module scope would be circular.
     from .evaluate import cascade_evaluate, eir_uplift_eval, evaluate, loo_evaluate

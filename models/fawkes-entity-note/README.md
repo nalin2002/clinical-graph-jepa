@@ -1,9 +1,10 @@
-# Paper entity-note v16
+# Fawkes entity-note — the paper model
 
-This is the standalone experiment implementation packaged from
-`fawkes_trainer_jepa_entity_note_v16_wmatbooth_260723.py`. It is the closest
-code path to the entity-localized note experiment and reported checkpoint in
-the paper.
+**This is the implementation behind the paper.** It is packaged from
+`fawkes_trainer_jepa_entity_note_v16_wmatbooth_260723.py` and is the closest
+code path to the entity-localized note experiment and reported checkpoint in the
+paper. The sibling `clinical_jepa` package is *not* the paper implementation,
+despite the repository name.
 
 Read the [paper PDF](../../paper/clinical_jepa.pdf),
 [OpenReview record](https://openreview.net/forum?id=HXsMPubPqE), and
@@ -11,18 +12,19 @@ Read the [paper PDF](../../paper/clinical_jepa.pdf),
 
 ## Important naming clarification
 
-Paper-v16 and modular Graph-JEPA v6 are separate development lineages. The name
-`v16` is an experiment revision number, not evidence that this is a drop-in
-upgrade of modular v6. Their inputs, GNNs, pretraining units, readout heads, and
-checkpoint state dictionaries differ.
+`fawkes` and the `clinical_jepa` localized-note variant are separate development
+lineages. The historical name `v16` was an experiment revision number, not
+evidence that this is a drop-in upgrade of the modular `v6`. Their inputs, GNNs,
+pretraining units, readout heads, and checkpoint state dictionaries all differ.
+See [`docs/LINEAGE.md`](../../docs/LINEAGE.md).
 
 ## Artifact and exact saved configuration
 
 | Item | Released value |
 | --- | --- |
 | Checkpoint | `fawkes_trainer_jepa_entity_note_v16_260615.pt` |
-| Source | `src/paper_v16/trainer.py` |
-| Local evaluator | `src/paper_v16/evaluate.py` |
+| Source | `src/fawkes/{config,data,model,train}.py` |
+| Local evaluator | `src/fawkes/evaluate.py` (`fawkes-eval`) |
 | Hidden width | 128 |
 | GNN | 2 `TransformerConv` layers, 4 heads |
 | Note mode | Enabled, 768-d, grounded by provenance |
@@ -64,7 +66,7 @@ demographics, an optional note, and a precomputed note embedding:
 }
 ```
 
-Unlike v5/v6, paper-v16 does not call SapBERT when constructing nodes. It creates
+Unlike `clinical_jepa`, `fawkes` does not call SapBERT when constructing nodes. It creates
 three input channels and adds them after projecting them to the same hidden
 width.
 
@@ -74,7 +76,7 @@ width.
 
 Every node type has a trainable 128-dimensional lookup vector. The vocabulary
 includes patient, diagnosis, medication, microbiology, procedure, service, lab
-test, procurement, and a retained NOTE type. v16 localizes note vectors onto
+test, procurement, and a retained NOTE type. This model localizes note vectors onto
 existing entities, so it does not create a NOTE node during normal use.
 
 ### 2. Hashed entity representation
@@ -109,7 +111,7 @@ ungrounded entity: [6 demographics | 768 zeros]       = 774 values
 
 When `USE_NOTE=0`, `numfeat` contains only the six values. This exact code uses
 **774**, not 778, in note mode. It also does not append SapBERT, so 1536/1550 is
-not the standalone paper-v16 design.
+not this model's design.
 
 ### 4. Combining the channels
 
@@ -203,7 +205,7 @@ For each mini-batch, 40% of nodes become prediction targets:
 7. minimize cosine distance `2 - 2 * dot(prediction, target)`.
 
 The target encoder sees the complete graph but receives no gradients. It is
-updated only by EMA. This is node-level masking, whereas modular v5/v6 predict
+updated only by EMA. This is node-level masking, whereas `clinical_jepa` predicts
 balanced BFS patch latents.
 
 ## Phase 2: frozen edge-recovery readout
@@ -261,44 +263,61 @@ pass them explicitly:
 
 ```bash
 USE_NOTE=1 GROUND_BY=prov EMBED_DIM=768 USE_SCORES=0 PRUNE_NO_EVIDENCE=1 \
-uv run python -m paper_v16.evaluate \
-  --checkpoint models/paper_v16/fawkes_trainer_jepa_entity_note_v16_260615.pt \
-  --data /path/to/fawkes_training_graph_full_embedded_260615.jsonl \
+fawkes-eval \
+  --checkpoint models/fawkes-entity-note/fawkes_trainer_jepa_entity_note_v16_260615.pt \
+  --data data/fawkes-training-graph-embedded-260615/fawkes_training_graph_full_embedded_260615.jsonl \
   --device cpu \
-  --output outputs/paper_v16_loo.json
+  --output outputs/fawkes_loo.json
 ```
 
-The packaged raw JSONL cannot faithfully evaluate this note checkpoint because
-it contains neither note embeddings nor evidence/provenance label dictionaries.
+This reports MRR 0.440249 over 40,000 queries, reproducing
+`baseline/paper_loo.json`. **That is not the paper's reported number** — it is
+the whole 4,000-record file under the evaluator's own `>= 2` edge filter, with
+no split. The published number is MRR 0.418653 over n=8,283, on the seeded test
+split; see [`docs/EVALUATION.md`](../../docs/EVALUATION.md) and
+`baseline/reproduce_paper_testsplit.py`.
+
+The 400-record raw JSONL cannot faithfully evaluate this note checkpoint: it
+contains neither note embeddings nor evidence/provenance label dictionaries, and
+it is not present in this working tree.
 
 ## Retrain Option B with notes
 
 Set `PUSH=0` unless you deliberately want the script to upload its checkpoint:
 
 ```bash
-DATA_PATH=/path/to/fawkes_training_graph_full_embedded_260615.jsonl \
+DATA_PATH=data/fawkes-training-graph-embedded-260615/fawkes_training_graph_full_embedded_260615.jsonl \
 USE_NOTE=1 GROUND_BY=prov EMBED_DIM=768 \
 USE_SCORES=0 PRUNE_NO_EVIDENCE=1 PUSH=0 \
-uv run python -m paper_v16.trainer
+fawkes-train
 ```
+
+> [!CAUTION]
+> `fawkes-train` accepts **no command-line options**; the experiment is
+> configured from the environment. `--help` prints usage and exits without
+> training, but a bare `fawkes-train` starts training immediately. `PUSH`
+> defaults to `1`, which uploads the finished checkpoint to the Hugging Face
+> repository named by `OUTPUT_REPO`. `PUSH=0` above is load-bearing, not
+> decoration.
 
 ## Retrain Option A without notes
 
 The packaged data has no evidence vectors, so disable evidence pruning:
 
 ```bash
-DATA_PATH=data/fawkes_1k_patients/fawkes_1k_patients_graphs_260615.jsonl \
+DATA_PATH=data/fawkes-training-graph-embedded-260615/fawkes_training_graph_full_embedded_260615.jsonl \
 USE_NOTE=0 PRUNE_NO_EVIDENCE=0 PUSH=0 \
-uv run python -m paper_v16.trainer
+fawkes-train
 ```
 
-This executes the paper-v16 no-note architecture, but exact checkpoint
-reproduction still requires the original split/order and evidence-scored source
-dataset.
+This executes the no-note architecture, but exact checkpoint reproduction still
+requires the original split/order and evidence-scored source dataset. New
+checkpoints are written as `fawkes_entity_note.pt` or `fawkes_no_note.pt`,
+replacing the hardcoded release filename.
 
-## Paper-v16 versus modular v6
+## Fawkes versus the localized-note Clinical-JEPA variant
 
-| Component | Paper-v16 | Modular v6 |
+| Component | Fawkes (this model) | Clinical-JEPA, localized note |
 | --- | --- | --- |
 | Entity semantics | Learned MD5 hash bucket | Frozen SapBERT vector |
 | Note placement | In 774-d numeric branch | Concatenated with SapBERT to 1536-d |
@@ -306,4 +325,29 @@ dataset.
 | JEPA prediction unit | Individual masked node | Balanced BFS patch |
 | Latent width | 128 | 160 |
 | Readout | Frozen DistMult + InfoNCE | MLP edge head + revision/ranking losses |
-| Checkpoint compatibility | Only paper-v16 | Only modular v6 |
+| Checkpoint compatibility | Only `fawkes` | Only `clinical_jepa` |
+| Is it the paper? | **Yes** | No |
+
+## This checkpoint's SHA-256 was corrected in Phase 7
+
+`models/MANIFEST.json` recorded sha256 `fc8c494a…` for this checkpoint. The file
+on disk hashes `6c21abb2…`. **The manifest was wrong; the file is correct.**
+
+The evidence, established before the value was changed:
+
+- The byte count matched the manifest **exactly** (5,204,898), and all four
+  `clinical_jepa` checksums matched their files, so the manifest was not
+  generally stale — the discrepancy was specific to this one entry.
+- Re-running the trainer's test-split evaluation with this file reproduces the
+  metrics stored *inside* the checkpoint to a delta of exactly `0.000e+00` on
+  all four metrics, with `n=8283` matching. A file with different weights could
+  not do that. See `baseline/paper_loo_testsplit.json` and `baseline/README.md`
+  for the invocation.
+
+The conclusion is that the recorded hash came from a different `torch.save`
+re-serialization of the same weights, not from different weights. The manifest
+entry now records the real hash and retains the superseded one under
+`sha256_superseded`, so the correction stays auditable rather than silent.
+
+The discrepancy was deliberately left in place through Phases 0–6 as evidence
+that it had been investigated rather than overlooked.

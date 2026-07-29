@@ -25,12 +25,13 @@ from conftest import CKPT, assert_pyg_equal, assert_state_dict_equal, requires_c
 
 from clinical_jepa.config import Config, TrainConfig
 from clinical_jepa.encoders import MockEncoder
-from clinical_jepa.graph.builders import SyntheticGraphGenerator
+from clinical_jepa.graph.builders import JsonlGraphBuilder, SyntheticGraphGenerator
 from clinical_jepa.graph.patches import build_patch_data, sample_patch_task
 from clinical_jepa.graph.tensors import to_graph_data
 from clinical_jepa.model import GraphJEPA
 from clinical_jepa.schema import PatientGraph
 
+from fawkes_core.data import JsonlGraphBuilder as OldJsonlGraphBuilder
 from graph_jepa_v5 import data as old_v5_data
 from graph_jepa_v5.config import Config as OldV5Config
 from graph_jepa_v5.model import GraphJEPAv5 as OldGraphJEPAv5
@@ -38,13 +39,13 @@ from graph_jepa_v6 import data as old_v6_data
 from graph_jepa_v6.config import Config as OldV6Config
 from graph_jepa_v6.model import GraphJEPAv6 as OldGraphJEPAv6
 
-BASE_IN_DIM = 768  # models/v5_without_note/config_v5.json::model.in_dim
-NOTE_DIM = 768  # models/v6_with_note/config_v6.json::model.note_embedding_dim
+BASE_IN_DIM = 768  # models/clinical-jepa-no-note/config.json::model.in_dim
+NOTE_DIM = 768  # models/clinical-jepa-localized-note/config.json::model.note_embedding_dim
 
-V5_CONFIG = CKPT / "v5_without_note/config_v5.json"
-V6_CONFIG = CKPT / "v6_with_note/config_v6.json"
-V5_CHECKPOINT = CKPT / "v5_without_note/graph_jepa_v5.pt"
-V6_CHECKPOINT = CKPT / "v6_with_note/graph_jepa_v6.pt"
+V5_CONFIG = CKPT / "clinical-jepa-no-note/config.json"
+V6_CONFIG = CKPT / "clinical-jepa-localized-note/config.json"
+V5_CHECKPOINT = CKPT / "clinical-jepa-no-note/graph_jepa_v5.pt"
+V6_CHECKPOINT = CKPT / "clinical-jepa-localized-note/graph_jepa_v6.pt"
 BASELINE = Path(__file__).resolve().parents[1] / "baseline"
 
 # The four ModelConfig fields the v5 lineage never had. Plan section 2.1: these
@@ -135,7 +136,8 @@ def test_config_matches_old_v5_where_old_v5_could_read_it():
 
     v6's Config reads both sidecars; v5's reads only its own -- its ModelConfig
     has no ``base_in_dim``. So the merged class can only be compared against old
-    v5 on ``config_v5.json``, and there it agrees on every field v5 had. The
+    v5 on the no-note ``config.json``, and there it agrees on every field v5
+    had. The
     difference is exactly the four ModelConfig note fields, which is what plan
     section 2.1 predicts and nothing more.
     """
@@ -154,6 +156,51 @@ def test_config_matches_old_v5_where_old_v5_could_read_it():
 
     with pytest.raises(TypeError):
         OldV5Config.from_dict(json.loads(V6_CONFIG.read_text()))
+
+
+# --------------------------------------------------------------------------- #
+# The JSONL builder. Carried over from the pre-restructure ``test_suite.py``
+# (Phase 7 split it into per-module files) and strengthened into a differential:
+# the original only asserted the three metadata fields, which cannot notice the
+# builder dropping or reshaping anything else on the record.
+# --------------------------------------------------------------------------- #
+def test_jsonl_builder_preserves_graph_metadata(tmp_path):
+    """Admission metadata, the note vector and provenance labels survive the load.
+
+    These three are what the localized-note variant depends on: without
+    ``note_embedding`` in ``extra`` and ``prov_in_note`` on the edge, the note
+    vector has nothing to ground onto and the variant silently degrades to
+    all-zero note features.
+    """
+    path = tmp_path / "graphs.jsonl"
+    record = {
+        "subject_id": 7,
+        "note_embedding": [0.1, 0.2],
+        "nodes": [
+            {"id": "P", "type": "PATIENT", "name": "patient"},
+            {"id": "D", "type": "DIAGNOSIS", "name": "pneumonia"},
+        ],
+        "edges": [
+            {
+                "source": "P",
+                "target": "D",
+                "relation": "HAS_DIAGNOSIS",
+                "labels": {"prov_in_note": 1},
+            }
+        ],
+    }
+    path.write_text(json.dumps(record) + "\n", encoding="utf-8")
+
+    graph = JsonlGraphBuilder(path).build()[0]
+    assert graph.extra["subject_id"] == 7
+    assert graph.extra["note_embedding"] == [0.1, 0.2]
+    assert graph.edges[0]["labels"]["prov_in_note"] == 1
+
+    # ...and the whole record, against the builder this one replaces.
+    old = OldJsonlGraphBuilder(path).build()[0]
+    assert graph.nodes == old.nodes
+    assert graph.edges == old.edges
+    assert graph.extra == old.extra
 
 
 # --------------------------------------------------------------------------- #

@@ -626,8 +626,11 @@ def build_arg_parser() -> argparse.ArgumentParser:
     add_data_args(parser)
     # Plan section 5.2: defaults must point at files that exist. The old v5/v6
     # defaults were checkpoints/graph_jepa_v{5,6}.pt, a directory this
-    # repository has never contained. Phase 7 renames models/v6_with_note/.
-    parser.add_argument("--checkpoint", default="models/v6_with_note/graph_jepa_v6.pt")
+    # repository has never contained.
+    parser.add_argument(
+        "--checkpoint",
+        default="models/clinical-jepa-localized-note/graph_jepa_v6.pt",
+    )
     parser.add_argument("--encoder-cache", default=".cache/clinical_jepa/encoder")
     parser.add_argument("--device", default="cpu")
     parser.add_argument(

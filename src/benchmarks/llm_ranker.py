@@ -5,8 +5,8 @@ definitions were duplicated. The two copies are byte-identical over this region,
 so the dedup needed no reconciliation; the v6 copy was taken.
 
 This module imports no first-party code, and must not start to. It is the
-boundary-safe half of ``benchmarks``: ``vs_llm.py`` and ``vs_loo_baseline.py``
-will import both model lineages, this does not, so an LLM run can be exercised
+boundary-safe half of ``benchmarks``: ``vs_llm.py`` and ``vs_fawkes.py``
+import both model lineages, this does not, so an LLM run can be exercised
 without loading torch or either package.
 
 ``_load_dotenv_files`` and ``_api_key`` locate the repository root with

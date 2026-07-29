@@ -20,15 +20,14 @@ CKPT = ROOT / "models"
 BASELINE = ROOT / "baseline"
 
 # The 4,000-record embedded dataset. Note this is NOT the file that
-# fawkes_core/training.py:306 defaults --jsonl-path to; that one
+# clinical_jepa/train/loop.py defaults --jsonl-path to; that one
 # (data/fawkes_1k_patients/...) is absent from the working tree. Only the
 # fawkes/paper lineage reads this; the clinical_jepa gates use seeded synthetic
 # graphs and need no data file at all.
 DATA = ROOT / "data/fawkes-training-graph-embedded-260615/fawkes_training_graph_full_embedded_260615.jsonl"
 
-# Phase 7 renames these to clinical-jepa-no-note / clinical-jepa-localized-note.
 requires_checkpoints = pytest.mark.skipif(
-    not any((CKPT / "v5_without_note").glob("*.pt")),
+    not any((CKPT / "clinical-jepa-no-note").glob("*.pt")),
     reason="released checkpoints not present in the working tree",
 )
 

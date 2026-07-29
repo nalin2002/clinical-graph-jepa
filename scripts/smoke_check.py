@@ -1,63 +1,55 @@
 #!/usr/bin/env python3
-"""Load all three model architectures and their packaged checkpoints."""
+"""Load every packaged checkpoint and validate its input dimensions.
+
+The import-boundary guard that used to live here AST-walked
+``src/graph_jepa_v5`` and ``src/graph_jepa_v6`` for imports of
+``graph_jepa_v2/v3/v4`` -- packages this repository has never contained. After
+Phase 0 moved those directories to ``old_src/`` it scanned zero files and passed
+green regardless. ``tests/test_import_boundaries.py`` replaces it with a real
+boundary test that asserts on its own walked-file count.
+"""
 
 from __future__ import annotations
 
-import ast
 from pathlib import Path
 
 import torch
 
-from graph_jepa_v5.training import load_model_checkpoint as load_v5
-from graph_jepa_v6.training import load_model_checkpoint as load_v6
-from paper_v16 import trainer
+from clinical_jepa.train.loop import load_model_checkpoint
+from fawkes.config import Config as FawkesConfig
+from fawkes.model import DistMult, Encoder
 
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def check_independence() -> None:
-    forbidden = {"graph_jepa", "graph_jepa_v2", "graph_jepa_v3", "graph_jepa_v4"}
-    for package in (ROOT / "src/graph_jepa_v5", ROOT / "src/graph_jepa_v6"):
-        for path in package.glob("*.py"):
-            tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
-            for node in ast.walk(tree):
-                module = None
-                if isinstance(node, ast.ImportFrom):
-                    module = node.module
-                elif isinstance(node, ast.Import):
-                    for alias in node.names:
-                        if alias.name.split(".")[0] in forbidden:
-                            raise RuntimeError(f"Historical import {alias.name} in {path}")
-                if module and module.split(".")[0] in forbidden:
-                    raise RuntimeError(f"Historical import {module} in {path}")
-
-
 def main() -> None:
-    check_independence()
     device = torch.device("cpu")
-    v5, cfg5 = load_v5(
-        str(ROOT / "models/v5_without_note/graph_jepa_v5.pt"), device
+    no_note, cfg_no_note = load_model_checkpoint(
+        str(ROOT / "models/clinical-jepa-no-note/graph_jepa_v5.pt"), device
     )
-    v6, cfg6 = load_v6(
-        str(ROOT / "models/v6_with_note/graph_jepa_v6.pt"), device
+    localized_note, cfg_localized_note = load_model_checkpoint(
+        str(ROOT / "models/clinical-jepa-localized-note/graph_jepa_v6.pt"), device
     )
 
     checkpoint = torch.load(
-        ROOT / "models/paper_v16/fawkes_trainer_jepa_entity_note_v16_260615.pt",
+        ROOT / "models/fawkes-entity-note/fawkes_trainer_jepa_entity_note_v16_260615.pt",
         map_location=device,
         weights_only=False,
     )
-    paper_encoder = trainer.Encoder().to(device)
-    paper_scorer = trainer.DistMult().to(device)
-    paper_encoder.load_state_dict(checkpoint["encoder"])
-    paper_scorer.load_state_dict(checkpoint["scorer"])
+    fawkes_cfg = FawkesConfig()
+    encoder = Encoder(fawkes_cfg).to(device)
+    scorer = DistMult(fawkes_cfg).to(device)
+    encoder.load_state_dict(checkpoint["encoder"])
+    scorer.load_state_dict(checkpoint["scorer"])
 
     print(
         "OK: "
-        f"v5={type(v5).__name__}(in={cfg5.model.in_dim}), "
-        f"v6={type(v6).__name__}(in={cfg6.model.in_dim}), "
-        f"paper={checkpoint['config']['model']}"
+        f"clinical-jepa-no-note={type(no_note).__name__}"
+        f"(in={cfg_no_note.model.in_dim}), "
+        f"clinical-jepa-localized-note={type(localized_note).__name__}"
+        f"(in={cfg_localized_note.model.in_dim}), "
+        f"fawkes-entity-note={checkpoint['config']['model']}"
     )
 
 

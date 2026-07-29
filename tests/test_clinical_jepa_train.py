@@ -59,16 +59,27 @@ VARIANTS = {
     # name: (old module, checkpoint, encoder cache, baseline payload)
     "v5": (
         old_v5_evaluate,
-        "models/v5_without_note/graph_jepa_v5.pt",
+        "models/clinical-jepa-no-note/graph_jepa_v5.pt",
         ".cache/graph_jepa_v5/encoder",
         "v5_loo.json",
     ),
     "v6": (
         old_v6_evaluate,
-        "models/v6_with_note/graph_jepa_v6.pt",
+        "models/clinical-jepa-localized-note/graph_jepa_v6.pt",
         ".cache/graph_jepa_v6/encoder",
         "v6_loo.json",
     ),
+}
+
+# The payload records ``args.checkpoint`` verbatim, and Phase 7 renamed the model
+# directories, so that one string differs from what Phase 0 recorded. The
+# baselines are the regression oracle and are never regenerated; instead the
+# expected text is rewritten by exactly this substitution before comparison, so
+# the byte comparison stays exact for every metric, count and per-relation row.
+# Anything beyond the directory rename still fails.
+RENAMED_CHECKPOINT_DIRS = {
+    "models/v5_without_note/": "models/clinical-jepa-no-note/",
+    "models/v6_with_note/": "models/clinical-jepa-localized-note/",
 }
 
 # Both released configs set ``encoder: sapbert``, so a cold cache would download
@@ -121,7 +132,9 @@ def test_evaluate_reproduces_baseline_payload(variant, tmp_path, monkeypatch):
     """Every metric, every per-relation row, every count -- as written bytes.
 
     ``chdir`` because the payload records ``args.checkpoint`` verbatim and the
-    baselines were recorded with repo-relative paths.
+    baselines were recorded with repo-relative paths. Those paths carry the
+    pre-Phase-7 directory names, which is the only permitted difference -- see
+    ``RENAMED_CHECKPOINT_DIRS``.
     """
     monkeypatch.chdir(ROOT)
     expected = BASELINE / VARIANTS[variant][3]
@@ -129,7 +142,13 @@ def test_evaluate_reproduces_baseline_payload(variant, tmp_path, monkeypatch):
 
     new_evaluate.main(_loo_argv(variant, output=produced))
 
-    assert produced.read_text(encoding="utf-8") == expected.read_text(encoding="utf-8")
+    expected_text = expected.read_text(encoding="utf-8")
+    for old_dir, new_dir in RENAMED_CHECKPOINT_DIRS.items():
+        expected_text = expected_text.replace(old_dir, new_dir)
+    # The substitution must actually have applied, or this silently degrades
+    # into comparing the baseline against itself under a stale assumption.
+    assert VARIANTS[variant][1] in expected_text
+    assert produced.read_text(encoding="utf-8") == expected_text
 
     # Pin the headline numbers here too, so a failure reads as a number rather
     # than as a diff of 1,700 lines of JSON.

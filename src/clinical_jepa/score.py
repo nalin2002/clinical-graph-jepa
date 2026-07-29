@@ -680,14 +680,15 @@ def run(args) -> None:
 def build_arg_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="Revise KG edges with Graph-JEPA scores")
     p.add_argument("--input", required=True, help="KG JSON file or directory")
-    # Phase 7 renames these directories to models/clinical-jepa-no-note/ and
-    # models/clinical-jepa-localized-note/; the checkpoint filenames do not
-    # change (plan §5.1). There is no default because the variant is a choice.
+    # The checkpoint filenames keep their released names (plan §5.1); only the
+    # directories were renamed. There is no default because the variant is a
+    # choice.
     p.add_argument(
         "--checkpoint",
         required=True,
-        help="trained checkpoint .pt, e.g. models/v5_without_note/graph_jepa_v5.pt "
-             "or models/v6_with_note/graph_jepa_v6.pt",
+        help="trained checkpoint .pt, e.g. "
+             "models/clinical-jepa-no-note/graph_jepa_v5.pt or "
+             "models/clinical-jepa-localized-note/graph_jepa_v6.pt",
     )
     p.add_argument("--output", required=True, help="output file or directory")
     p.add_argument("--device", default="cpu")

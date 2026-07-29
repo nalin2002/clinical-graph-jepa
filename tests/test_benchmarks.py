@@ -52,8 +52,8 @@ from graph_jepa_v6 import training as old_training
 from graph_jepa_v6.data import PatientGraphDataset as OldPatientGraphDataset
 
 DEVICE = torch.device("cpu")
-PAPER_CKPT = ROOT / "models/paper_v16/fawkes_trainer_jepa_entity_note_v16_260615.pt"
-V6_CKPT = ROOT / "models/v6_with_note/graph_jepa_v6.pt"
+PAPER_CKPT = ROOT / "models/fawkes-entity-note/fawkes_trainer_jepa_entity_note_v16_260615.pt"
+V6_CKPT = ROOT / "models/clinical-jepa-localized-note/graph_jepa_v6.pt"
 BENCHMARKS_SRC = ROOT / "src/benchmarks"
 
 # Enough test-split admissions for the differential to cover every relation the

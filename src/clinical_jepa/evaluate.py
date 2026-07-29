@@ -333,9 +333,11 @@ def build_arg_parser() -> argparse.ArgumentParser:
         )
     )
     add_data_args(parser)
-    # Plan section 5.2: the default must point at a file that exists. Phase 7
-    # renames this directory to models/clinical-jepa-localized-note/.
-    parser.add_argument("--checkpoint", default="models/v6_with_note/graph_jepa_v6.pt")
+    # Plan section 5.2: the default must point at a file that exists.
+    parser.add_argument(
+        "--checkpoint",
+        default="models/clinical-jepa-localized-note/graph_jepa_v6.pt",
+    )
     parser.add_argument("--encoder-cache", default=".cache/clinical_jepa/encoder")
     parser.add_argument("--device", default="cpu")
     parser.add_argument("--cap", type=int, default=40000)

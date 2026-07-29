@@ -190,9 +190,9 @@ def finetune(args) -> Path:
 def build_arg_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="Fine-tune Graph-JEPA candidate ranking")
     add_data_args(p)
-    # Plan section 5.2: the default must point at a file that exists. Phase 7
-    # renames this directory to models/clinical-jepa-localized-note/.
-    p.add_argument("--checkpoint", default="models/v6_with_note/graph_jepa_v6_pretrain.pt",
+    # Plan section 5.2: the default must point at a file that exists.
+    p.add_argument("--checkpoint",
+                   default="models/clinical-jepa-localized-note/graph_jepa_v6_pretrain.pt",
                    help="masked-pretrained Graph-JEPA checkpoint")
     p.add_argument("--out", default="checkpoints/")
     p.add_argument("--epochs", type=int, default=40)

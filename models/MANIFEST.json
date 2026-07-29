@@ -1,39 +1,42 @@
 {
-  "v5_without_note": {
+  "clinical-jepa-no-note": {
     "final": {
-      "path": "v5_without_note/graph_jepa_v5.pt",
+      "path": "clinical-jepa-no-note/graph_jepa_v5.pt",
       "bytes": 6912191,
       "sha256": "f9f1c0e5074bbab113f1679f1d051325083a16ce98a1b9050e2d03eeacdbdb49"
     },
     "pretrain": {
-      "path": "v5_without_note/graph_jepa_v5_pretrain.pt",
+      "path": "clinical-jepa-no-note/graph_jepa_v5_pretrain.pt",
       "bytes": 6913316,
       "sha256": "787d61b322674c288355bda0d84e05899a98398cb4050c3be9db077532490733"
     }
   },
-  "v6_with_note": {
+  "clinical-jepa-localized-note": {
     "final": {
-      "path": "v6_with_note/graph_jepa_v6.pt",
+      "path": "clinical-jepa-localized-note/graph_jepa_v6.pt",
       "bytes": 7895359,
       "sha256": "0a345ddb693e31863206d3d0315b1b201d61d2a9a759496c29141d7457377555"
     },
     "pretrain": {
-      "path": "v6_with_note/graph_jepa_v6_pretrain.pt",
+      "path": "clinical-jepa-localized-note/graph_jepa_v6_pretrain.pt",
       "bytes": 7896484,
       "sha256": "01994475ace54cef05c4f279be9e489a6b23688a3851a41286b28a53457038be"
     }
   },
-  "paper_v16": {
+  "fawkes-entity-note": {
     "final": {
-      "path": "paper_v16/fawkes_trainer_jepa_entity_note_v16_260615.pt",
+      "path": "fawkes-entity-note/fawkes_trainer_jepa_entity_note_v16_260615.pt",
       "bytes": 5204898,
-      "sha256": "fc8c494afcde681a6cac9846ac9b76f936b493b1a360924ae847c5f0214166ff"
+      "sha256": "6c21abb27cee16804ad9a3f257d8fc40b9994ce14163ef2deac088e361f01b5b",
+      "sha256_superseded": "fc8c494afcde681a6cac9846ac9b76f936b493b1a360924ae847c5f0214166ff",
+      "note": "sha256 corrected in Phase 7. The superseded value never matched the file on disk, while the byte count always did. The file was verified to be the published artifact before the value was changed - see models/fawkes-entity-note/README.md and baseline/README.md."
     }
   },
   "data": {
     "path": "../data/fawkes_1k_patients/fawkes_1k_patients_graphs_260615.jsonl",
     "bytes": 5420960,
-    "sha256": "d343446917cb9d18ffc7e3de182ed8fbb27925af130714361d186e6c4c9719ab"
+    "sha256": "d343446917cb9d18ffc7e3de182ed8fbb27925af130714361d186e6c4c9719ab",
+    "note": "Absent from this working tree. Recorded from the supplied artifact; retained as the checksum to verify a copy against. See docs/DATA.md."
   },
   "paper": {
     "path": "../paper/clinical_jepa.pdf",

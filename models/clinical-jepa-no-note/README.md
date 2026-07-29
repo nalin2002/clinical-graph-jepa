@@ -1,4 +1,4 @@
-# Raw Graph-JEPA v5 without notes
+# Clinical-JEPA without notes
 
 This is the simplest model in the repository and the best starting point for a
 new reader. It learns from graph structure and biomedical entity names only; it
@@ -6,12 +6,15 @@ never reads a clinical note or a precomputed note embedding.
 
 ## When to use this model
 
-Use v5 when:
+Use the no-note variant when:
 
 - notes are unavailable or cannot be used;
-- you want to run directly on the packaged JSONL;
+- you want to run on graph topology and entity names alone;
 - you want the modular patch-based Graph-JEPA architecture; or
-- you need a note-free baseline for comparison with v6.
+- you need a note-free baseline for comparison with the localized-note variant.
+
+This is **not** the paper implementation — see
+[`models/fawkes-entity-note/`](../fawkes-entity-note/README.md) for that.
 
 ## Artifacts
 
@@ -19,15 +22,22 @@ Use v5 when:
 | --- | --- |
 | `graph_jepa_v5_pretrain.pt` | Model after masked patch pretraining |
 | `graph_jepa_v5.pt` | Final model after revision and ranking fine-tuning |
-| `config_v5_pretrain.json` | Exact pretraining architecture/configuration |
-| `config_v5.json` | Exact final checkpoint configuration |
+| `config_pretrain.json` | Exact pretraining architecture/configuration |
+| `config.json` | Exact final checkpoint configuration |
 
-Implementation entry points:
+The checkpoint filenames keep the names they were released under; only the
+directory was renamed. That is what makes `models/MANIFEST.json`'s checksums
+byte-stable across the rename.
 
-- `src/graph_jepa_v5/pretrain.py`
-- `src/graph_jepa_v5/finetune.py`
-- `src/graph_jepa_v5/evaluate.py`
-- `src/graph_jepa_v5/score.py`
+Implementation entry points — one set of modules serves both variants, which one
+you get is read from the checkpoint's own config:
+
+| Module | Console script |
+| --- | --- |
+| `src/clinical_jepa/train/pretrain.py` | — (`python -m clinical_jepa.train.pretrain`) |
+| `src/clinical_jepa/train/finetune.py` | `clinical-jepa-train` |
+| `src/clinical_jepa/evaluate.py` | `clinical-jepa-eval` |
+| `src/clinical_jepa/score.py` | `clinical-jepa-score` |
 
 ## Input: from one graph record to tensors
 
@@ -58,7 +68,7 @@ and creates these PyTorch Geometric tensors:
 
 ### SapBERT node representation
 
-For each node, v5 builds the text `"{TYPE}: {normalized_name}"`. For example:
+For each node, the model builds the text `"{TYPE}: {normalized_name}"`. For example:
 
 ```text
 DIAGNOSIS: atrial fibrillation
@@ -70,12 +80,12 @@ The frozen `cambridgeltl/SapBERT-from-PubMedBERT-fulltext` encoder takes the CLS
 token, produces a 768-dimensional vector, and L2-normalizes it. SapBERT was
 trained to place synonymous biomedical concepts near one another, so names such
 as `myocardial infarction` and `heart attack` receive semantically related
-vectors. The embeddings are cached on disk. SapBERT is not fine-tuned by v5.
+vectors. The embeddings are cached on disk. SapBERT is not fine-tuned here.
 
 No demographic vector and no note vector are concatenated in this model:
 
 ```text
-v5 node input = SapBERT(TYPE + entity text) = 768 dimensions
+node input = SapBERT(TYPE + entity text) = 768 dimensions
 ```
 
 ## Architecture
@@ -105,7 +115,7 @@ LayerNorm, GELU, dropout 0.1, and a residual connection. The output is a
 
 ### 2. Balanced graph patches
 
-Patient graphs vary in size, so v5 groups nearby nodes into up to eight patches:
+Patient graphs vary in size, so the model groups nearby nodes into up to eight patches:
 
 1. choose graph-spread seed nodes;
 2. expand them with balanced multi-source BFS;
@@ -180,14 +190,19 @@ alternatives.
 From the repository root:
 
 ```bash
-uv run python -m graph_jepa_v5.evaluate \
-  --checkpoint models/v5_without_note/graph_jepa_v5.pt \
+clinical-jepa-eval \
+  --checkpoint models/clinical-jepa-no-note/graph_jepa_v5.pt \
   --data jsonl \
-  --jsonl-path data/fawkes_1k_patients/fawkes_1k_patients_graphs_260615.jsonl \
+  --jsonl-path data/fawkes-training-graph-embedded-260615/fawkes_training_graph_full_embedded_260615.jsonl \
+  --jsonl-limit 50 \
   --candidate-mode schema \
+  --cap 2000 \
   --device cpu \
-  --output outputs/v5_loo.json
+  --output outputs/no_note_loo.json
 ```
+
+Drop `--jsonl-limit` and raise `--cap` for a full run. `--jsonl-path` has a
+default, but it names a file this repository does not contain, so pass it.
 
 The first run downloads SapBERT. Use the same encoder cache for training and
 evaluation so identical node text always maps to identical stored vectors.
@@ -195,38 +210,51 @@ evaluation so identical node text always maps to identical stored vectors.
 ## Reproduce training
 
 ```bash
-uv run python -m graph_jepa_v5.pretrain \
+python -m clinical_jepa.train.pretrain \
   --data jsonl \
-  --jsonl-path data/fawkes_1k_patients/fawkes_1k_patients_graphs_260615.jsonl \
+  --jsonl-path data/fawkes-training-graph-embedded-260615/fawkes_training_graph_full_embedded_260615.jsonl \
+  --no-note-embeddings \
   --encoder sapbert \
   --epochs 60 \
   --lr 0.0008 \
   --batch_size 16 \
   --device cuda \
-  --out outputs/v5_retrained
+  --out outputs/no_note_retrained
 
-uv run python -m graph_jepa_v5.finetune \
-  --checkpoint outputs/v5_retrained/graph_jepa_v5_pretrain.pt \
+clinical-jepa-train \
+  --checkpoint outputs/no_note_retrained/clinical_jepa_no_note_pretrain.pt \
   --data jsonl \
-  --jsonl-path data/fawkes_1k_patients/fawkes_1k_patients_graphs_260615.jsonl \
+  --jsonl-path data/fawkes-training-graph-embedded-260615/fawkes_training_graph_full_embedded_260615.jsonl \
   --epochs 90 \
   --llm-confidence-negatives \
   --clinical-artifact-filters \
   --llm-negative-weight 0.6 \
   --device cuda \
-  --out outputs/v5_retrained
+  --out outputs/no_note_retrained
 ```
+
+Checkpoints written by the current code are named from the variant, so
+pretraining produces `clinical_jepa_no_note_pretrain.pt` and fine-tuning
+produces `clinical_jepa_no_note.pt`, alongside `config_pretrain.json` and
+`config.json` sidecars.
+
+> [!NOTE]
+> A training run is not bit-reproducible above one intra-op thread: CPU backward
+> reduces across threads in an unfixed order, so two identical runs drift about
+> `4.6e-7` on the parameters after one epoch. `torch.set_num_threads(1)` removes
+> it. Evaluation is forward-only and unaffected.
 
 CPU evaluation is supported. A CUDA device is recommended for full training.
 Exact numeric reproduction also depends on the original graph ordering, split,
 software versions, and hardware determinism.
 
-## What v5 does not contain
+## What this variant does not contain
 
 - no Clinical-ModernBERT note embedding;
 - no hashed entity lookup table;
 - no standalone DistMult readout; and
 - no assumption that a discharge note exists.
 
-Continue with [v6](../v6_with_note/README.md) to see how the same modular model
-changes when entity-localized note context is added.
+Continue with the
+[localized-note variant](../clinical-jepa-localized-note/README.md) to see how
+the same model changes when entity-localized note context is added.
