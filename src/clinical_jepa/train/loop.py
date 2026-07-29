@@ -1,0 +1,474 @@
+"""Shared training helpers: data loading, the epoch loop, and checkpoint I/O.
+
+Merged from ``fawkes_core/training.py`` (argument parsers, graph building, EMA
+schedule, W&B) and ``graph_jepa_v{5,6}/training.py`` (the loop the released
+checkpoints were trained with). The two v5/v6 copies differed only in the model
+class name, the two hardcoded checkpoint-name constants, and whether
+``PatientGraphDataset`` received the note arguments — all three now derive from
+``cfg``.
+
+``fawkes_core``'s own ``train_epochs`` is **not** carried over. It trained
+``GraphJEPAv4``, which plan section 4.3 dissolves, and no released checkpoint
+used it; its metric dictionary is a strict subset of the surviving loop's. Its
+``FINETUNE_STAGE`` was ``"joint_finetune"``; the surviving stage name is v5/v6's
+``"candidate_rank_finetune"``, which is what the released checkpoints record.
+
+``build_checkpoint_encoder`` lives in :mod:`clinical_jepa.encoders`, not here —
+the scoring path needs it too.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import math
+from pathlib import Path
+from typing import List
+
+import torch
+from torch_geometric.loader import DataLoader
+from tqdm.auto import tqdm
+
+from ..config import Config
+from ..graph.builders import (
+    AciBenchGraphBuilder,
+    JsonlGraphBuilder,
+    MimicGraphBuilder,
+    MimicSubKGGraphBuilder,
+    SyntheticGraphGenerator,
+)
+from ..graph.patches import build_patch_data, sample_patch_task
+from ..graph.tensors import PatientGraphDataset
+from ..losses import (
+    confidence_sanitized_graph_data,
+    pretrain_sanitized_graph_data,
+    sanitized_graph_data,
+)
+from ..model import GraphJEPA
+from ..schema import PatientGraph
+
+PRETRAIN_STAGE = "masked_pretrain"
+FINETUNE_STAGE = "candidate_rank_finetune"
+
+
+def checkpoint_filename(cfg: Config, *, pretrain: bool) -> str:
+    """Checkpoint name for a stage and variant — plan section 5.3.
+
+    Replaces the per-package ``PRETRAIN_CHECKPOINT_NAME`` / ``FINAL_CHECKPOINT_NAME``
+    constants, which were a duplication vector between v5 and v6.
+    """
+    variant = "note" if cfg.model.use_note_embeddings else "no_note"
+    stage = "_pretrain" if pretrain else ""
+    return f"clinical_jepa_{variant}{stage}.pt"
+
+
+def build_graphs(args, cfg: Config) -> List[PatientGraph]:
+    if args.data == "synthetic":
+        gen = SyntheticGraphGenerator(
+            seed=cfg.train.seed,
+            min_nodes=cfg.train.synthetic_min_nodes,
+            max_nodes=cfg.train.synthetic_max_nodes,
+        )
+        return gen.generate_many(cfg.train.synthetic_graphs)
+    if args.data == "mimic":
+        return MimicGraphBuilder(args.mimic_root, include_notes=args.mimic_notes).build()
+    if args.data == "mimic-subkgs":
+        return MimicSubKGGraphBuilder(
+            args.mimic_subkg_path,
+            limit=args.mimic_subkg_limit,
+        ).build()
+    if args.data == "jsonl":
+        return JsonlGraphBuilder(
+            args.jsonl_path,
+            limit=args.jsonl_limit,
+        ).build()
+    if args.data == "aci-bench":
+        return AciBenchGraphBuilder(
+            args.aci_kg_path,
+            limit=args.aci_limit,
+        ).build()
+    raise ValueError(f"unknown --data: {args.data!r}")
+
+
+def ema_decay(step: int, total_steps: int, cfg: Config) -> float:
+    if total_steps <= 1:
+        return cfg.train.ema_end
+    progress = step / float(total_steps - 1)
+    cosine = 0.5 * (1.0 - math.cos(math.pi * progress))
+    return cfg.train.ema_start + cosine * (cfg.train.ema_end - cfg.train.ema_start)
+
+
+def apply_common_train_args(args, cfg: Config) -> None:
+    cfg.train.lr = args.lr
+    cfg.train.batch_size = args.batch_size
+    cfg.train.num_workers = args.num_workers
+    cfg.train.context_patches = args.context_patches
+    cfg.train.target_patches = args.target_patches
+    cfg.train.synthetic_graphs = args.synthetic_graphs
+    cfg.train.synthetic_min_nodes = args.synthetic_min_nodes
+    cfg.train.synthetic_max_nodes = args.synthetic_max_nodes
+
+
+def build_train_loader(args, cfg: Config, encoder):
+    graphs = build_graphs(args, cfg)
+    dataset = PatientGraphDataset(
+        graphs,
+        encoder,
+        use_note_embeddings=cfg.model.use_note_embeddings,
+        note_embedding_dim=cfg.model.note_embedding_dim,
+        note_ground_by=cfg.model.note_ground_by,
+    )
+    loader_gen = torch.Generator().manual_seed(cfg.train.seed)
+    loader = DataLoader(
+        dataset,
+        batch_size=cfg.train.batch_size,
+        shuffle=True,
+        num_workers=cfg.train.num_workers,
+        generator=loader_gen,
+    )
+    return dataset, loader
+
+
+def load_model_checkpoint(checkpoint: str, device: torch.device):
+    ckpt = torch.load(checkpoint, map_location=device, weights_only=False)
+    cfg = Config.from_dict(ckpt["config"])
+    model = GraphJEPA(cfg.model).to(device)
+    model.load_state_dict(ckpt["state_dict"])
+    return model, cfg
+
+
+def save_checkpoint(
+    model: GraphJEPA,
+    cfg: Config,
+    out: str,
+    *,
+    checkpoint_name: str,
+    config_name: str,
+) -> Path:
+    out_dir = Path(out)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    ckpt_path = out_dir / checkpoint_name
+    torch.save({"state_dict": model.state_dict(), "config": cfg.to_dict()}, ckpt_path)
+    with open(out_dir / config_name, "w") as f:
+        json.dump(cfg.to_dict(), f, indent=2)
+    print(f"Saved checkpoint to {ckpt_path}")
+    return ckpt_path
+
+
+def init_wandb(
+    args,
+    cfg: Config,
+    dataset_size: int,
+    *,
+    script: str,
+    checkpoint_name: str,
+):
+    if not args.wandb:
+        return None
+    try:
+        import wandb
+    except ImportError as exc:
+        raise SystemExit("wandb logging requested; install with `pip install wandb`.") from exc
+
+    return wandb.init(
+        project=args.wandb_project,
+        entity=args.wandb_entity or None,
+        name=args.wandb_run_name or None,
+        tags=args.wandb_tags or None,
+        mode=args.wandb_mode,
+        config={
+            "script": script,
+            "checkpoint_name": checkpoint_name,
+            "dataset_size": dataset_size,
+            "cli": vars(args),
+            "graph_jepa": cfg.to_dict(),
+        },
+    )
+
+
+def train_epochs(
+    model: GraphJEPA,
+    optimizer: torch.optim.Optimizer,
+    train_loader,
+    cfg: Config,
+    *,
+    stage_name: str,
+    epochs: int,
+    use_revision: bool,
+    device: torch.device,
+    generator: torch.Generator,
+    wandb_run=None,
+) -> int:
+    total_steps = max(1, epochs * len(train_loader))
+    global_step = 0
+    for epoch in range(epochs):
+        model.train()
+        agg = {
+            "loss": 0.0,
+            "jepa_inv": 0.0,
+            "jepa_var": 0.0,
+            "revision_bce": 0.0,
+            "ranking_ce": 0.0,
+            "ranking_pos": 0.0,
+            "ranking_neg": 0.0,
+            "ranking_llm_excluded": 0.0,
+            "ranking_artifact_excluded": 0.0,
+            "patch_std": 0.0,
+            "schema_dropped": 0.0,
+            "llm_dropped": 0.0,
+            "revision_invalid_neg": 0.0,
+            "revision_llm_neg": 0.0,
+            "revision_artifact_neg": 0.0,
+            "revision_llm_ignored": 0.0,
+        }
+        n = 0
+        progress = tqdm(
+            train_loader,
+            desc=f"{stage_name} {epoch:03d}",
+            total=len(train_loader),
+            unit="batch",
+            dynamic_ncols=True,
+            leave=False,
+        )
+        for data in progress:
+            data = data.to(device)
+            if data.num_nodes < 2:
+                continue
+            message_data = sanitized_graph_data(data)
+            schema_dropped = int(
+                data.edge_index.size(1) - message_data.edge_index.size(1)
+            )
+            llm_dropped = 0
+            if not use_revision:
+                schema_edges = int(message_data.edge_index.size(1))
+                message_data = pretrain_sanitized_graph_data(
+                    data,
+                    negative_threshold=cfg.train.llm_negative_threshold,
+                    negative_threshold_by_relation=(
+                        cfg.train.llm_negative_threshold_by_relation
+                    ),
+                )
+                llm_dropped = schema_edges - int(message_data.edge_index.size(1))
+            elif (
+                cfg.train.llm_confidence_negatives
+                or cfg.train.clinical_artifact_filters
+            ):
+                schema_edges = int(message_data.edge_index.size(1))
+                message_data = confidence_sanitized_graph_data(
+                    data,
+                    enabled=cfg.train.llm_confidence_negatives,
+                    negative_threshold=cfg.train.llm_negative_threshold,
+                    positive_threshold=cfg.train.llm_positive_threshold,
+                    negative_threshold_by_relation=(
+                        cfg.train.llm_negative_threshold_by_relation
+                    ),
+                    positive_threshold_by_relation=(
+                        cfg.train.llm_positive_threshold_by_relation
+                    ),
+                    clinical_artifact_filters=(
+                        cfg.train.clinical_artifact_filters
+                    ),
+                )
+                llm_dropped = schema_edges - int(message_data.edge_index.size(1))
+
+            patch_data = build_patch_data(
+                message_data,
+                num_patches=cfg.model.num_patches,
+                patch_pe_dim=cfg.model.patch_pe_dim,
+                generator=generator,
+            ).to(device)
+            task = sample_patch_task(
+                patch_data,
+                context_patches=cfg.train.context_patches,
+                target_patches=cfg.train.target_patches,
+                generator=generator,
+            ).to(device)
+
+            jepa, jlog = model.jepa_loss(
+                message_data,
+                patch_data,
+                task,
+                var_weight=cfg.train.vicreg_var_weight,
+                cov_weight=cfg.train.vicreg_cov_weight,
+            )
+            if use_revision:
+                revision, rlog = model.revision_loss(
+                    data,
+                    mask_ratio=cfg.train.revision_mask_ratio,
+                    neg_per_pos=cfg.train.revision_neg_per_pos,
+                    llm_confidence_negatives=cfg.train.llm_confidence_negatives,
+                    llm_negative_threshold=cfg.train.llm_negative_threshold,
+                    llm_positive_threshold=cfg.train.llm_positive_threshold,
+                    llm_negative_threshold_by_relation=(
+                        cfg.train.llm_negative_threshold_by_relation
+                    ),
+                    llm_positive_threshold_by_relation=(
+                        cfg.train.llm_positive_threshold_by_relation
+                    ),
+                    llm_negative_weight=cfg.train.llm_negative_weight,
+                    clinical_artifact_filters=(
+                        cfg.train.clinical_artifact_filters
+                    ),
+                )
+                ranking, klog = model.candidate_ranking_loss(
+                    data,
+                    mask_ratio=cfg.train.ranking_mask_ratio,
+                    neg_per_pos=cfg.train.ranking_neg_per_pos,
+                    max_pos=cfg.train.ranking_max_pos,
+                    temperature=cfg.train.ranking_temperature,
+                    llm_confidence_negatives=cfg.train.llm_confidence_negatives,
+                    llm_negative_threshold=cfg.train.llm_negative_threshold,
+                    llm_positive_threshold=cfg.train.llm_positive_threshold,
+                    llm_negative_threshold_by_relation=(
+                        cfg.train.llm_negative_threshold_by_relation
+                    ),
+                    llm_positive_threshold_by_relation=(
+                        cfg.train.llm_positive_threshold_by_relation
+                    ),
+                    clinical_artifact_filters=(
+                        cfg.train.clinical_artifact_filters
+                    ),
+                )
+                loss = (
+                    cfg.train.jepa_weight * jepa
+                    + cfg.train.revision_weight * revision
+                    + cfg.train.ranking_weight * ranking
+                )
+            else:
+                rlog = {"revision_bce": 0.0, "revision_invalid_neg": 0.0}
+                klog = {"ranking_ce": 0.0, "ranking_pos": 0, "ranking_neg": 0}
+                loss = cfg.train.jepa_weight * jepa
+
+            optimizer.zero_grad()
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), cfg.train.grad_clip)
+            optimizer.step()
+            model.update_target(ema_decay(global_step, total_steps, cfg))
+            global_step += 1
+
+            agg["loss"] += float(loss.detach())
+            agg["jepa_inv"] += jlog["jepa_inv"]
+            agg["jepa_var"] += jlog["jepa_var"]
+            agg["patch_std"] += jlog["patch_std"]
+            agg["revision_bce"] += rlog["revision_bce"]
+            agg["ranking_ce"] += klog["ranking_ce"]
+            agg["ranking_pos"] += klog["ranking_pos"]
+            agg["ranking_neg"] += klog["ranking_neg"]
+            agg["ranking_llm_excluded"] += klog.get("ranking_llm_excluded", 0.0)
+            agg["ranking_artifact_excluded"] += klog.get(
+                "ranking_artifact_excluded",
+                0.0,
+            )
+            agg["schema_dropped"] += schema_dropped
+            agg["llm_dropped"] += llm_dropped
+            agg["revision_invalid_neg"] += rlog.get("revision_invalid_neg", 0.0)
+            agg["revision_llm_neg"] += rlog.get("revision_llm_neg", 0.0)
+            agg["revision_artifact_neg"] += rlog.get(
+                "revision_artifact_neg",
+                0.0,
+            )
+            agg["revision_llm_ignored"] += rlog.get("revision_llm_ignored", 0.0)
+            n += 1
+            progress.set_postfix(
+                loss=f"{agg['loss']/n:.4f}",
+                jepa=f"{agg['jepa_inv']/n:.4f}",
+                revision=f"{agg['revision_bce']/n:.4f}",
+                ranking=f"{agg['ranking_ce']/n:.4f}",
+            )
+
+        denom = max(n, 1)
+        metrics = {
+            "epoch": epoch,
+            "train/stage_is_joint": int(use_revision),
+            "train/loss": agg["loss"] / denom,
+            "train/jepa_inv": agg["jepa_inv"] / denom,
+            "train/jepa_var": agg["jepa_var"] / denom,
+            "train/revision_bce": agg["revision_bce"] / denom,
+            "train/ranking_ce": agg["ranking_ce"] / denom,
+            "train/ranking_pos": agg["ranking_pos"] / denom,
+            "train/ranking_neg": agg["ranking_neg"] / denom,
+            "train/ranking_llm_excluded": agg["ranking_llm_excluded"] / denom,
+            "train/ranking_artifact_excluded": (
+                agg["ranking_artifact_excluded"] / denom
+            ),
+            "train/revision_invalid_neg": agg["revision_invalid_neg"] / denom,
+            "train/revision_llm_neg": agg["revision_llm_neg"] / denom,
+            "train/revision_artifact_neg": (
+                agg["revision_artifact_neg"] / denom
+            ),
+            "train/revision_llm_ignored": agg["revision_llm_ignored"] / denom,
+            "train/schema_dropped_edges": agg["schema_dropped"] / denom,
+            "train/llm_dropped_edges": agg["llm_dropped"] / denom,
+            "train/patch_std": agg["patch_std"] / denom,
+            "train/lr": cfg.train.lr,
+            "train/global_step": global_step,
+        }
+        print(
+            f"{stage_name} epoch {epoch:03d} | loss {metrics['train/loss']:.4f} "
+            f"| jepa_inv {metrics['train/jepa_inv']:.4f} "
+            f"| revision_bce {metrics['train/revision_bce']:.4f} "
+            f"| ranking_ce {metrics['train/ranking_ce']:.4f} "
+            f"| patch_std {metrics['train/patch_std']:.4f}"
+        )
+        if wandb_run:
+            wandb_run.log(metrics, step=epoch)
+    return global_step
+
+
+def build_optimizer(model: GraphJEPA, cfg: Config) -> torch.optim.Optimizer:
+    return torch.optim.AdamW(
+        [p for p in model.parameters() if p.requires_grad],
+        lr=cfg.train.lr,
+        weight_decay=cfg.train.weight_decay,
+    )
+
+
+def add_data_args(p: argparse.ArgumentParser) -> None:
+    p.add_argument(
+        "--data",
+        choices=["synthetic", "mimic", "mimic-subkgs", "jsonl", "aci-bench"],
+        default="synthetic",
+    )
+    p.add_argument("--synthetic-graphs", type=int, default=256)
+    p.add_argument("--synthetic-min-nodes", type=int, default=8)
+    p.add_argument("--synthetic-max-nodes", type=int, default=28)
+    p.add_argument("--mimic-root", default=None)
+    p.add_argument("--mimic-notes", action="store_true")
+    p.add_argument("--mimic-subkg-path", default=None,
+                   help="MIMIC sub-KG JSON file or directory. Defaults to "
+                        "outputs/mimic_4/sub_kgs.")
+    p.add_argument("--mimic-subkg-limit", type=int, default=None,
+                   help="Limit number of adapted MIMIC sub-KGs loaded for training/smoke tests.")
+    p.add_argument(
+        "--jsonl-path",
+        default="data/fawkes_1k_patients/fawkes_1k_patients_graphs_260615.jsonl",
+        help="One clinical graph JSON object per line.",
+    )
+    p.add_argument(
+        "--jsonl-limit",
+        type=int,
+        default=None,
+        help="Optional maximum number of JSONL graphs to load.",
+    )
+    p.add_argument("--aci-kg-path", default=None,
+                   help="ACI-Bench KG JSON file or directory. Defaults to "
+                        "outputs/aci_bench/sub_kgs, then curated EIR KGs, then smoke KGs.")
+    p.add_argument("--aci-limit", type=int, default=None,
+                   help="Limit number of ACI-Bench graphs loaded for training/smoke tests.")
+
+
+def add_runtime_args(p: argparse.ArgumentParser) -> None:
+    p.add_argument("--out", default="checkpoints/")
+    p.add_argument("--epochs", type=int, default=40)
+    p.add_argument("--lr", type=float, default=8e-4)
+    p.add_argument("--device", default="cpu")
+    p.add_argument("--batch_size", type=int, default=16)
+    p.add_argument("--num-workers", type=int, default=0)
+    p.add_argument("--context-patches", type=int, default=1)
+    p.add_argument("--target-patches", type=int, default=4)
+    p.add_argument("--wandb", action="store_true", help="Log training metrics to Weights & Biases")
+    p.add_argument("--wandb-project", default="clinical-kg-graph-jepa")
+    p.add_argument("--wandb-entity", default=None)
+    p.add_argument("--wandb-run-name", default=None)
+    p.add_argument("--wandb-tags", nargs="*", default=None)
+    p.add_argument("--wandb-mode", choices=["online", "offline", "disabled"], default="online")
