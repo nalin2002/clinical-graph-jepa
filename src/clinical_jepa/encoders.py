@@ -224,3 +224,23 @@ def build_encoder(kind: str, *, mock_dim: int = 256, **kwargs):
     if kind == "sapbert":
         return SapBertNodeEncoder(**kwargs)
     raise ValueError(f"unknown encoder kind: {kind!r}")
+
+
+def build_checkpoint_encoder(cfg, encoder_cache: str):
+    """Build the encoder a checkpoint's config implies.
+
+    Lives here rather than in ``train/loop.py`` (where plan §4.2 maps it) because
+    both the training and scoring paths need it and it does nothing but dispatch
+    encoder construction. Leaving it under ``train/`` would make ``score.py``
+    import ``train/`` for four lines. It was duplicated verbatim across all three
+    old ``training.py`` modules.
+
+    ``base_in_dim``, not ``in_dim``: the encoder emits pre-note vectors, and the
+    note append doubles the width at the model's ``input_proj``. For a no-note
+    config ``from_dict`` derives them equal (768/768), which is why old v5's
+    ``in_dim`` was correct there; for a note config they differ (768 vs 1536) and
+    only ``base_in_dim`` builds an encoder of the right width.
+    """
+    if cfg.encoder in ("bge", "sapbert"):
+        return build_encoder(cfg.encoder, cache_dir=encoder_cache)
+    return build_encoder("mock", mock_dim=cfg.model.base_in_dim)
