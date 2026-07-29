@@ -39,13 +39,27 @@ requires_data = pytest.mark.skipif(
 
 
 def assert_pyg_equal(a, b, path=""):
-    """Assert two PyG Data objects are elementwise identical."""
+    """Assert two PyG Data objects are elementwise identical.
+
+    NaN-aware, and it has to be: torch.equal returns False for NaN == NaN, and
+    edge_llm_confidence is all-NaN whenever edges carry no confidence — which is
+    every synthetic graph, on both the old and new side. A plain torch.equal here
+    cannot compare any clinical_jepa Data object at all.
+
+    This is stricter than torch.equal, not looser: the NaN masks must match
+    positionally AND every non-NaN value must be bit-identical. No tolerance.
+    """
     ka, kb = set(a.keys()), set(b.keys())
     assert ka == kb, f"{path}: key mismatch {ka ^ kb}"
     for key in sorted(ka):
         va, vb = a[key], b[key]
         if torch.is_tensor(va):
-            assert torch.equal(va, vb), f"{path}.{key}: tensor mismatch"
+            if va.is_floating_point():
+                na, nb = torch.isnan(va), torch.isnan(vb)
+                assert torch.equal(na, nb), f"{path}.{key}: NaN mask mismatch"
+                assert torch.equal(va[~na], vb[~nb]), f"{path}.{key}: tensor mismatch"
+            else:
+                assert torch.equal(va, vb), f"{path}.{key}: tensor mismatch"
         else:
             assert va == vb, f"{path}.{key}: {va!r} != {vb!r}"
 
@@ -58,6 +72,10 @@ def assert_state_dict_equal(actual, expected_path, section=None):
     and v6 key sets are identical and differ only in two input_proj shapes, so a
     merged model that ignored use_note_embeddings would still pass this. Pair it
     with load_state_dict(..., strict=True), which checks shapes.
+
+    `section` is required for EVERY baseline dump, v5/v6 included — they are all
+    written as {"state_dict": [...]}, and the paper dump as
+    {"encoder": [...], "scorer": [...]}. Use section="state_dict" for v5/v6.
     """
     import json
 
