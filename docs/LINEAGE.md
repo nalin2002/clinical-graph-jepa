@@ -119,7 +119,7 @@ frozen — never edited, not even to import from the new tree.
 | `fawkes_core/encoders.py` | `clinical_jepa/encoders.py` |
 | `fawkes_core/schema.py` | `clinical_jepa/schema.py` |
 | `graph_jepa_v{5,6}/evaluate_llm.py` | `benchmarks/vs_llm.py` |
-| `graph_jepa_v{5,6}/evaluate_loo_v12_jepa_llm.py` | `benchmarks/vs_loo_baseline.py` |
+| `graph_jepa_v{5,6}/evaluate_loo_v12_jepa_llm.py` | `benchmarks/vs_fawkes.py` — renamed with the baseline arm; see below |
 | — | `benchmarks/llm_ranker.py` (extracted from the two `evaluate_llm.py` copies) |
 | `paper_v16/trainer.py` | split into `fawkes/{config,data,model,train,evaluate}.py` |
 | `paper_v16/evaluate.py` | folded into `fawkes/evaluate.py` |
@@ -139,7 +139,7 @@ package and must not start to — `tests/test_import_boundaries.py` asserts it.
 | `GraphJEPAv5`, `GraphJEPAv6` | both dissolved into `GraphJEPA` |
 | `_v3`, `_v4` import aliases | deleted |
 | `_install_v6_data_conversion` | deleted; converter passed as an argument |
-| `LooEncoder`, `LooDistMult`, `LooMLPScorer` | stay in `benchmarks/vs_loo_baseline.py` — see "the v12 LOO baseline" below |
+| `LooEncoder`, `LooDistMult`, `LooMLPScorer` | deleted; the baseline arm is the v16 paper checkpoint — see "the v12 LOO baseline" below |
 
 Class renames are safe for checkpoints. `save_checkpoint` writes
 `{"state_dict": ..., "config": cfg.to_dict()}` where `to_dict` is `asdict`, so
@@ -175,27 +175,41 @@ disk.
 
 ## Two measurements worth recording
 
-### The v12 LOO baseline is deferred, not ported
+### The v12 LOO baseline is replaced, not ported — and §7.1 landed anyway
 
-Plan §7.1 proposed consolidating `LooEncoder` into `fawkes.model.Encoder`. It
-looks like it should work: `LooEncoder` is `TransformerConv` with hashed entity
-buckets and a DistMult readout, and its `LOO_NUMERIC_DIM = 6` against the paper
-trainer's `6 + EMBED_DIM` is consistent with it being the no-note variant of the
-same architecture.
+Plan §7.1 proposed consolidating `LooEncoder` into `fawkes.model.Encoder`,
+**gated on loading `fawkes_jepa_loo_eval_v12_260615.pt` into it with
+`strict=True`**. That checkpoint is not present in the working tree and is not
+being obtained, so the gate could never be run — and neither could the arm it
+served: the old three-way comparison's first arm had no weights to load.
 
-That consolidation was **gated on loading `fawkes_jepa_loo_eval_v12_260615.pt`
-into `fawkes.model.Encoder` with `strict=True`**. That checkpoint is not present
-in the working tree and is not being obtained, so the gate cannot be run.
+Phase 6b resolved that by substitution rather than by consolidation. **The
+baseline arm of `benchmarks/vs_fawkes.py` is now the v16 paper checkpoint**
+(`models/paper_v16/`, whose behaviour Phase 0 pinned exactly), loaded through
+`fawkes` itself. `LooEncoder`, `LooDistMult`, `LooMLPScorer` and their `LOO_*`
+vocabularies are therefore deleted rather than ported — roughly 200 lines, and
+§2.3's third copy of the paper-lineage architecture. §7.1's outcome (one copy of
+that architecture, not three) has landed by a different route than the plan
+anticipated; `tests/test_benchmarks.py::test_loo_baseline_architecture_is_gone`
+keeps it landed.
 
-Per §7.1's own instruction for this case: **the v12 LOO baseline is recorded here
-as a distinct architecture pending verification.** `LooEncoder`, `LooDistMult`,
-and `LooMLPScorer` stay where they are. Whether they are really the same
-architecture as `fawkes.model.Encoder` is an open question, not a settled fact —
-the resemblance is structural, and nobody has loaded one into the other.
+**What this does not establish.** The v16 checkpoint was never loaded into
+`LooEncoder`, and could not be: `LOO_NUMERIC_DIM` was 6 where the v16
+checkpoint's config records `numeric_dim: 774` (6 + 768 note dimensions). They
+are different configurations of the same architecture *family*, which is exactly
+what nobody has verified. The question §7.1 asked is retired, not answered. The
+v12 checkpoint is no longer required by anything in this repository.
 
-Consequences: the three-way comparison in `benchmarks/vs_loo_baseline.py` cannot
-run, and Phase 6 gate 1 is blocked on it. This is the third copy of the paper
-architecture in the repository, and it remains a copy.
+**What it buys.** A phase that had no numeric gate now has an exact one: the
+`fawkes` arm reproduces `baseline/paper_loo_testsplit.json` — MRR 0.418653448
+over n=8283 — to a delta of `0.000e+00`, per-relation rows included.
+
+**What it costs.** The arms are no longer paired. `LooEncoder` was written to eat
+`clinical_jepa`'s tensors, so one dataset pipeline could feed both model arms and
+one `n` column described both. `fawkes` has its own `to_data`, vocabularies and
+edge pruning, so each arm now runs its own pipeline over the same admissions and
+the comparison aligns on relation name only, with per-arm counts. See the
+`benchmarks/vs_fawkes.py` docstring for the measured population difference.
 
 ### `models/paper_v16/`'s checkpoint hash differs from the manifest
 
