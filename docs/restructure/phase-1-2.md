@@ -96,8 +96,26 @@ precisely what lets one merged class load both released checkpoints (§2.1).
 attribute paths (`context_node_encoder.input_proj.weight`), not class names —
 they survive class renames but not attribute renames. Flattening
 `GraphJEPAv3 → GraphJEPAv4 → GraphJEPA` is safe only if every submodule keeps its
-attribute name on the merged class. Gate 1 is the one that catches a bad flatten;
-gates 2 and 3 can both pass while a key set has quietly drifted.
+attribute name on the merged class.
+
+**Gate 1 alone is not sufficient, contrary to what the plan implies.** Phase 0
+measured it: `baseline/v5_keys.json` and `baseline/v6_keys.json` are *identical*
+— 119 keys each. The entire architectural difference between the variants is two
+tensor shapes:
+
+```
+context_node_encoder.input_proj.weight   v5=(160, 768)   v6=(160, 1536)
+target_node_encoder.input_proj.weight    v5=(160, 768)   v6=(160, 1536)
+```
+
+So a merged `GraphJEPA` that ignored `use_note_embeddings` entirely would still
+pass gate 1 for both configs. Gate 1 catches a renamed attribute path and nothing
+else; **gate 2 (`strict=True`) is what catches a wrong variant**, because it
+checks shapes. Run both and treat neither as a formality.
+
+`tests/conftest.py` provides `assert_state_dict_equal(actual, path, section=None)`
+for gate 1 — `section` selects `encoder`/`scorer` for the paper dumps and is
+unused for v5/v6.
 
 ## Stop and report — do not work around
 
