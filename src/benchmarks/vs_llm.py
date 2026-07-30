@@ -12,8 +12,9 @@ and are imported from there; the copies that used to live here are gone.
 
 The LLM half of this comparison is **not deterministic** and has no pinned
 baseline. What is gated is the query sampling, the prompt text, the response
-parsing and the ``clinical_jepa`` ranks — all four are exact against
-``old_src`` — plus the fact that importing this module needs no API key.
+parsing and the ``clinical_jepa`` ranks — all four are exact against the
+pre-restructure implementation — plus the fact that importing this module needs
+no API key.
 """
 
 from __future__ import annotations

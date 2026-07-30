@@ -6,7 +6,7 @@ world model; PHASE 2 = frozen-encoder edge recovery readout. Inverse-edge
 leakage + test-set-selection bugs fixed. CLAUDE.md: deterministic, [TAG] logging,
 NO fallback (unknown type/relation/missing data fails loud). Added 260615.
 
-Split out of ``old_src/paper_v16/trainer.py``; see ``docs/LINEAGE.md`` for the
+Split out of ``paper_v16/trainer.py``; see ``docs/LINEAGE.md`` for the
 full version history that used to sit at the top of that file.
 """
 

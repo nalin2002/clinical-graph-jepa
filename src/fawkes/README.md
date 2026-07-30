@@ -82,8 +82,9 @@ USE_NOTE=1 GROUND_BY=prov EMBED_DIM=768 USE_SCORES=0 PRUNE_NO_EVIDENCE=1 \
 
 No numerics, no defaults, no tensor operations, and no environment-variable
 names changed. `tests/test_fawkes.py` gates every module against
-`old_src/paper_v16` running in the same process, plus the `baseline/*.json`
-recorded before the split. Two deliberate exceptions:
+the `baseline/*.json` files recorded from `paper_v16`
+before the split — see `baseline/README.md` and `baseline/COVERAGE.md`. Two
+deliberate exceptions:
 
 - **New checkpoints are named `fawkes_entity_note.pt` / `fawkes_no_note.pt`**
   (plan §5.3), replacing the hardcoded `fawkes_trainer_jepa_entity_note_v16_260615.pt`.

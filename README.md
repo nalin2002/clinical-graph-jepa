@@ -250,10 +250,8 @@ clinical-graph-jepa/
 │       ├── vs_llm.py                  clinical_jepa versus an LLM
 │       └── vs_fawkes.py               fawkes versus clinical_jepa versus an LLM
 │
-├── old_src/                           Pre-restructure tree; the gates' oracle
-│
 └── tests/
-    ├── conftest.py                    Shared fixtures and differential helpers
+    ├── conftest.py                    Shared fixtures and pinned-oracle helpers
     ├── test_import_boundaries.py      The two lineages never import each other
     ├── test_clinical_jepa_core.py     Graph/config/model equality gates
     ├── test_clinical_jepa_train.py    Training-loop and evaluator gates
@@ -262,10 +260,12 @@ clinical-graph-jepa/
     └── test_benchmarks.py             Cross-lineage comparison gates
 ```
 
-`old_src/` holds the pre-restructure implementation. It is frozen: most tests
-import it and the new tree side by side in one process and assert they agree
-exactly, which is a stronger guarantee than comparing against a pinned file. It
-is removed once those gates are converted to read `baseline/` instead.
+During the restructure the pre-restructure implementation sat beside the new
+tree, and most tests imported both in one process and asserted they agreed
+exactly. That tree is gone; the gates now assert against artifacts recorded from
+it in `baseline/`, which is why that directory is kept permanently.
+[`baseline/COVERAGE.md`](baseline/COVERAGE.md) records what the deletion cost,
+test by test.
 
 **The checkpoint filenames deliberately do not match their directories.** A
 checkpoint is a historical artifact and its filename is legitimate provenance,
@@ -282,7 +282,7 @@ written by the *current* code use variant-derived names instead
 | --- | --- | --- |
 | Understand the research idea | [Paper](paper/clinical_jepa.pdf) | [Paper-to-code map](docs/PAPER_CODE_MAP.md) |
 | **Find the code behind the paper** | [`src/fawkes/README.md`](src/fawkes/README.md) | [Fawkes model guide](models/fawkes-entity-note/README.md) |
-| Work out what a name used to be | [Lineage](docs/LINEAGE.md) | `git log` on `old_src/` |
+| Work out what a name used to be | [Lineage](docs/LINEAGE.md) | `git log` before the restructure commits |
 | Compare all three architectures | [Architecture guide](docs/ARCHITECTURE.md) | The three model guides under `models/` |
 | Understand the JSONL | [Data contract](docs/DATA.md) | `clinical_jepa/graph/builders.py`, `fawkes/data.py` |
 | Run the note-free model | [No-note guide](models/clinical-jepa-no-note/README.md) | `clinical_jepa/evaluate.py` |

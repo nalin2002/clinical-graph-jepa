@@ -45,7 +45,8 @@ def _import_roots(path: Path, package: str) -> set[str]:
     A relative import resolves to ``package``: ``from .x import y`` inside
     ``clinical_jepa`` can only ever reach ``clinical_jepa``, so it cannot cross
     a lineage boundary. Roots are matched exactly, which is why ``fawkes_core``
-    (the old package, still in ``old_src``) does not read as ``fawkes``.
+    (a pre-restructure package name; see ``docs/LINEAGE.md``) does not read as
+    ``fawkes``.
     """
     roots: set[str] = set()
     tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
@@ -100,6 +101,9 @@ def test_import_root_extraction_works(tmp_path):
 
     If _import_roots ever silently returns an empty set, every boundary
     assertion below becomes a tautology. This is the one test that would fail.
+
+    ``fawkes_core`` is here as a prefix-sharing name that must NOT be folded
+    into ``fawkes``; it needs no such package to exist, and none does.
     """
     module = tmp_path / "sample.py"
     module.write_text(

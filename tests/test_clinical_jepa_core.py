@@ -1,9 +1,11 @@
 """Phase 1 and 2 gates for the merged ``clinical_jepa`` core.
 
-Every assertion here is differential: the new implementation and the old one run
-in the same process on the same input and must agree exactly. ``old_src`` is
-removed in Phase 8, at which point the checkpoint-key gates fall back to
-``baseline/*_keys.json`` (which they already compare against today).
+Every assertion here compares the new implementation against the old one on the
+same input, exactly — no tolerance anywhere. Until Phase 8 the old side ran in
+the same process; now it is read from ``baseline/old_clinical_jepa_core.json``,
+which ``baseline/record_old_pins.py`` recorded from it. What is asserted is
+unchanged; ``baseline/COVERAGE.md`` records the two halves that could not come
+along.
 
 Test data is the seeded synthetic graph set — the same population the Phase 0
 baselines were recorded over (``baseline/README.md``). It needs no data file:
@@ -21,7 +23,9 @@ import pytest
 import torch
 from torch_geometric.loader import DataLoader
 
-from conftest import CKPT, assert_pyg_equal, assert_state_dict_equal, requires_checkpoints
+from conftest import (CKPT, assert_digests_match, assert_pyg_equal,
+                      assert_state_dict_equal, digest_data, digest_fields, load_pin,
+                      requires_checkpoints)
 
 from clinical_jepa.config import Config, TrainConfig
 from clinical_jepa.encoders import MockEncoder
@@ -31,13 +35,7 @@ from clinical_jepa.graph.tensors import to_graph_data
 from clinical_jepa.model import GraphJEPA
 from clinical_jepa.schema import PatientGraph
 
-from fawkes_core.data import JsonlGraphBuilder as OldJsonlGraphBuilder
-from graph_jepa_v5 import data as old_v5_data
-from graph_jepa_v5.config import Config as OldV5Config
-from graph_jepa_v5.model import GraphJEPAv5 as OldGraphJEPAv5
-from graph_jepa_v6 import data as old_v6_data
-from graph_jepa_v6.config import Config as OldV6Config
-from graph_jepa_v6.model import GraphJEPAv6 as OldGraphJEPAv6
+PIN = "old_clinical_jepa_core.json"
 
 BASE_IN_DIM = 768  # models/clinical-jepa-no-note/config.json::model.in_dim
 NOTE_DIM = 768  # models/clinical-jepa-localized-note/config.json::model.note_embedding_dim
@@ -96,12 +94,21 @@ def synthetic_graphs() -> list[PatientGraph]:
 # --------------------------------------------------------------------------- #
 def test_tensors_match_old_v5_and_v6():
     """Not marked ``requires_checkpoints``: seeded synthetic graphs and the mock
-    encoder need no artifact on disk, so this gate runs on a clean clone."""
+    encoder need no artifact on disk, so this gate runs on a clean clone.
+
+    512 comparisons -- 256 graphs against each released variant's converter. The
+    tensors themselves are far too large to track (a 17x768 ``x`` per graph), so
+    the pin is a per-field digest per graph; a mismatch names the graph and the
+    field.
+    """
     graphs = synthetic_graphs()
     assert len(graphs) == 256
 
+    pinned = load_pin(PIN)["tensors"]
     encoder = MockEncoder(dim=BASE_IN_DIM)
-    for old_module, use_note in ((old_v5_data, False), (old_v6_data, True)):
+    for variant, use_note in (("graph_jepa_v5", False), ("graph_jepa_v6", True)):
+        expected = pinned[variant]
+        assert len(expected) == len(graphs), variant
         for index, graph in enumerate(graphs):
             new = to_graph_data(
                 graph,
@@ -109,8 +116,9 @@ def test_tensors_match_old_v5_and_v6():
                 use_note_embeddings=use_note,
                 note_embedding_dim=NOTE_DIM,
             )
-            old = old_module.to_graph_data(graph, encoder)
-            assert_graph_data_equal(new, old, path=f"{old_module.__name__}[{index}]")
+            assert_digests_match(
+                digest_data(new), expected[index], path=f"{variant}[{index}]"
+            )
 
 
 @pytest.mark.parametrize("config_path", [V5_CONFIG, V6_CONFIG])
@@ -125,7 +133,8 @@ def test_config_from_dict_matches_old_v6(config_path):
     raw = json.loads(config_path.read_text())
     new = Config.from_dict(raw).to_dict()
 
-    assert new == OldV6Config.from_dict(raw).to_dict()
+    pinned = load_pin(PIN)["config_to_dict"]["graph_jepa_v6"][config_path.parent.name]
+    assert new == pinned
 
     # to_dict is the checkpoint payload, so it has to survive a reload.
     assert Config.from_dict(new).to_dict() == new
@@ -140,10 +149,16 @@ def test_config_matches_old_v5_where_old_v5_could_read_it():
     had. The
     difference is exactly the four ModelConfig note fields, which is what plan
     section 2.1 predicts and nothing more.
+
+    The other half of the asymmetry -- ``OldV5Config.from_dict`` raising
+    ``TypeError`` on the localized-note sidecar -- was the reason only one
+    file is compared here. It needed the old class to assert, so Phase 8
+    retired it; ``baseline/old_clinical_jepa_core.json`` records v5's ``to_dict``
+    for the no-note file only, which is the same fact stated as an artifact.
     """
     raw = json.loads(V5_CONFIG.read_text())
     new = Config.from_dict(raw).to_dict()
-    old_v5 = OldV5Config.from_dict(raw).to_dict()
+    old_v5 = load_pin(PIN)["config_to_dict"]["graph_jepa_v5"]["clinical-jepa-no-note"]
 
     assert set(new["model"]) - set(old_v5["model"]) == set(V6_ONLY_MODEL_FIELDS)
     shared = dict(new)
@@ -153,9 +168,6 @@ def test_config_matches_old_v5_where_old_v5_could_read_it():
         if key not in V6_ONLY_MODEL_FIELDS
     }
     assert shared == old_v5
-
-    with pytest.raises(TypeError):
-        OldV5Config.from_dict(json.loads(V6_CONFIG.read_text()))
 
 
 # --------------------------------------------------------------------------- #
@@ -197,10 +209,17 @@ def test_jsonl_builder_preserves_graph_metadata(tmp_path):
     assert graph.edges[0]["labels"]["prov_in_note"] == 1
 
     # ...and the whole record, against the builder this one replaces.
-    old = OldJsonlGraphBuilder(path).build()[0]
-    assert graph.nodes == old.nodes
-    assert graph.edges == old.edges
-    assert graph.extra == old.extra
+    old = load_pin(PIN)["jsonl_builder"]
+    extra = dict(graph.extra)
+    # The builder stamps the file it read. The pin cannot hold a tmp_path, so it
+    # holds a placeholder; the real value is asserted here against this run's
+    # input, which is the same guarantee in two steps.
+    assert extra["_source_path"] == f"{path}:1"
+    extra["_source_path"] = "<input>:1"
+
+    assert graph.nodes == old["nodes"]
+    assert graph.edges == old["edges"]
+    assert extra == old["extra"]
 
 
 # --------------------------------------------------------------------------- #
@@ -244,25 +263,26 @@ ALIAS_KEY_STYLES = {
 def test_alias_keyed_edges_are_normalized(style):
     """All three endpoint spellings produce the same tensors, and match old v6.
 
-    v6 already normalized (``graph_jepa_v6/data.py:105``); v5 did not. Both
-    variants now behave like v6 -- see ``test_v5_used_to_reject_alias_keys``
-    for the behaviour this replaces.
+    v6 already normalized (``graph_jepa_v6/data.py:105``); v5 did not -- it
+    indexed ``edge["source_id"]`` unguarded (``graph_jepa_v5/data.py:75``) and
+    raised ``KeyError`` on the spelling the only shipped dataset uses. Both
+    variants now behave like v6, which is why the ``aliased`` and ``mixed``
+    cases below convert at all.
     """
     encoder = MockEncoder(dim=8)
     source_key, target_key = ALIAS_KEY_STYLES[style]
     graph = _alias_fixture(source_key, target_key)
     canonical = _alias_fixture(*ALIAS_KEY_STYLES["canonical"])
+    pinned = load_pin(PIN)["alias_tensors"][style]
 
-    for use_note in (False, True):
+    for variant, use_note in (("no_note", False), ("note", True)):
         kwargs = {"use_note_embeddings": use_note, "note_embedding_dim": 4}
         new = to_graph_data(graph, encoder, **kwargs)
         assert_graph_data_equal(
             new, to_graph_data(canonical, encoder, **kwargs), path=style
         )
-        assert_graph_data_equal(
-            new,
-            old_v6_data.to_graph_data(graph, encoder, **kwargs),
-            path=f"{style}/old_v6",
+        assert_digests_match(
+            digest_data(new), pinned[variant], path=f"{style}/old_v6/{variant}"
         )
 
     # The note vector reaches both endpoints of the prov_in_note edge whichever
@@ -273,22 +293,6 @@ def test_alias_keyed_edges_are_normalized(style):
 
     # Node text falls back to `name` when absent, so D is not encoded as "".
     assert not torch.equal(noted.x[1, :8], torch.zeros(8))
-
-
-def test_v5_used_to_reject_alias_keys():
-    """Pins the divergence this phase removes rather than assuming it.
-
-    ``graph_jepa_v5/data.py:75`` indexes ``edge["source_id"]`` unguarded, so the
-    no-note variant raised ``KeyError`` on the endpoint spelling used by the
-    only dataset shipped in this repository. The merged converter does not.
-    """
-    encoder = MockEncoder(dim=8)
-    graph = _alias_fixture("source", "target")
-
-    with pytest.raises(KeyError):
-        old_v5_data.to_graph_data(graph, encoder)
-
-    to_graph_data(graph, encoder, use_note_embeddings=False)
 
 
 # --------------------------------------------------------------------------- #
@@ -361,63 +365,57 @@ def _patch_inputs(cfg, batch):
 
 @requires_checkpoints
 @pytest.mark.parametrize(
-    ("checkpoint_path", "old_config_cls", "old_model_cls"),
-    [
-        (V5_CHECKPOINT, OldV5Config, OldGraphJEPAv5),
-        (V6_CHECKPOINT, OldV6Config, OldGraphJEPAv6),
-    ],
+    ("checkpoint_path", "pin_key"),
+    [(V5_CHECKPOINT, "no_note"), (V6_CHECKPOINT, "localized_note")],
 )
-def test_forward_matches_old_model(checkpoint_path, old_config_cls, old_model_cls):
+def test_forward_matches_old_model(checkpoint_path, pin_key):
     """Released weights, one seeded batch, every output tensor compared exactly.
 
     Each loss is re-seeded immediately before the call because the revision and
-    ranking objectives draw their masks and negatives from the global RNG.
+    ranking objectives draw their masks and negatives from the global RNG. The
+    log dictionaries are compared in full as well -- they carry the positive,
+    negative and exclusion counts, which is where a mis-transcribed mask shows
+    up before the loss value moves enough to notice.
     """
+    pinned = load_pin(PIN)["forward"][pin_key]
     checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
     cfg = Config.from_dict(checkpoint["config"])
-    old_cfg = old_config_cls.from_dict(checkpoint["config"])
 
-    new_model = GraphJEPA(cfg.model)
-    new_model.load_state_dict(checkpoint["state_dict"], strict=True)
-    new_model.eval()
-    old_model = old_model_cls(old_cfg.model)
-    old_model.load_state_dict(checkpoint["state_dict"], strict=True)
-    old_model.eval()
+    model = GraphJEPA(cfg.model)
+    model.load_state_dict(checkpoint["state_dict"], strict=True)
+    model.eval()
 
     batch = _batch(cfg, MockEncoder(dim=cfg.model.base_in_dim))
     assert batch.x.size(1) == cfg.model.in_dim
     patch_data, task = _patch_inputs(cfg, batch)
 
-    assert torch.equal(new_model.encode_nodes(batch), old_model.encode_nodes(batch))
-    assert torch.equal(
-        new_model.encode_target_nodes(batch), old_model.encode_target_nodes(batch)
-    )
+    outputs = {
+        "encode_nodes": model.encode_nodes(batch),
+        "encode_target_nodes": model.encode_target_nodes(batch),
+        "patch_prediction_energy": model.patch_prediction_energy(
+            batch, patch_data, task.target_idx[:1]
+        ),
+    }
 
-    target_patch_idx = task.target_idx[:1]
-    assert torch.equal(
-        new_model.patch_prediction_energy(batch, patch_data, target_patch_idx),
-        old_model.patch_prediction_energy(batch, patch_data, target_patch_idx),
-    )
-
-    def paired(call):
+    def seeded(label, call):
         torch.manual_seed(1234)
-        new_loss, new_log = call(new_model)
-        torch.manual_seed(1234)
-        old_loss, old_log = call(old_model)
-        assert torch.equal(new_loss, old_loss), f"{new_loss} != {old_loss}"
-        assert new_log == old_log
+        loss, log = call()
+        outputs[label] = loss
+        assert log == pinned["logs"][label], label
 
-    paired(
-        lambda model: model.jepa_loss(
+    seeded(
+        "jepa_loss",
+        lambda: model.jepa_loss(
             batch,
             patch_data,
             task,
             var_weight=cfg.train.vicreg_var_weight,
             cov_weight=cfg.train.vicreg_cov_weight,
-        )
+        ),
     )
-    paired(
-        lambda model: model.revision_loss(
+    seeded(
+        "revision_loss",
+        lambda: model.revision_loss(
             batch,
             mask_ratio=cfg.train.revision_mask_ratio,
             neg_per_pos=cfg.train.revision_neg_per_pos,
@@ -428,14 +426,17 @@ def test_forward_matches_old_model(checkpoint_path, old_config_cls, old_model_cl
             llm_positive_threshold_by_relation=cfg.train.llm_positive_threshold_by_relation,
             llm_negative_weight=cfg.train.llm_negative_weight,
             clinical_artifact_filters=cfg.train.clinical_artifact_filters,
-        )
+        ),
     )
-    paired(
-        lambda model: model.candidate_ranking_loss(
+    seeded(
+        "candidate_ranking_loss",
+        lambda: model.candidate_ranking_loss(
             batch,
             mask_ratio=cfg.train.ranking_mask_ratio,
             neg_per_pos=cfg.train.ranking_neg_per_pos,
             max_pos=cfg.train.ranking_max_pos,
             temperature=cfg.train.ranking_temperature,
-        )
+        ),
     )
+
+    assert_digests_match(digest_fields(outputs), pinned["tensors"], path=pin_key)

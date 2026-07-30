@@ -33,7 +33,7 @@ from dataclasses import astuple
 import pytest
 import torch
 
-from conftest import BASELINE, DATA, ROOT, requires_checkpoints, requires_data
+from conftest import BASELINE, DATA, ROOT, load_pin, requires_checkpoints, requires_data
 
 from benchmarks import vs_fawkes, vs_llm
 from clinical_jepa.encoders import MockEncoder
@@ -44,13 +44,7 @@ from clinical_jepa.schema import EDGE_TYPE_TO_IDX, NODE_TYPE_TO_IDX
 from clinical_jepa.train import loop
 from fawkes.evaluate import _load_graphs
 
-from fawkes_core.data import adapt_mimic_subkg as old_adapt_mimic_subkg
-from graph_jepa_v6 import evaluate as old_evaluate
-from graph_jepa_v6 import evaluate_llm as old_llm
-from graph_jepa_v6 import evaluate_loo_v12_jepa_llm as old_three_way
-from graph_jepa_v6 import training as old_training
-from graph_jepa_v6.data import PatientGraphDataset as OldPatientGraphDataset
-
+PIN = "old_benchmarks.json"
 DEVICE = torch.device("cpu")
 PAPER_CKPT = ROOT / "models/fawkes-entity-note/fawkes_trainer_jepa_entity_note_v16_260615.pt"
 V6_CKPT = ROOT / "models/clinical-jepa-localized-note/graph_jepa_v6.pt"
@@ -114,26 +108,28 @@ def test_fawkes_arm_reproduces_paper_test_split(fawkes_run):
 
 
 # --------------------------------------------------------------------------- #
-# Gate 2: the clinical_jepa arm, differentially against old_src.
+# Gate 2: the clinical_jepa arm, against `graph_jepa_v6`'s pipeline.
 # --------------------------------------------------------------------------- #
 @requires_paper_checkpoint
 @requires_checkpoints
 @requires_data
 def test_clinical_jepa_arm_matches_old_pipeline(fawkes_run):
-    """New pipeline vs `graph_jepa_v6`'s, in one process, on the same records.
+    """New pipeline vs `graph_jepa_v6`'s, on the same records.
 
-    `baseline/v{5,6}_loo.json` are synthetic-graph runs, so there is no pinned
-    oracle for this arm on this dataset; the differential is the gate. Each side
-    builds its own `PatientGraph`s with its own adapter and its own dataset
-    class, so a drift anywhere between the raw JSON and the metric dict shows up
-    here.
+    `baseline/v{5,6}_loo.json` are synthetic-graph runs, so Phase 0 pinned no
+    oracle for this arm on this dataset; Phase 8 recorded one by running the old
+    adapter, the old dataset class and the old evaluator over this exact record
+    slice (`baseline/old_benchmarks.json`). A drift anywhere between the raw JSON
+    and the metric dict shows up here.
 
-    Both sides share one `MockEncoder`: node features are held constant so the
+    Both sides used one `MockEncoder`: node features are held constant so the
     comparison is of the pipeline, not of an encoder download. The metric values
     are therefore not meaningful — the equality is.
     """
     raw, _metrics, records, _cfg = fawkes_run
-    records = records[:DIFFERENTIAL_GRAPHS]
+    pinned = load_pin(PIN)["clinical_jepa_arm"]
+    records = records[:pinned["graphs"]]
+    assert pinned["graphs"] == DIFFERENTIAL_GRAPHS
 
     model, cfg = loop.load_model_checkpoint(str(V6_CKPT), DEVICE)
     model.eval()
@@ -154,28 +150,7 @@ def test_clinical_jepa_arm_matches_old_pipeline(fawkes_run):
         candidate_mode="same-type",
     )
 
-    old_model, old_cfg = old_training.load_model_checkpoint(str(V6_CKPT), DEVICE)
-    old_model.eval()
-    old_dataset = OldPatientGraphDataset(
-        [
-            old_adapt_mimic_subkg(raw[index], source_path=f"{DATA}:{index + 1}")
-            for index in records
-        ],
-        encoder,
-        use_note_embeddings=old_cfg.model.use_note_embeddings,
-        note_embedding_dim=old_cfg.model.note_embedding_dim,
-        note_ground_by=old_cfg.model.note_ground_by,
-    )
-    old = old_evaluate.leave_one_out_recovery(
-        old_model,
-        [old_dataset[idx] for idx in range(len(old_dataset))],
-        old_cfg,
-        DEVICE,
-        cap=40000,
-        candidate_mode="same-type",
-    )
-
-    assert new == old
+    assert new == pinned["metrics"]
     # Not vacuous: the slice has to actually rank something, across relations.
     assert new["n"] > 0
     assert len(new["per_rel"]) > 1
@@ -254,16 +229,21 @@ SAMPLING = dict(
 )
 
 
-def _synthetic_side(training, dataset_cls, load_checkpoint):
-    """Build one lineage's (graphs, data_list, model, cfg) from seeded synthetic graphs."""
+def _synthetic_side():
+    """Build (graphs, data_list, model, cfg) from seeded synthetic graphs.
+
+    `baseline/record_old_pins.py` runs these same lines against
+    `graph_jepa_v6.training` and its dataset class, which is what makes the
+    pinned queries, prompts and ranks comparable.
+    """
     parser = argparse.ArgumentParser()
-    training.add_data_args(parser)
+    loop.add_data_args(parser)
     args = parser.parse_args(SYNTHETIC_ARGV)
-    model, cfg = load_checkpoint(str(V6_CKPT), DEVICE)
+    model, cfg = loop.load_model_checkpoint(str(V6_CKPT), DEVICE)
     model.eval()
     cfg.train.synthetic_graphs = args.synthetic_graphs
-    graphs = training.build_graphs(args, cfg)
-    dataset = dataset_cls(
+    graphs = loop.build_graphs(args, cfg)
+    dataset = PatientGraphDataset(
         graphs,
         MockEncoder(dim=cfg.model.base_in_dim),
         use_note_embeddings=cfg.model.use_note_embeddings,
@@ -281,34 +261,29 @@ def test_query_sampling_prompts_and_ranks_match_old_evaluate_llm():
     the model sees, `jepa_rank_query` produces the row the LLM is compared
     against. None of the three touches the network, so all three are exact
     against `graph_jepa_v6/evaluate_llm.py`.
+
+    The prompts are pinned as text, not as digests: the prompt *is* the
+    interface to the LLM, so a change to it has to be readable in the diff.
     """
-    graphs, data_list, model, cfg = _synthetic_side(
-        loop, PatientGraphDataset, loop.load_model_checkpoint
-    )
-    old_graphs, old_data_list, old_model, old_cfg = _synthetic_side(
-        old_training, OldPatientGraphDataset, old_training.load_model_checkpoint
-    )
+    graphs, data_list, model, cfg = _synthetic_side()
+    old = load_pin(PIN)["llm"]
 
     queries = vs_llm.collect_recovery_queries(data_list, cfg, **SAMPLING)
-    old_queries = old_llm.collect_recovery_queries(old_data_list, old_cfg, **SAMPLING)
 
-    assert queries, "no queries sampled; the differential would be vacuous"
-    assert [astuple(q) for q in queries] == [astuple(q) for q in old_queries]
+    assert queries, "no queries sampled; the comparison would be vacuous"
+    # Through JSON because `RecoveryQuery.candidates` is a tuple and the pin
+    # cannot be; comparing the encodings keeps the whole dataclass in scope.
+    assert json.loads(json.dumps([astuple(q) for q in queries])) == old["queries"]
 
     prompt_kwargs = dict(context_mode="full", max_context_edges=120)
-    for query, old_query in zip(queries, old_queries):
+    for index, query in enumerate(queries):
         assert vs_llm.build_prompt(
             graphs[query.graph_index], data_list[query.graph_index],
             cfg, query, **prompt_kwargs,
-        ) == old_llm.build_prompt(
-            old_graphs[old_query.graph_index], old_data_list[old_query.graph_index],
-            old_cfg, old_query, **prompt_kwargs,
-        )
+        ) == old["prompts"][index], f"prompt {index}"
         assert vs_llm.jepa_rank_query(
             model, data_list[query.graph_index], query, cfg, DEVICE
-        ) == old_llm.jepa_rank_query(
-            old_model, old_data_list[old_query.graph_index], old_query, old_cfg, DEVICE
-        )
+        ) == old["jepa_ranks"][index], f"rank {index}"
 
 
 @pytest.mark.parametrize(
@@ -325,13 +300,14 @@ def test_query_sampling_prompts_and_ranks_match_old_evaluate_llm():
 def test_parse_ranking_matches_old(reply):
     """The reply parser is the one part of the LLM path that must not drift:
     a silent change here rewrites the LLM's score without touching the model."""
-    assert vs_llm.parse_ranking(reply, 3) == old_llm.parse_ranking(reply, 3)
+    assert list(vs_llm.parse_ranking(reply, 3)) == load_pin(PIN)["parse_ranking"][reply]
 
 
 def test_summarize_merges_two_identical_copies():
-    """`_summarize` existed twice in `old_src`, annotated with two different
-    dataclasses. One copy now serves both benchmark drivers; this asserts it
-    agrees with each of the two it replaced."""
+    """`_summarize` existed twice in the pre-restructure tree, annotated with two
+    different dataclasses. One copy now serves both benchmark drivers; this
+    asserts it agrees with each of the two it replaced, whose outputs on this
+    fixture are pinned separately."""
     ranks = [(1, 4), (2, 1), (3, 3), (1, 2), (7, 7)]
     relations = ["MANAGED_FOR", "MANAGED_FOR", "INDICATES", "INDICATES", "CONFIRMS"]
     shared = dict(
@@ -345,23 +321,10 @@ def test_summarize_merges_two_identical_copies():
         vs_llm.QueryResult(relation=rel, jepa_rank=j, llm_rank=m, **shared)
         for rel, (j, m) in zip(relations, ranks)
     ]
-    old_pairwise = [
-        old_llm.QueryResult(relation=rel, jepa_rank=j, llm_rank=m, **shared)
-        for rel, (j, m) in zip(relations, ranks)
-    ]
-    old_three = [
-        old_three_way.ComparisonResult(
-            relation=rel, loo_jepa_rank=j, v6_jepa_rank=j, llm_rank=m, **shared
-        )
-        for rel, (j, m) in zip(relations, ranks)
-    ]
 
-    assert vs_llm._summarize(new, "jepa_rank") == old_llm._summarize(
-        old_pairwise, "jepa_rank"
-    )
-    assert vs_llm._summarize(new, "llm_rank") == old_three_way._summarize(
-        old_three, "llm_rank"
-    )
+    old = load_pin(PIN)["summaries"]
+    assert vs_llm._summarize(new, "jepa_rank") == old["vs_llm.jepa_rank"]
+    assert vs_llm._summarize(new, "llm_rank") == old["three_way.llm_rank"]
 
 
 # --------------------------------------------------------------------------- #
@@ -521,10 +484,12 @@ def test_loo_baseline_architecture_is_gone():
     Definitions, not text: `vs_fawkes`'s docstring names all three deliberately,
     and that is the record of why they went.
     """
-    assert all(
-        hasattr(old_three_way, name)
-        for name in ("LooEncoder", "LooDistMult", "LooMLPScorer", "LOO_NUMERIC_DIM")
-    ), "old_src is the oracle for what was removed; it must still define them"
+    # That the old module really defined all four is what made "gone" a claim
+    # about something rather than about nothing. The names are recorded rather
+    # than asserted now (`baseline/COVERAGE.md`).
+    assert load_pin(PIN)["loo_baseline_symbols"] == [
+        "LOO_NUMERIC_DIM", "LooDistMult", "LooEncoder", "LooMLPScorer"
+    ]
 
     defined: set[str] = set()
     for path in sorted((ROOT / "src").rglob("*.py")):

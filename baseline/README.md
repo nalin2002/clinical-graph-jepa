@@ -1,11 +1,22 @@
 # Baseline — the regression oracle
 
-Produced by Phase 0 of `docs/RESTRUCTURE_PLAN.md`, from the **pre-restructure**
-code (now `old_src/`). Every gate in Phases 1–8 compares against these files.
+Everything here was produced by the **pre-restructure** code, in two rounds:
+
+- **Phase 0** froze the metrics and `state_dict` key lists, before any code moved.
+- **Phase 8** recorded everything else, in the last hour the old tree existed —
+  the tensors, scored output JSON, LLM prompts, training-step values and CLI
+  option sets that the differential gates had been comparing in-process. Those
+  are the `old_*` files, written by `record_old_pins.py`.
+
+After Phase 8 there is no other evidence that the restructure preserved the
+released models' behaviour, which is why plan §11 item 3 recommends keeping this
+directory permanently. `COVERAGE.md` is the companion record: every gate that
+lost coverage when the old tree went, and what covers the live half now.
 
 A metric without its invocation is not reproducible, so each command below is
 recorded verbatim. If a gate fails, the correct response is to find out why —
-never to regenerate these files.
+**never to regenerate these files.** `record_old_pins.py` cannot in any case be
+re-run: it imports `old_src`.
 
 ## Environment
 
@@ -31,6 +42,22 @@ inexplicably, an environment drift is the first thing to check.
 `PYTHONPATH=src python -m pytest` — **3 passed**, before any restructuring. No
 pre-existing failures. (`src/` was not on the path by default; there is no
 `pythonpath` in `[tool.pytest.ini_options]` until Phase 0 adds it.)
+
+## File inventory
+
+| File | Recorded | What it holds |
+| --- | --- | --- |
+| `v5_loo.json`, `v6_loo.json` | Phase 0 | the two released evaluators' LOO payloads, byte-reproducible |
+| `paper_loo.json` | Phase 0 | the shipped paper evaluator's output over the whole file |
+| `paper_loo_testsplit.json` | Phase 0 | the published test-split number; reproduces the checkpoint's own metrics exactly |
+| `v5_keys.json`, `v6_keys.json`, `paper_keys.json` | Phase 0 | `sorted(state_dict().keys())` |
+| `reproduce_paper_testsplit.py` | Phase 0 | the one-off that produced `paper_loo_testsplit.json` |
+| `old_clinical_jepa_core.json` | Phase 8 | 512 per-graph tensor digests, the alias fixture, both old `Config.to_dict`s, the old JSONL builder's record, the forward pass and three loss logs per variant |
+| `old_clinical_jepa_score.json` | Phase 8 | revision counts, four `_load_graph_for_scoring` outputs, the schema guard, `RELATIONS`/`NEGATED_OR_ABSENT_MARKERS`, the released CLI option set |
+| `old_clinical_jepa_score_output/` | Phase 8 | the four scored JSON files the old scorer wrote — the Phase 4 byte gate |
+| `old_clinical_jepa_train.json` | Phase 8 | `train_epochs`' parameters after one epoch of each stage, from a seeded initialisation |
+| `old_fawkes.json` | Phase 8 | the trainer's 47 module globals in two environments, `jepa_step`/`readout_step`, the three evaluators, and `to_data` over all 4,000 records |
+| `old_benchmarks.json` | Phase 8 | the old `clinical_jepa` arm's metrics, 30 sampled queries with full prompt text and ranks, the reply parser, both `_summarize` copies |
 
 ## Artifact inventory
 
@@ -59,6 +86,41 @@ re-serialization, not different weights.
 it now would destroy the evidence.
 
 ## Files
+
+### The `old_*` files — Phase 8
+
+```
+PYTHONPATH=src:old_src python baseline/record_old_pins.py
+```
+
+One command writes all six artifacts plus `old_clinical_jepa_score_output/`. The
+script's docstring records what each group is and which gate reads it; the
+seeds, thresholds and fixtures are the ones the gates use, duplicated in the
+script so it stands on its own.
+
+**Verification, and why the recording direction matters.** Every value is
+computed by `old_src`; the new tree is imported only to build inputs and starting
+points the old tree could not produce on its own (the seeded synthetic
+population, the two randomly-initialised models whose weights the gates copied
+from new to old before training, and `benchmarks`' test-split record selection).
+The recording is deterministic, so agreement with live `old_src` was checked by
+re-recording into a scratch directory and diffing:
+
+```
+PYTHONPATH=src:old_src python baseline/record_old_pins.py /tmp/pins
+diff -r baseline /tmp/pins        # empty
+```
+
+That check was run while `old_src` still existed and cannot be run again. The
+suite passing with `pythonpath = ["src", "old_src"]` and then with
+`pythonpath = ["src"]` alone, at the same test count, is the other half of the
+Phase 8 gate.
+
+**One value could not be pinned literally.** The old `JsonlGraphBuilder` stamps
+`extra["_source_path"]` with the file it read, which is a temporary directory.
+The pin holds `"<input>:1"`; the gate asserts the real value against its own
+input path and substitutes the same placeholder before comparing the rest of
+`extra`.
 
 ### `v5_loo.json`, `v6_loo.json`
 

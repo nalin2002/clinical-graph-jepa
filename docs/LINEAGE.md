@@ -94,9 +94,12 @@ from a separate line of work, not the successor to `v6`.
 | `src/graph_jepa_v6/` | `src/clinical_jepa/` | merged — localized-note variant |
 | — | `src/benchmarks/` | new; cross-lineage comparison |
 
-The pre-restructure tree lives at `old_src/` for the duration of the migration
-and is deleted in Phase 8. It is the oracle every gate compares against, so it is
-frozen — never edited, not even to import from the new tree.
+For the duration of the migration the pre-restructure tree sat beside the new one
+and was the oracle every gate compared against — frozen, never edited, not even
+to import from the new tree. Phase 8 deleted it, having first recorded what it
+produced into `baseline/` (`baseline/record_old_pins.py`).
+`baseline/COVERAGE.md` lists every gate that lost coverage in that move and what
+covers the live half now.
 
 ## 2. Modules
 

@@ -1,6 +1,6 @@
 """Experiment configuration for the paper implementation.
 
-``old_src/paper_v16/trainer.py`` read roughly thirty ``os.environ`` values at
+``paper_v16/trainer.py`` read roughly thirty ``os.environ`` values at
 module import time and computed ``NUMERIC_DIM`` — a tensor shape — from them.
 That had three consequences: environment variables had to be set before Python
 imported the module, two configurations could not coexist in one process, and

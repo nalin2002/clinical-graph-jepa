@@ -1,6 +1,6 @@
 """The shared encoder (the world model), the JEPA wrapper, and the readout heads.
 
-Split out of ``old_src/paper_v16/trainer.py`` lines 256-335 — the "shared
+Split out of ``paper_v16/trainer.py`` lines 256-335 — the "shared
 encoder" and "downstream readout" seams.
 
 Every submodule attribute name here is load-bearing: ``state_dict`` keys derive

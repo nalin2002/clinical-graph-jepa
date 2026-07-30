@@ -1,7 +1,7 @@
 """Evaluation: batch-mask recovery, leave-one-out, cascade, and EIR uplift.
 
-Split out of ``old_src/paper_v16/trainer.py`` (lines 382-421 and 423-579) with
-``old_src/paper_v16/evaluate.py`` — the checkpoint-only CLI — folded in at the
+Split out of ``paper_v16/trainer.py`` (lines 382-421 and 423-579) with
+``paper_v16/evaluate.py`` — the checkpoint-only CLI — folded in at the
 bottom.
 
 The four evaluators answer different questions and are not interchangeable:
@@ -366,7 +366,7 @@ def eir_uplift_eval(enc, scorer, pairs, tau, device, cfg):
 
 
 # ---- CLI: evaluate a saved checkpoint on a local clinical-graph JSONL file ----
-# Was old_src/paper_v16/evaluate.py.
+# Was paper_v16/evaluate.py.
 
 def _load_graphs(path: Path, limit: int | None) -> tuple[list, dict]:
     raw = []

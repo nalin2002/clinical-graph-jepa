@@ -4,7 +4,7 @@
 The import-boundary guard that used to live here AST-walked
 ``src/graph_jepa_v5`` and ``src/graph_jepa_v6`` for imports of
 ``graph_jepa_v2/v3/v4`` -- packages this repository has never contained. After
-Phase 0 moved those directories to ``old_src/`` it scanned zero files and passed
+Phase 0 moved those directories out of ``src/`` it scanned zero files and passed
 green regardless. ``tests/test_import_boundaries.py`` replaces it with a real
 boundary test that asserts on its own walked-file count.
 """

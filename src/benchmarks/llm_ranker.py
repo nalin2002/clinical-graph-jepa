@@ -12,7 +12,7 @@ without loading torch or either package.
 ``_load_dotenv_files`` and ``_api_key`` locate the repository root with
 ``Path(__file__).resolve().parents[2]``. That depth is unchanged by the move:
 ``src/benchmarks/llm_ranker.py`` sits exactly as deep as
-``old_src/graph_jepa_v6/evaluate_llm.py`` did.
+``graph_jepa_v6/evaluate_llm.py`` did.
 
 Requires ``openai`` and ``python-dotenv``, both imported lazily at the point of
 use so that importing this module costs nothing when no LLM run is happening.

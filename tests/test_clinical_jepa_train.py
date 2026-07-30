@@ -1,21 +1,21 @@
 """Phase 3 gates for the merged ``clinical_jepa`` training loop and evaluator.
 
-The evaluator gate is asserted twice, deliberately:
+The evaluator gate was asserted twice, deliberately:
 
-* **differentially** — old and new run in one process on one input and their
-  metric dictionaries must be equal. This is the stronger form, and it exists
-  only because every package was renamed, so both trees import side by side.
+* **differentially** — old and new ran in one process on one input and their
+  metric dictionaries had to be equal. That needed both trees importable, so
+  Phase 8 retired it (``baseline/COVERAGE.md``).
 * **against the pinned payload** — the JSON written by the new evaluator must be
-  byte-identical to ``baseline/v{5,6}_loo.json``. That covers the parts the
-  return value does not: the graph count, the recorded invocation fields, and
-  float formatting. Phase 0 verified those files are byte-reproducible, so this
-  is exact, not toleranced. It is also what survives Phase 8, when ``old_src``
-  goes away and the differential half of the gate becomes unrunnable.
+  byte-identical to ``baseline/v{5,6}_loo.json``. That covers strictly more than
+  the return value did: the graph count, the recorded invocation fields, and
+  float formatting. Phase 0 recorded those files *from the old evaluator on this
+  exact invocation* and verified they are byte-reproducible, so the surviving
+  half is the same comparison against the same oracle — exact, not toleranced.
 
-``train/loop.py`` has no pinned oracle — no metric file was recorded for a
-training run — so it is gated purely differentially, one epoch of each stage
-against ``graph_jepa_v5.training.train_epochs`` with identical seeds and
-weights.
+``train/loop.py`` had no pinned oracle in Phase 0 — no metric file was recorded
+for a training run — so Phase 8 recorded one: one epoch of each stage from a
+seeded initialisation, run through ``graph_jepa_v5.training.train_epochs``, in
+``baseline/old_clinical_jepa_train.json``.
 """
 
 from __future__ import annotations
@@ -26,7 +26,8 @@ import json
 import pytest
 import torch
 
-from conftest import ROOT, requires_checkpoints
+from conftest import (BASELINE, ROOT, assert_digests_match, digest_fields, load_pin,
+                      requires_checkpoints)
 
 from clinical_jepa import evaluate as new_evaluate
 from clinical_jepa.config import Config
@@ -34,13 +35,7 @@ from clinical_jepa.encoders import MockEncoder
 from clinical_jepa.model import GraphJEPA
 from clinical_jepa.train import finetune, loop, pretrain
 
-from graph_jepa_v5 import evaluate as old_v5_evaluate
-from graph_jepa_v5 import training as old_v5_training
-from graph_jepa_v5.config import Config as OldV5Config
-from graph_jepa_v5.model import GraphJEPAv5 as OldGraphJEPAv5
-from graph_jepa_v6 import evaluate as old_v6_evaluate
-
-BASELINE = ROOT / "baseline"
+PIN = "old_clinical_jepa_train.json"
 
 # baseline/README.md records this invocation verbatim; the gate is reproducing
 # the files it produced, so the flags are copied rather than paraphrased.
@@ -56,15 +51,13 @@ LOO_ARGV = [
 ]
 
 VARIANTS = {
-    # name: (old module, checkpoint, encoder cache, baseline payload)
+    # name: (checkpoint, encoder cache, baseline payload)
     "v5": (
-        old_v5_evaluate,
         "models/clinical-jepa-no-note/graph_jepa_v5.pt",
         ".cache/graph_jepa_v5/encoder",
         "v5_loo.json",
     ),
     "v6": (
-        old_v6_evaluate,
         "models/clinical-jepa-localized-note/graph_jepa_v6.pt",
         ".cache/graph_jepa_v6/encoder",
         "v6_loo.json",
@@ -93,7 +86,7 @@ requires_encoder_cache = pytest.mark.skipif(
 
 
 def _loo_argv(variant: str, output=None) -> list[str]:
-    _old, checkpoint, cache, _baseline = VARIANTS[variant]
+    checkpoint, cache, _baseline = VARIANTS[variant]
     argv = LOO_ARGV + ["--checkpoint", checkpoint, "--encoder-cache", cache]
     if output is not None:
         argv += ["--output", str(output)]
@@ -101,29 +94,7 @@ def _loo_argv(variant: str, output=None) -> list[str]:
 
 
 # --------------------------------------------------------------------------- #
-# Phase 3 gate, differential half.
-# --------------------------------------------------------------------------- #
-@requires_checkpoints
-@requires_encoder_cache
-@pytest.mark.parametrize("variant", sorted(VARIANTS))
-def test_evaluate_matches_old_evaluator(variant, monkeypatch):
-    """One merged evaluator reproduces both of the two it replaces.
-
-    Each side parses the same argv with its own parser, so the merged parser has
-    to accept the recorded invocation as well as agree on every metric.
-    """
-    monkeypatch.chdir(ROOT)
-    old_module = VARIANTS[variant][0]
-    argv = _loo_argv(variant)
-
-    new = new_evaluate.run(new_evaluate.build_arg_parser().parse_args(argv))
-    old = old_module.run(old_module.build_arg_parser().parse_args(argv))
-
-    assert new == old
-
-
-# --------------------------------------------------------------------------- #
-# Phase 3 gate, pinned half: byte-identical payload, not "within tolerance".
+# Phase 3 gate: byte-identical payload, not "within tolerance".
 # --------------------------------------------------------------------------- #
 @requires_checkpoints
 @requires_encoder_cache
@@ -131,13 +102,18 @@ def test_evaluate_matches_old_evaluator(variant, monkeypatch):
 def test_evaluate_reproduces_baseline_payload(variant, tmp_path, monkeypatch):
     """Every metric, every per-relation row, every count -- as written bytes.
 
+    The expected file is what the old evaluator wrote on this exact invocation
+    (``baseline/README.md`` records the command), so this is the same
+    old-vs-new comparison the retired differential half made, over strictly more
+    of the output.
+
     ``chdir`` because the payload records ``args.checkpoint`` verbatim and the
     baselines were recorded with repo-relative paths. Those paths carry the
     pre-Phase-7 directory names, which is the only permitted difference -- see
     ``RENAMED_CHECKPOINT_DIRS``.
     """
     monkeypatch.chdir(ROOT)
-    expected = BASELINE / VARIANTS[variant][3]
+    expected = BASELINE / VARIANTS[variant][2]
     produced = tmp_path / f"{variant}_loo.json"
 
     new_evaluate.main(_loo_argv(variant, output=produced))
@@ -147,7 +123,7 @@ def test_evaluate_reproduces_baseline_payload(variant, tmp_path, monkeypatch):
         expected_text = expected_text.replace(old_dir, new_dir)
     # The substitution must actually have applied, or this silently degrades
     # into comparing the baseline against itself under a stale assumption.
-    assert VARIANTS[variant][1] in expected_text
+    assert VARIANTS[variant][0] in expected_text
     assert produced.read_text(encoding="utf-8") == expected_text
 
     # Pin the headline numbers here too, so a failure reads as a number rather
@@ -176,14 +152,14 @@ IN_DIM = 32
 
 
 def _small_config(config_cls):
+    """``baseline/record_old_pins.py`` builds this same config for the old side."""
     cfg = config_cls()
     cfg.model.in_dim = IN_DIM
     cfg.model.num_patches = 4
     cfg.train.synthetic_graphs = 8
     cfg.train.batch_size = 4
-    if hasattr(cfg.model, "use_note_embeddings"):
-        cfg.model.use_note_embeddings = False
-        cfg.model.base_in_dim = IN_DIM
+    cfg.model.use_note_embeddings = False
+    cfg.model.base_in_dim = IN_DIM
     return cfg
 
 
@@ -208,8 +184,10 @@ def single_threaded():
     torch.set_num_threads(previous)
 
 
-@pytest.mark.parametrize("use_revision", [False, True])
-def test_train_epochs_matches_old_loop(use_revision, single_threaded):
+@pytest.mark.parametrize(
+    ("use_revision", "pin_key"), [(False, "no_revision"), (True, "revision")]
+)
+def test_train_epochs_matches_old_loop(use_revision, pin_key, single_threaded):
     """One epoch, identical seeds and starting weights, every parameter compared.
 
     ``use_revision=False`` is the masked-pretraining branch (which routes through
@@ -217,7 +195,15 @@ def test_train_epochs_matches_old_loop(use_revision, single_threaded):
     revision and candidate-ranking objectives. Both draw negatives from the
     global RNG and patches from the passed generator, so both are re-seeded
     immediately before each call.
+
+    The starting weights come from ``model_init_seed`` rather than from an
+    unseeded ``GraphJEPA``: the old loop's parameters after one epoch are pinned,
+    which is only meaningful from a reproducible initialisation. The recorder
+    copied exactly these weights into ``GraphJEPAv5`` before training it, so the
+    comparison is still one epoch of the old loop against one epoch of the new
+    one from the same point.
     """
+    pinned = load_pin(PIN)
     device = torch.device("cpu")
     encoder = MockEncoder(dim=IN_DIM)
 
@@ -225,35 +211,30 @@ def test_train_epochs_matches_old_loop(use_revision, single_threaded):
     loop.add_data_args(parser)
     args = parser.parse_args(["--data", "synthetic"])
 
-    cfg, old_cfg = _small_config(Config), _small_config(OldV5Config)
-    new_model = GraphJEPA(cfg.model)
-    old_model = OldGraphJEPAv5(old_cfg.model)
-    old_model.load_state_dict(new_model.state_dict(), strict=True)
+    cfg = _small_config(Config)
+    torch.manual_seed(pinned["model_init_seed"])
+    model = GraphJEPA(cfg.model)
 
-    def run(module, model, config):
-        _dataset, train_loader = module.build_train_loader(args, config, encoder)
-        torch.manual_seed(1234)
-        return module.train_epochs(
-            model,
-            module.build_optimizer(model, config),
-            train_loader,
-            config,
-            stage_name="gate",
-            epochs=1,
-            use_revision=use_revision,
-            device=device,
-            generator=torch.Generator().manual_seed(0),
-            wandb_run=None,
-        )
+    _dataset, train_loader = loop.build_train_loader(args, cfg, encoder)
+    torch.manual_seed(1234)
+    steps = loop.train_epochs(
+        model,
+        loop.build_optimizer(model, cfg),
+        train_loader,
+        cfg,
+        stage_name="gate",
+        epochs=1,
+        use_revision=use_revision,
+        device=device,
+        generator=torch.Generator().manual_seed(0),
+        wandb_run=None,
+    )
 
-    new_steps = run(loop, new_model, cfg)
-    old_steps = run(old_v5_training, old_model, old_cfg)
-
-    assert new_steps == old_steps == 2  # 8 graphs, batch_size 4
-    new_state, old_state = new_model.state_dict(), old_model.state_dict()
-    assert sorted(new_state) == sorted(old_state)
-    for key, value in new_state.items():
-        assert torch.equal(value, old_state[key]), f"{key} diverged after training"
+    expected = pinned["train_epochs"][pin_key]
+    assert steps == expected["steps"] == 2  # 8 graphs, batch_size 4
+    assert_digests_match(
+        digest_fields(model.state_dict()), expected["state_dict"], path=pin_key
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -269,8 +250,8 @@ def test_train_epochs_matches_old_loop(use_revision, single_threaded):
     ],
 )
 def test_checkpoint_filename_follows_plan_5_3(use_note, is_pretrain, expected):
-    """The table has no oracle in ``old_src`` -- it replaces the hardcoded
-    ``graph_jepa_v{5,6}*.pt`` constants -- so it is pinned directly."""
+    """The table has no oracle in the pre-restructure tree -- it replaces the
+    hardcoded ``graph_jepa_v{5,6}*.pt`` constants -- so it is asserted directly."""
     cfg = Config()
     cfg.model.use_note_embeddings = use_note
     assert loop.checkpoint_filename(cfg, pretrain=is_pretrain) == expected

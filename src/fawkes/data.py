@@ -1,6 +1,6 @@
 """Vocabulary, feature construction, and PyG tensor conversion.
 
-Split out of ``old_src/paper_v16/trainer.py`` lines 92-254. The vocabularies are
+Split out of ``paper_v16/trainer.py`` lines 92-254. The vocabularies are
 the paper's own — note the ``NOTE`` and ``PROCUREMENT`` node types, which
 ``clinical_jepa`` does not have. The two schemas genuinely differ and are
 deliberately not unified (plan §9).

@@ -2,31 +2,36 @@
 
 The gate: scoring one fixed input graph with each released checkpoint produces
 **byte-identical output JSON** before and after the merge, for the
-KEEP/REVIEW/PRUNE path and for the candidate-addition path.
+KEEP/REVIEW/PRUNE path and for the candidate-addition path. The four files the
+old code produced are tracked under
+``baseline/old_clinical_jepa_score_output/``, so the comparison is still a byte
+comparison; before Phase 8 the old side wrote them in the same process.
 
-v5 and v6 genuinely diverge here today, so the old side runs for *both* -- not
-just the one the new code was modelled on. ``test_old_v6_monkeypatch_...`` and
-``test_alias_keyed_input_...`` pin the two places they disagreed, so the merge
-cannot quietly resolve either.
+v5 and v6 genuinely diverge here, so the old side was recorded for *both* -- not
+just the one the new code was modelled on. ``test_alias_keyed_input_...`` pins
+one place they disagreed. The other, ``_install_v6_data_conversion``'s global
+rebinding, is recorded in ``baseline/COVERAGE.md``: it could only be
+demonstrated by running the old module, and what replaces it is
+``test_variants_coexist_in_one_process``.
 
-Two things about running the old side:
+Two things about the recorded old side:
 
-* **The old scorer draws its patch partition from the global RNG.**
-  ``score_base.py:262`` passes ``generator=None`` to ``build_patch_data``, so
-  the structural half of every score depends on how much randomness the process
-  consumed earlier. That is preserved, not fixed -- it is behaviour, not a move.
-  It does mean a byte comparison is only well defined if both sides start from
-  the same seed, so every scoring test calls ``torch.manual_seed(SEED)``
-  immediately before each side. Same reason ``test_clinical_jepa_core.py``
-  re-seeds around each loss.
+* **The old scorer drew its patch partition from the global RNG.**
+  ``score_base.py:262`` passed ``generator=None`` to ``build_patch_data``, so
+  the structural half of every score depended on how much randomness the process
+  had already consumed. That is preserved, not fixed -- it is behaviour, not a
+  move. It does mean a byte comparison is only well defined from a known seed,
+  so every scoring test calls ``torch.manual_seed(SEED)`` immediately before
+  scoring, and the recorder used the same seed. Same reason
+  ``test_clinical_jepa_core.py`` re-seeds around each loss.
 
-* **The old v6 path mutates ``fawkes_core`` globally.** Anything that calls
-  ``_install_v6_data_conversion`` restores the two module attributes afterwards,
-  or it silently changes what every later test in the session is measuring.
+* **The old v6 path mutated ``fawkes_core`` globally.** The recorder restored
+  the two module attributes after each localized-note run, or the no-note pins
+  taken afterwards would have been scored with 1536-wide features.
 
 Scoring uses ``MockEncoder`` rather than the SapBERT encoder both checkpoints
-name in their config: it is the same encoder on both sides of every comparison,
-it is deterministic, and it keeps these tests runnable offline.
+name in their config: it was the same encoder on both sides of every
+comparison, it is deterministic, and it keeps these tests runnable offline.
 ``test_load_builds_the_checkpoint_encoder`` covers the real ``_load``.
 """
 
@@ -34,12 +39,11 @@ from __future__ import annotations
 
 import json
 import random
-from contextlib import contextmanager
 
 import pytest
 import torch
 
-from conftest import CKPT, DATA, requires_checkpoints, requires_data
+from conftest import BASELINE, CKPT, DATA, load_pin, requires_checkpoints, requires_data
 
 from clinical_jepa import score as new_score
 from clinical_jepa.config import Config
@@ -47,17 +51,8 @@ from clinical_jepa.encoders import MockEncoder, SapBertNodeEncoder
 from clinical_jepa.model import GraphJEPA
 from clinical_jepa.schema import PatientGraph as NewPatientGraph
 
-from fawkes_core import data_graph as old_data_graph
-from fawkes_core import score_base as old_v3
-from fawkes_core import score_revision as old_v4
-from fawkes_core.config import Config as OldFawkesConfig
-from fawkes_core.schema import PatientGraph as OldPatientGraph
-from graph_jepa_v5.config import Config as OldV5Config
-from graph_jepa_v5.model import GraphJEPAv5
-from graph_jepa_v5 import score as old_v5_score
-from graph_jepa_v6.config import Config as OldV6Config
-from graph_jepa_v6.model import GraphJEPAv6
-from graph_jepa_v6 import score as old_v6_score
+PIN = "old_clinical_jepa_score.json"
+PINNED_OUTPUT = BASELINE / "old_clinical_jepa_score_output"
 
 # Phase 7 renamed these directories; the checkpoint filenames did not change.
 V5_CHECKPOINT = CKPT / "clinical-jepa-no-note/graph_jepa_v5.pt"
@@ -73,10 +68,10 @@ CANDIDATE_THRESHOLD = 0.5
 WEAK_OVERRIDES = ["INDICATES=0.10", "LOCATED_AT=0.05", "CONFIRMS=0.08"]
 
 VARIANTS = [
-    ("no_note", V5_CHECKPOINT, OldV5Config, GraphJEPAv5, False),
-    ("localized_note", V6_CHECKPOINT, OldV6Config, GraphJEPAv6, True),
+    ("no_note", V5_CHECKPOINT),
+    ("localized_note", V6_CHECKPOINT),
 ]
-VARIANT_IDS = [v[0] for v in VARIANTS]
+VARIANT_IDS = [name for name, _ in VARIANTS]
 
 
 # --------------------------------------------------------------------------- #
@@ -150,57 +145,43 @@ def write_kg(tmp_path, name: str = "kg.json", **kwargs):
 
 
 # --------------------------------------------------------------------------- #
-# Driving one scoring run. ``mod`` is clinical_jepa.score or the old
-# fawkes_core.score_revision -- the merged module keeps every name the old CLI
-# loop body used, so one helper drives both sides.
+# Driving one scoring run. These are ``run()``'s CLI override block and per-file
+# loop body: the merged module keeps every name the old CLI used, which is why
+# the same lines drove the old side when it was still here.
 # --------------------------------------------------------------------------- #
-def configure(mod, cfg):
+def configure(cfg):
     """The slice of ``run()``'s CLI override block this gate exercises."""
     cfg.score.prune_threshold = PRUNE_THRESHOLD
     cfg.score.candidate_threshold = CANDIDATE_THRESHOLD
     cfg.score.candidate_threshold_by_relation = {
-        relation: CANDIDATE_THRESHOLD for relation in mod.RELATIONS
+        relation: CANDIDATE_THRESHOLD for relation in new_score.RELATIONS
     }
-    mod._update_relation_thresholds(cfg.score.weak_threshold_by_relation, WEAK_OVERRIDES)
+    new_score._update_relation_thresholds(
+        cfg.score.weak_threshold_by_relation, WEAK_OVERRIDES
+    )
     return cfg
 
 
-def revise(mod, graph, model, encoder, cfg, device, *, add_candidates):
-    """``run()``'s per-file loop body, verbatim. It is identical in all four
-    old modules, so the same lines drive the old side and the new one."""
-    scores, flags = mod.score_graph(graph, model, encoder, cfg, device)
+def revise(graph, model, encoder, cfg, device, *, add_candidates):
+    """``run()``'s per-file loop body, verbatim."""
+    scores, flags = new_score.score_graph(graph, model, encoder, cfg, device)
     graph.annotate_edges(scores, flags)
-    mod._annotate_revision_actions(graph, cfg)
+    new_score._annotate_revision_actions(graph, cfg)
 
     added = 0
     if add_candidates:
-        added = mod.add_candidate_edges(graph, model, encoder, cfg, device)
-        mod._annotate_revision_actions(graph, cfg)
+        added = new_score.add_candidate_edges(graph, model, encoder, cfg, device)
+        new_score._annotate_revision_actions(graph, cfg)
 
     pruned = 0
     if cfg.score.prune_threshold is not None:
-        pruned = mod._prune(graph, cfg.score.prune_threshold)
+        pruned = new_score._prune(graph, cfg.score.prune_threshold)
     return added, pruned
-
-
-@contextmanager
-def old_v6_data_conversion():
-    """The global mutation old ``graph_jepa_v6/score.py`` performed in ``run()``.
-
-    Restoring on exit is not tidiness: leaving it installed would make every
-    later no-note comparison in this session silently score 1536-wide features.
-    """
-    saved = (old_v3.to_graph_data, old_v4.to_graph_data)
-    old_v6_score._install_v6_data_conversion()
-    try:
-        yield
-    finally:
-        old_v3.to_graph_data, old_v4.to_graph_data = saved
 
 
 def score_with_new(checkpoint_path, kg_path, out_path, *, add_candidates):
     checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
-    cfg = configure(new_score, Config.from_dict(checkpoint["config"]))
+    cfg = configure(Config.from_dict(checkpoint["config"]))
     model = GraphJEPA(cfg.model)
     model.load_state_dict(checkpoint["state_dict"], strict=True)
     model.eval()
@@ -209,7 +190,6 @@ def score_with_new(checkpoint_path, kg_path, out_path, *, add_candidates):
     graph = new_score._load_graph_for_scoring(kg_path)
     new_score._validate_checkpoint_relation_capacity(graph, cfg)
     counts = revise(
-        new_score,
         graph,
         model,
         MockEncoder(dim=cfg.model.base_in_dim),
@@ -219,43 +199,6 @@ def score_with_new(checkpoint_path, kg_path, out_path, *, add_candidates):
     )
     graph.save(out_path)
     return graph, counts
-
-
-def score_with_old(checkpoint_path, old_config_cls, old_model_cls, patched,
-                   kg_path, out_path, *, add_candidates):
-    checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
-    cfg = configure(old_v4, old_config_cls.from_dict(checkpoint["config"]))
-    model = old_model_cls(cfg.model)
-    model.load_state_dict(checkpoint["state_dict"], strict=True)
-    model.eval()
-    # The mock dimension has to come from the merged config: old v5's
-    # ModelConfig has no base_in_dim at all.
-    mock_dim = Config.from_dict(checkpoint["config"]).model.base_in_dim
-
-    def run_old():
-        torch.manual_seed(SEED)
-        graph = old_v4._load_graph_for_scoring(kg_path)
-        old_v4._validate_checkpoint_relation_capacity(graph, cfg)
-        counts = revise(
-            old_v4,
-            graph,
-            model,
-            MockEncoder(dim=mock_dim),
-            cfg,
-            torch.device("cpu"),
-            add_candidates=add_candidates,
-        )
-        graph.save(out_path)
-        return graph, counts
-
-    if patched:
-        with old_v6_data_conversion():
-            return run_old()
-    # The no-note path is the *unpatched* fawkes_core converter. Assert it,
-    # rather than assume no earlier test leaked the v6 rebinding into it.
-    assert old_v3.to_graph_data is old_data_graph.to_graph_data
-    assert old_v4.to_graph_data is old_data_graph.to_graph_data
-    return run_old()
 
 
 def _assert_not_vacuous(graph, added, pruned, *, add_candidates):
@@ -275,37 +218,28 @@ def _assert_not_vacuous(graph, added, pruned, *, add_candidates):
 # The gate.
 # --------------------------------------------------------------------------- #
 @requires_checkpoints
-@pytest.mark.parametrize("add_candidates", [False, True], ids=["revise", "add_candidates"])
-@pytest.mark.parametrize(
-    ("name", "checkpoint_path", "old_config_cls", "old_model_cls", "patched"),
-    VARIANTS,
-    ids=VARIANT_IDS,
-)
-def test_scoring_output_is_byte_identical(
-    tmp_path, name, checkpoint_path, old_config_cls, old_model_cls, patched, add_candidates
-):
+@pytest.mark.parametrize("path_name", ["revise", "add_candidates"])
+@pytest.mark.parametrize(("name", "checkpoint_path"), VARIANTS, ids=VARIANT_IDS)
+def test_scoring_output_is_byte_identical(tmp_path, name, checkpoint_path, path_name):
     """Phase 4 gate, run for both released variants and both output paths.
 
-    ``patched`` selects which old scoring path is the oracle: the no-note
-    variant scored through ``fawkes_core``'s converter, the localized-note
-    variant through the one v6 installed over it. Running only the second would
-    pass while concealing any change to the first.
+    Each of the four pinned files was written by the old scoring path this
+    variant actually used: the no-note variant scored through ``fawkes_core``'s
+    converter, the localized-note variant through the one v6 installed over it.
+    Recording only the second would have left any change to the first invisible.
     """
     kg_path = write_kg(tmp_path)
-    new_out = tmp_path / f"{name}_new.json"
-    old_out = tmp_path / f"{name}_old.json"
+    produced = tmp_path / f"{name}_{path_name}.json"
+    add_candidates = path_name == "add_candidates"
 
-    new_graph, (new_added, new_pruned) = score_with_new(
-        checkpoint_path, kg_path, new_out, add_candidates=add_candidates
-    )
-    _, (old_added, old_pruned) = score_with_old(
-        checkpoint_path, old_config_cls, old_model_cls, patched,
-        kg_path, old_out, add_candidates=add_candidates,
+    graph, counts = score_with_new(
+        checkpoint_path, kg_path, produced, add_candidates=add_candidates
     )
 
-    assert (new_added, new_pruned) == (old_added, old_pruned)
-    assert new_out.read_bytes() == old_out.read_bytes()
-    _assert_not_vacuous(new_graph, new_added, new_pruned, add_candidates=add_candidates)
+    pinned = load_pin(PIN)["revision_counts"][name][path_name]
+    assert list(counts) == pinned
+    assert produced.read_bytes() == (PINNED_OUTPUT / f"{name}_{path_name}.json").read_bytes()
+    _assert_not_vacuous(graph, *counts, add_candidates=add_candidates)
 
 
 @requires_checkpoints
@@ -318,7 +252,7 @@ def test_the_two_variants_do_not_produce_the_same_output(tmp_path):
     """
     kg_path = write_kg(tmp_path)
     outputs = []
-    for name, checkpoint_path, *_ in VARIANTS:
+    for name, checkpoint_path in VARIANTS:
         out = tmp_path / f"{name}.json"
         score_with_new(checkpoint_path, kg_path, out, add_candidates=True)
         outputs.append(out.read_bytes())
@@ -327,47 +261,19 @@ def test_the_two_variants_do_not_produce_the_same_output(tmp_path):
 
 # --------------------------------------------------------------------------- #
 # Divergence 1 (plan section 2.4): the global rebinding, and its removal.
+# ``test_old_v6_monkeypatch_made_the_variants_mutually_exclusive`` demonstrated
+# the defect by triggering it -- installing ``_install_v6_data_conversion`` and
+# watching the no-note scorer raise ``RuntimeError: mat1 and mat2 shapes cannot
+# be multiplied``. That needed the old module to exist, so Phase 8 retired it
+# (``baseline/COVERAGE.md``). The live property is below and needs nothing old.
 # --------------------------------------------------------------------------- #
-@requires_checkpoints
-def test_old_v6_monkeypatch_made_the_variants_mutually_exclusive(tmp_path):
-    """Pins the behaviour ``_install_v6_data_conversion`` had, before deleting it.
-
-    It rebinds ``to_graph_data`` on two ``fawkes_core`` modules and never
-    restores them, so in a process where the localized-note CLI has run once,
-    the no-note scorer feeds 1536-wide features to a 768-wide input projection.
-    """
-    kg_path = write_kg(tmp_path)
-    checkpoint = torch.load(V5_CHECKPOINT, map_location="cpu", weights_only=False)
-    cfg = OldV5Config.from_dict(checkpoint["config"])
-    model = GraphJEPAv5(cfg.model)
-    model.load_state_dict(checkpoint["state_dict"], strict=True)
-    model.eval()
-    encoder = MockEncoder(dim=Config.from_dict(checkpoint["config"]).model.base_in_dim)
-    device = torch.device("cpu")
-
-    def score_once():
-        torch.manual_seed(SEED)
-        graph = old_v4._load_graph_for_scoring(kg_path)
-        return old_v4.score_graph(graph, model, encoder, cfg, device)[0]
-
-    before = score_once()
-    assert any(value > 0.0 for value in before)
-
-    with old_v6_data_conversion():
-        with pytest.raises(RuntimeError, match="mat1 and mat2 shapes cannot be multiplied"):
-            score_once()
-
-    # And the module attributes really were left rebound until the restore.
-    assert old_v3.to_graph_data is old_data_graph.to_graph_data
-    assert score_once() == before
-
-
 @requires_checkpoints
 def test_variants_coexist_in_one_process(tmp_path):
     """What replaces the rebinding: the converter is chosen from ``cfg.model``.
 
     Score no-note, then localized-note, then no-note again. The first and third
-    runs are byte-identical, so the localized-note run left nothing behind.
+    runs are byte-identical, so the localized-note run left nothing behind --
+    which is exactly what the old rebinding could not promise.
     """
     kg_path = write_kg(tmp_path)
     first = tmp_path / "first.json"
@@ -398,12 +304,12 @@ def test_canonical_input_loads_identically(tmp_path):
     :func:`test_relation_keyed_canonical_input_also_stops_being_adapted`.
     """
     kg_path = write_kg(tmp_path)
-    old = old_v4._load_graph_for_scoring(kg_path)
+    old = load_pin(PIN)["loader"]["canonical_fixture"]
     new = new_score._load_graph_for_scoring(kg_path)
 
-    assert new.nodes == old.nodes
-    assert new.edges == old.edges
-    assert new.extra == old.extra
+    assert new.nodes == old["nodes"]
+    assert new.edges == old["edges"]
+    assert new.extra == old["extra"]
 
 
 def test_relation_keyed_canonical_input_also_stops_being_adapted(tmp_path):
@@ -440,24 +346,24 @@ def test_relation_keyed_canonical_input_also_stops_being_adapted(tmp_path):
         )
     )
 
-    assert old_v3._looks_like_mimic_subkg(json.loads(kg_path.read_text()))
+    old = load_pin(PIN)["loader"]["relation_keyed_fixture"]
+    assert old["looks_like_mimic_subkg"] is True
     assert not new_score._looks_like_mimic_subkg(json.loads(kg_path.read_text()))
 
-    old = old_v4._load_graph_for_scoring(kg_path)
     new = new_score._load_graph_for_scoring(kg_path)
 
-    assert old.extra["_method"] == "mimic_subkg_adapter"
+    assert old["method"] == "mimic_subkg_adapter"
     assert all(stamp not in new.extra for stamp in _MIMIC_STAMPS)
 
     # What the encoder embeds and what the scorer indexes -- identical, which is
     # why routing changed and the numbers did not.
-    encoder_visible = lambda graph: [(n.get("type"), n.get("text")) for n in graph.nodes]
-    endpoints = lambda graph: [
-        (e.get("source_id"), e.get("target_id"), e.get("relation"), e.get("type"))
-        for e in graph.edges
+    encoder_visible = [[n.get("type"), n.get("text")] for n in new.nodes]
+    endpoints = [
+        [e.get("source_id"), e.get("target_id"), e.get("relation"), e.get("type")]
+        for e in new.edges
     ]
-    assert encoder_visible(new) == encoder_visible(old)
-    assert endpoints(new) == endpoints(old)
+    assert encoder_visible == old["encoder_visible"]
+    assert endpoints == old["endpoints"]
 
 
 def test_alias_keyed_input_no_longer_routes_through_the_mimic_adapter(tmp_path):
@@ -476,27 +382,22 @@ def test_alias_keyed_input_no_longer_routes_through_the_mimic_adapter(tmp_path):
     the same scores. What changes is the provenance metadata in the output JSON.
     """
     kg_path = write_kg(tmp_path, source_key="source", target_key="target")
-    old = old_v4._load_graph_for_scoring(kg_path)
+    old = load_pin(PIN)["loader"]["alias_fixture"]
     new = new_score._load_graph_for_scoring(kg_path)
 
     # Old only got there via the adapter; new never touches it.
-    assert old.extra["_method"] == "mimic_subkg_adapter"
+    assert old["method"] == "mimic_subkg_adapter"
     assert all(stamp not in new.extra for stamp in _MIMIC_STAMPS)
-    assert all("mimic_type" in node for node in old.nodes)
+    assert old["every_node_stamped"] is True
     assert not any("mimic_type" in node for node in new.nodes)
-    assert all("mimic_relation" in edge for edge in old.edges)
+    assert old["every_edge_stamped"] is True
     assert not any("mimic_relation" in edge for edge in new.edges)
 
     # Everything the scorer actually reads is identical, which is why this
     # changes the output file and not the numbers in it.
-    def scored_fields(graph):
-        return (
-            [{k: v for k, v in n.items() if k != "mimic_type"} for n in graph.nodes],
-            [{k: v for k, v in e.items() if k != "mimic_relation"} for e in graph.edges],
-        )
-
-    assert scored_fields(new) == scored_fields(old)
-    assert {k: v for k, v in old.extra.items() if k not in _MIMIC_STAMPS} == new.extra
+    assert new.nodes == old["nodes_without_stamp"]
+    assert new.edges == old["edges_without_stamp"]
+    assert new.extra == old["extra_without_stamps"]
 
 
 @requires_data
@@ -521,21 +422,19 @@ def test_alias_fold_on_the_real_dataset(tmp_path):
     assert all("source_id" not in edge for edge in record["edges"])
     assert "subject_id" in record
 
-    old = old_v4._load_graph_for_scoring(path)
+    old = load_pin(PIN)["loader"]["real_dataset_first_record"]
     new = new_score._load_graph_for_scoring(path)
 
-    assert old.extra["_method"] == "mimic_subkg_adapter"
+    assert old["method"] == "mimic_subkg_adapter"
     assert all(stamp not in new.extra for stamp in _MIMIC_STAMPS)
-    assert old.extra["_mimic_adapter"]["dropped_nodes"] == 0
-    assert old.extra["_mimic_adapter"]["dropped_edges"] == 0
+    assert old["dropped_nodes"] == 0
+    assert old["dropped_edges"] == 0
 
-    def endpoints(graph):
-        return [(e["source_id"], e["type"], e["target_id"]) for e in graph.edges]
-
-    assert endpoints(new) == endpoints(old)
-    assert [n["id"] for n in new.nodes] == [n["id"] for n in old.nodes]
+    endpoints = [[e["source_id"], e["type"], e["target_id"]] for e in new.edges]
+    assert endpoints == old["endpoints"]
+    assert [n["id"] for n in new.nodes] == old["node_ids"]
     # node_encoder_keys() is (type, text); identical keys mean identical scores.
-    assert new.node_encoder_keys() == old.node_encoder_keys()
+    assert [list(key) for key in new.node_encoder_keys()] == old["node_encoder_keys"]
 
 
 # --------------------------------------------------------------------------- #
@@ -553,21 +452,23 @@ def test_unscoreable_graph_still_gets_the_schema_guard():
     edge = {"source_id": "A", "target_id": "B", "type": "INDICATES",
             "evidence": "", "turn_id": ""}
     new_graph = NewPatientGraph(nodes=[], edges=[dict(edge)])
-    old_graph = OldPatientGraph(nodes=[], edges=[dict(edge)])
     device = torch.device("cpu")
 
-    new_out = new_score.score_graph(new_graph, None, None, Config(), device)
-    old_out = old_v4.score_graph(old_graph, None, None, OldFawkesConfig(), device)
+    old = load_pin(PIN)["schema_guard"]
+    scores, flags = new_score.score_graph(new_graph, None, None, Config(), device)
 
-    assert new_out == old_out == ([0.0], ["inconsistent"])
-    assert new_graph.edges == old_graph.edges
+    assert [scores, flags] == old["result"] == [[0.0], ["inconsistent"]]
+    assert new_graph.edges == old["edges"]
     assert new_graph.edges[0]["jepa_schema_valid"] is False
     assert new_graph.edges[0]["jepa_schema_error"] == "missing source node 'A'"
 
 
 def test_install_v6_data_conversion_is_gone():
+    """``graph_jepa_v6/score.py`` really did define ``_install_v6_data_conversion``
+    -- that was the other half of this assertion until Phase 8, and
+    ``baseline/COVERAGE.md`` records it. The half that still runs is the one that
+    would notice it coming back."""
     assert not hasattr(new_score, "_install_v6_data_conversion")
-    assert hasattr(old_v6_score, "_install_v6_data_conversion")  # it really existed
 
 
 # The 15 module-level assignments score_revision.py used to re-export from
@@ -592,15 +493,22 @@ _OLD_REEXPORTS = [
 
 
 def test_reexport_block_is_gone():
-    """Every name score_revision re-exported is defined in score.py itself."""
+    """Every name score_revision re-exported is defined in score.py itself.
+
+    That each of the 15 really was a re-export -- ``getattr(score_revision, n) is
+    getattr(score_base, n)`` -- needed both old modules to assert, so Phase 8
+    retired that half (``baseline/COVERAGE.md``). What survives is the half that
+    matters going forward: all 15 names exist here, are defined here, and the two
+    vocabularies still hold what the old module held.
+    """
+    old = load_pin(PIN)["reexports"]
     assert len(_OLD_REEXPORTS) == 15
     for name in _OLD_REEXPORTS:
-        assert getattr(old_v4, name) is getattr(old_v3, name), f"{name} was not a re-export"
         value = getattr(new_score, name)
         if callable(value):
             assert value.__module__ == "clinical_jepa.score", name
-    assert new_score.RELATIONS == old_v3.RELATIONS
-    assert new_score.NEGATED_OR_ABSENT_MARKERS == old_v3.NEGATED_OR_ABSENT_MARKERS
+    assert sorted(new_score.RELATIONS) == old["RELATIONS"]
+    assert list(new_score.NEGATED_OR_ABSENT_MARKERS) == old["NEGATED_OR_ABSENT_MARKERS"]
 
 
 def test_parser_keeps_every_released_option():
@@ -611,12 +519,13 @@ def test_parser_keeps_every_released_option():
     ``.cache/fawkes_core/encoder``). One module cannot keep three, and the cache
     is keyed by a hash of ``(type, text)``, so a shared directory is a superset
     of any of them.
+
+    The three old parsers had identical option sets, which
+    ``baseline/record_old_pins.py`` asserted before writing one list.
     """
     new = new_score.build_arg_parser()
-    options = {tuple(a.option_strings) for a in new._actions}
-    for old_parser in (old_v3.build_arg_parser(), old_v5_score.build_arg_parser(),
-                       old_v6_score.build_arg_parser()):
-        assert {tuple(a.option_strings) for a in old_parser._actions} == options
+    options = sorted(list(a.option_strings) for a in new._actions)
+    assert options == load_pin(PIN)["parser_options"]
 
     args = new.parse_args([
         "--input", "in.json", "--checkpoint", "c.pt", "--output", "out.json",

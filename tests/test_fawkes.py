@@ -2,13 +2,14 @@
 
 `docs/RESTRUCTURE_PLAN.md` calls this the highest-risk phase: `paper_v16/trainer.py`
 is the one artifact that backs the paper, and it was split five ways. Every test
-here is an equality check against either `old_src/paper_v16` running in the same
-process or a `baseline/*.json` recorded from it before the split.
+here is an equality check against a `baseline/*.json` recorded from that trainer
+— the LOO metrics and `state_dict` keys in Phase 0, everything else in Phase 8
+(`baseline/old_fawkes.json`) as the old tree was retired.
 
 The three gates the plan names are `test_loo_reproduces_baseline`,
 `test_state_dict_keys_match_baseline`, and `test_no_module_scope_environment_reads`.
 The rest localize a failure: if `to_data` drifts, the LOO gate fails too, but the
-`to_data` differential says which of the five modules moved.
+`to_data` comparison says which of the five modules moved.
 """
 
 from __future__ import annotations
@@ -18,14 +19,16 @@ import json
 import os
 import subprocess
 import sys
-from dataclasses import fields
+from dataclasses import asdict, fields
 from pathlib import Path
 
 import numpy as np
 import pytest
 import torch
 
-from conftest import BASELINE, DATA, ROOT, assert_state_dict_equal, requires_data
+from conftest import (BASELINE, DATA, ROOT, assert_digests_match, assert_state_dict_equal,
+                      digest_data, digest_fields, fold_digests, load_pin,
+                      requires_data)
 
 from fawkes.config import Config
 from fawkes.data import resolve_rel, to_data
@@ -34,6 +37,7 @@ from fawkes.evaluate import (_load_graphs, cascade_evaluate, eir_uplift_eval, ev
 from fawkes.model import JEPA, DistMult, Encoder
 from fawkes.train import jepa_step, readout_step
 
+PIN = "old_fawkes.json"
 PAPER_CKPT = ROOT / "models/fawkes-entity-note/fawkes_trainer_jepa_entity_note_v16_260615.pt"
 FAWKES_SRC = ROOT / "src/fawkes"
 
@@ -202,43 +206,49 @@ def test_two_configurations_coexist():
     assert without_note.checkpoint_name == "fawkes_no_note.pt"
 
 
-# ---- Differential against old_src: localize a failure to one module ----
+# ---- Against the recorded trainer: localize a failure to one module ----
 
-def test_config_from_env_matches_trainer_globals():
+@pytest.mark.parametrize("environment", ["defaults", "non_default"])
+def test_config_from_env_matches_trainer_globals(environment):
     """Every env var the trainer read is a Config field with the same value.
 
-    Reads the ambient environment on both sides, so this holds whatever
-    USE_NOTE/GROUND_BY/... the suite is run under, not just the defaults.
+    The trainer read ~30 of them at import, so one process could only ever
+    observe one configuration -- which is why the recorded globals come from a
+    subprocess per environment and why ``from_env`` is read the same way here.
+    Two environments rather than one: the retired differential read the ambient
+    environment on both sides, so it held for any configuration, and a pin can
+    only hold for the configurations recorded. ``non_default`` is the one that
+    keeps the int/float/bool/lowercase/comma-list parsing rules under test.
     """
-    from paper_v16 import trainer
-
-    pairs = [
-        ("data_repo", "DATA_REPO"), ("data_file", "DATA_FILE"), ("data_path", "DATA_PATH"),
-        ("push", "PUSH"), ("output_repo", "OUTPUT_REPO"),
-        ("jepa_epochs", "JEPA_EPOCHS"), ("readout_epochs", "READOUT_EPOCHS"),
-        ("batch", "BATCH"), ("lr", "LR"), ("seed", "SEED"), ("deterministic", "DETERMINISTIC"),
-        ("hid", "HID"), ("layers", "LAYERS"), ("heads", "HEADS"), ("edge_emb", "EDGE_EMB"),
-        ("entity_vocab", "ENTITY_VOCAB"), ("use_entity_emb", "USE_ENTITY_EMB"),
-        ("query_entity", "QUERY_ENTITY"), ("decoder", "DECODER"), ("semantic_ent", "SEMANTIC_ENT"),
-        ("use_scores", "USE_SCORES"), ("prune_no_evidence", "PRUNE_NO_EVIDENCE"),
-        ("use_note", "USE_NOTE"), ("embed_dim", "EMBED_DIM"), ("ground_by", "GROUND_BY"),
-        ("node_mask", "NODE_MASK"), ("edge_mask", "EDGE_MASK"),
-        ("ema_base", "EMA_BASE"), ("ema_final", "EMA_FINAL"),
-        ("freeze_encoder", "FREEZE"), ("neg_k", "NEG_K"), ("temp", "TEMP"), ("loss", "LOSS"),
-        ("mask_schedule", "MASK_SCHEDULE"), ("mask_lo", "MASK_LO"), ("mask_hi", "MASK_HI"),
-        ("target_weight", "TARGET_WEIGHT"),
-        ("val_frac", "VAL_FRAC"), ("test_frac", "TEST_FRAC"), ("mrr_cap", "MRR_CAP"),
-        ("freeze_eval", "FREEZE_EVAL"), ("loo_cap", "LOO_CAP"), ("run_eir", "RUN_EIR"),
-        ("eir_holdout", "EIR_HOLDOUT"), ("eir_fuzzy", "EIR_FUZZY"),
-        ("run_cascade", "RUN_CASCADE"), ("cascade_order", "CASCADE_ORDER"),
-    ]
-    assert {f.name for f in fields(Config)} == {field for field, _ in pairs}, (
+    pinned = load_pin(PIN)["trainer_globals"]
+    field_to_global = pinned["field_to_global"]
+    assert {f.name for f in fields(Config)} == set(field_to_global), (
         "a Config field has no counterpart in trainer.py — map it or justify it here")
 
-    cfg = Config.from_env()
-    for field, global_name in pairs:
-        assert getattr(cfg, field) == getattr(trainer, global_name), f"{field} / {global_name}"
-    assert cfg.numeric_dim == trainer.NUMERIC_DIM
+    entry = pinned["environments"][environment]
+    env = {"PATH": os.environ.get("PATH", ""), "PYTHONPATH": str(ROOT / "src"),
+           **entry["env"]}
+    result = subprocess.run(
+        [sys.executable, "-c",
+         "import json, sys\n"
+         "from dataclasses import asdict\n"
+         "from fawkes.config import Config\n"
+         "cfg = Config.from_env()\n"
+         "print(json.dumps({'globals': asdict(cfg), 'numeric_dim': cfg.numeric_dim}))\n"],
+        env=env, capture_output=True, text=True, cwd=ROOT,
+    )
+    assert result.returncode == 0, result.stderr
+    produced = json.loads(result.stdout)
+
+    for field in sorted(field_to_global):
+        assert produced["globals"][field] == entry["globals"][field], (
+            f"{field} / {field_to_global[field]}")
+    assert produced["numeric_dim"] == entry["numeric_dim"]
+
+    # Config() and an unset environment describe the same experiment -- the
+    # class docstring's claim, which nothing else checks.
+    if environment == "defaults":
+        assert asdict(Config()) == entry["globals"]
 
 
 def _sample_graphs(cfg, n):
@@ -251,40 +261,42 @@ def _sample_graphs(cfg, n):
 @requires_paper_checkpoint
 @requires_data
 def test_training_steps_match_trainer():
-    """jepa_step and readout_step, bit-for-bit, against old_src.
+    """jepa_step and readout_step, bit-for-bit, against the recorded trainer.
 
     Neither is on the inference path, so the LOO gates say nothing about them —
     but they are ~90 lines of hand-transcribed tensor code and a drift here would
     only surface as a bad checkpoint after a full retrain. Both draw randomness,
-    so each side is seeded identically before the call.
+    so both sides were seeded identically before the call, and `JEPA`'s
+    initialisation comes off `model_init_seed` rather than being unseeded — the
+    recorder copied exactly these weights into the old class.
     """
     from torch_geometric.loader import DataLoader
-    from paper_v16 import trainer as old
 
+    pinned = load_pin(PIN)["training_steps"]
     cfg = Config()
     device = torch.device("cpu")
     graphs = [d for d, _ in _sample_graphs(cfg, 64)]
     batch = next(iter(DataLoader(graphs, batch_size=16, shuffle=False)))
 
-    new_model, old_model = JEPA(cfg), old.JEPA()
-    old_model.load_state_dict(new_model.state_dict())      # same weights, different class
+    torch.manual_seed(pinned["model_init_seed"])
+    model = JEPA(cfg)
     torch.manual_seed(0)
-    new_loss, new_std = jepa_step(new_model, batch.clone(), device, cfg)
-    torch.manual_seed(0)
-    old_loss, old_std = old.jepa_step(old_model, batch.clone(), device)
-    assert torch.equal(new_loss, old_loss) and torch.equal(new_std, old_std)
+    loss, std = jepa_step(model, batch.clone(), device, cfg)
 
     encoder, scorer, _ = _load_paper_model(cfg)
-    old_enc, old_sc = old.Encoder(), old.DistMult()
-    old_enc.load_state_dict(encoder.state_dict())
-    old_sc.load_state_dict(scorer.state_dict())
-    gen_args = dict(gen=torch.Generator(device=device).manual_seed(7), mask_ratio=0.3)
-    new_out = readout_step(encoder, scorer, batch.clone(), device, False, cfg, **gen_args)
-    gen_args["gen"] = torch.Generator(device=device).manual_seed(7)
-    old_out = old.readout_step(old_enc, old_sc, batch.clone(), device, False, **gen_args)
-    for i in range(4):
-        assert torch.equal(new_out[i], old_out[i]), f"readout_step return[{i}]"
-    assert new_out[4][-1] == old_out[4][-1], "qsig"
+    out = readout_step(
+        encoder, scorer, batch.clone(), device, False, cfg,
+        gen=torch.Generator(device=device).manual_seed(7), mask_ratio=0.3,
+    )
+    assert_digests_match(
+        digest_fields({
+            "jepa_step.loss": loss,
+            "jepa_step.emb_std": std,
+            **{f"readout_step[{i}]": out[i] for i in range(4)},
+        }),
+        pinned["tensors"],
+    )
+    assert out[4][-1] == pinned["readout_step.qsig"], "qsig"
 
 
 @requires_paper_checkpoint
@@ -292,45 +304,53 @@ def test_training_steps_match_trainer():
 def test_batchmask_cascade_and_eir_match_trainer():
     """The three evaluators the LOO gates do not exercise."""
     from torch_geometric.loader import DataLoader
-    from paper_v16 import trainer as old
 
+    pinned = load_pin(PIN)["evaluators"]
     cfg = Config()
     device = torch.device("cpu")
     pairs = _sample_graphs(cfg, 64)
     graphs = [d for d, _ in pairs]
     encoder, scorer, _ = _load_paper_model(cfg)
-    old_enc, old_sc = old.Encoder(), old.DistMult()
-    old_enc.load_state_dict(encoder.state_dict())
-    old_sc.load_state_dict(scorer.state_dict())
 
-    loader = lambda: DataLoader(graphs, batch_size=1, shuffle=False)
-    assert evaluate(encoder, scorer, loader(), device, cfg) == \
-        old.evaluate(old_enc, old_sc, loader(), device)
+    loader = DataLoader(graphs, batch_size=1, shuffle=False)
+    assert evaluate(encoder, scorer, loader, device, cfg) == pinned["evaluate"]
 
     order = [resolve_rel(r) for r in cfg.cascade_order]
     assert cascade_evaluate(encoder, scorer, graphs, order, device, cfg) == \
-        old.cascade_evaluate(old_enc, old_sc, graphs, order, device)
+        pinned["cascade_evaluate"]
 
     assert eir_uplift_eval(encoder, scorer, pairs, 0.5, device, cfg) == \
-        old.eir_uplift_eval(old_enc, old_sc, pairs, 0.5, device)
+        pinned["eir_uplift_eval"]
 
 
 @requires_data
 def test_to_data_matches_trainer():
-    """The data path, elementwise, over every record in the shipped dataset.
+    """The data path, over every record in the shipped dataset.
 
-    Uses the ambient environment for both sides for the same reason as above.
+    The pin is a per-field digest folded per record, plus one digest per field
+    over all 4,000, so a failure names the record *and* the field rather than
+    only reporting that something in a 234 MB conversion moved. Tracking the
+    tensors themselves is not an option: ``numfeat`` alone is (nodes x 774) per
+    record.
+
+    ``Config()`` rather than ``Config.from_env()``: the pin is the released
+    configuration, and ``test_config_from_env_matches_trainer_globals`` is what
+    covers ``from_env``'s parsing. Reading the ambient environment here would
+    make this fail for a stray ``USE_NOTE=0`` rather than for a real drift.
     """
-    from paper_v16 import trainer
-
-    cfg = Config.from_env()
+    pinned = load_pin(PIN)["to_data"]
+    cfg = Config()
     raw, demographics = _load_graphs(DATA, None)
-    for i, graph in enumerate(raw):
-        new, old = to_data(graph, demographics, cfg), trainer.to_data(graph, demographics)
-        assert set(new.keys()) == set(old.keys()), i
-        for key in sorted(new.keys()):
-            a, b = new[key], old[key]
-            if torch.is_tensor(a):
-                assert a.dtype == b.dtype and torch.equal(a, b), f"record {i}, {key}"
-            else:
-                assert a == b, f"record {i}, {key}: {a!r} != {b!r}"
+    assert len(raw) == pinned["records"]
+
+    per_key = {key: [] for key in pinned["keys"]}
+    for index, graph in enumerate(raw):
+        fields_ = digest_data(to_data(graph, demographics, cfg))
+        assert sorted(fields_) == pinned["keys"], index
+        for key, value in fields_.items():
+            per_key[key].append(value)
+        assert fold_digests(fields_) == pinned["per_record"][index], f"record {index}"
+
+    # Named per field too, so a systematic drift reads as "numfeat moved"
+    # instead of "record 0 moved, and so did the other 3,999".
+    assert {key: fold_digests(values) for key, values in per_key.items()} == pinned["per_key"]

@@ -35,7 +35,7 @@ variant now accepts inputs it used to reject. It is covered by its own test
 :func:`normalize_graph_aliases` is that single normalizer, and every consumer
 calls it rather than re-deriving the rule — today ``graph/tensors.py``, and in
 Phase 4 the scoring path (which still carries its own copy in
-``old_src/fawkes_core/score_base.py::_looks_like_mimic_subkg``). Graphs loaded
+``fawkes_core/score_base.py::_looks_like_mimic_subkg``). Graphs loaded
 through :func:`adapt_mimic_subkg` are already alias-normalized by
 :func:`_adapt_mimic_edge`, which applies the same decision at the JSONL loading
 boundary.
