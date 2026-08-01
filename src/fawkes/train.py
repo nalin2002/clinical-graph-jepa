@@ -55,125 +55,135 @@ def set_seed(cfg):
         torch.use_deterministic_algorithms(True, warn_only=True)
 
 
-def valid_mask(b, ng, ratio, device, tries=10):
-    n = b.size(0)
+def valid_mask(batch_index, num_graphs, ratio, device, tries=10):
+    num_nodes = batch_index.size(0)
     for _ in range(tries):
-        m = torch.rand(n, device=device) < ratio
-        tg = torch.zeros(ng, device=device).scatter_add_(0, b, m.float())
-        ct = torch.zeros(ng, device=device).scatter_add_(0, b, (~m).float())
-        if bool((tg > 0).all()) and bool((ct > 0).all()):
-            return m
+        mask = torch.rand(num_nodes, device=device) < ratio
+        targets_per_graph = torch.zeros(num_graphs, device=device).scatter_add_(0, batch_index, mask.float())
+        context_per_graph = torch.zeros(num_graphs, device=device).scatter_add_(0, batch_index, (~mask).float())
+        if bool((targets_per_graph > 0).all()) and bool((context_per_graph > 0).all()):
+            return mask
     raise RuntimeError(f"[FAILURE] no valid node mask after {tries} tries (ratio={ratio}); graphs too small.")
 
 
-def jepa_step(model, b, device, cfg):
-    b = b.to(device)
-    nt, eid, numf, ei, et, bt = b.node_type, b.entity_id, b.numfeat, b.edge_index, b.edge_type, b.batch
-    N = nt.size(0)
-    ng = int(bt.max().item()) + 1
-    tmask = valid_mask(bt, ng, cfg.node_mask, device)
-    cmask = ~tmask
-    cn = cmask.nonzero(as_tuple=False).view(-1)
+def jepa_step(model, batch, device, cfg):
+    batch = batch.to(device)
+    node_type, entity_id, numfeat = batch.node_type, batch.entity_id, batch.numfeat
+    edge_index, edge_type, batch_index = batch.edge_index, batch.edge_type, batch.batch
+    num_nodes = node_type.size(0)
+    num_graphs = int(batch_index.max().item()) + 1
+    target_mask = valid_mask(batch_index, num_graphs, cfg.node_mask, device)
+    context_mask = ~target_mask
+    context_nodes = context_mask.nonzero(as_tuple=False).view(-1)
     if cfg.use_scores:
-        cei, cet, emask = subgraph(cn, ei, edge_attr=et, relabel_nodes=True, num_nodes=N, return_edge_mask=True)
-        cef = b.edge_feat[emask]
-        cei, cet, cef = add_inverses(cei, cet, cef)
-        ch = model.ctx(nt[cn], eid[cn], numf[cn], cei, cet, cef, b.sem_id[cn])
+        ctx_edge_index, ctx_edge_type, kept_edges = subgraph(
+            context_nodes, edge_index, edge_attr=edge_type, relabel_nodes=True, num_nodes=num_nodes, return_edge_mask=True)
+        ctx_edge_feat = batch.edge_feat[kept_edges]
+        ctx_edge_index, ctx_edge_type, ctx_edge_feat = add_inverses(ctx_edge_index, ctx_edge_type, ctx_edge_feat)
+        context_repr = model.ctx(node_type[context_nodes], entity_id[context_nodes], numfeat[context_nodes],
+                                 ctx_edge_index, ctx_edge_type, ctx_edge_feat, batch.sem_id[context_nodes])
     else:
-        cei, cet = subgraph(cn, ei, edge_attr=et, relabel_nodes=True, num_nodes=N)
-        cei, cet = add_inverses(cei, cet)
-        ch = model.ctx(nt[cn], eid[cn], numf[cn], cei, cet, None, b.sem_id[cn])
-    csum = global_mean_pool(ch, bt[cn], size=ng)
+        ctx_edge_index, ctx_edge_type = subgraph(
+            context_nodes, edge_index, edge_attr=edge_type, relabel_nodes=True, num_nodes=num_nodes)
+        ctx_edge_index, ctx_edge_type = add_inverses(ctx_edge_index, ctx_edge_type)
+        context_repr = model.ctx(node_type[context_nodes], entity_id[context_nodes], numfeat[context_nodes],
+                                 ctx_edge_index, ctx_edge_type, None, batch.sem_id[context_nodes])
+    context_summary = global_mean_pool(context_repr, batch_index[context_nodes], size=num_graphs)
     with torch.no_grad():
         if cfg.use_scores:
-            fei, fet, fef = add_inverses(ei, et, b.edge_feat)
-            th = model.tgt(nt, eid, numf, fei, fet, fef, b.sem_id)
+            full_edge_index, full_edge_type, full_edge_feat = add_inverses(edge_index, edge_type, batch.edge_feat)
+            target_repr = model.tgt(node_type, entity_id, numfeat, full_edge_index, full_edge_type, full_edge_feat, batch.sem_id)
         else:
-            fei, fet = add_inverses(ei, et)
-            th = model.tgt(nt, eid, numf, fei, fet, None, b.sem_id)
-        emb_std = th.std(0).mean()
-    tn = tmask.nonzero(as_tuple=False).view(-1)
-    tgt = F.normalize(th[tn], dim=-1)
-    g2c = torch.full((N,), -1, dtype=torch.long, device=device)
-    g2c[cn] = torch.arange(cn.numel(), device=device)
-    s_, d_ = ei[0], ei[1]
-    m1 = tmask[s_] & cmask[d_]
-    m2 = tmask[d_] & cmask[s_]
-    tgt_ep = torch.cat([s_[m1], d_[m2]])
-    nbr = torch.cat([d_[m1], s_[m2]])
-    rels = torch.cat([et[m1], et[m2] + NUM_BASE])
-    msg = ch[g2c[nbr]] + model.slot_rel(rels)
-    slot = torch.zeros(N, cfg.hid, device=device).index_add_(0, tgt_ep, msg)
-    cnt = torch.zeros(N, device=device).index_add_(0, tgt_ep, torch.ones(tgt_ep.numel(), device=device))
-    slot = slot / cnt.clamp(min=1).unsqueeze(-1)
-    q = slot[tn] + model.ctx.type_emb(nt[tn])
+            full_edge_index, full_edge_type = add_inverses(edge_index, edge_type)
+            target_repr = model.tgt(node_type, entity_id, numfeat, full_edge_index, full_edge_type, None, batch.sem_id)
+        emb_std = target_repr.std(0).mean()
+    target_nodes = target_mask.nonzero(as_tuple=False).view(-1)
+    target_emb = F.normalize(target_repr[target_nodes], dim=-1)
+    global_to_context = torch.full((num_nodes,), -1, dtype=torch.long, device=device)
+    global_to_context[context_nodes] = torch.arange(context_nodes.numel(), device=device)
+    edge_src, edge_dst = edge_index[0], edge_index[1]
+    src_is_target = target_mask[edge_src] & context_mask[edge_dst]
+    dst_is_target = target_mask[edge_dst] & context_mask[edge_src]
+    masked_endpoints = torch.cat([edge_src[src_is_target], edge_dst[dst_is_target]])
+    neighbors = torch.cat([edge_dst[src_is_target], edge_src[dst_is_target]])
+    neighbor_rels = torch.cat([edge_type[src_is_target], edge_type[dst_is_target] + NUM_BASE])
+    messages = context_repr[global_to_context[neighbors]] + model.slot_rel(neighbor_rels)
+    slot = torch.zeros(num_nodes, cfg.hid, device=device).index_add_(0, masked_endpoints, messages)
+    msg_count = torch.zeros(num_nodes, device=device).index_add_(
+        0, masked_endpoints, torch.ones(masked_endpoints.numel(), device=device))
+    slot = slot / msg_count.clamp(min=1).unsqueeze(-1)
+    query = slot[target_nodes] + model.ctx.type_emb(node_type[target_nodes])
     if cfg.query_entity:
-        q = q + model.ctx.entity_emb(eid[tn])
-    pred = F.normalize(model.pred(torch.cat([csum[bt[tn]], q], -1)), dim=-1)
-    return (2 - 2 * (pred * tgt).sum(-1)).mean(), emb_std
+        query = query + model.ctx.entity_emb(entity_id[target_nodes])
+    prediction = F.normalize(model.pred(torch.cat([context_summary[batch_index[target_nodes]], query], -1)), dim=-1)
+    return (2 - 2 * (prediction * target_emb).sum(-1)).mean(), emb_std
 
 
-def buckets(nt, bt):
-    bk = bt * NUM_NODE_TYPES + nt
-    o = torch.argsort(bk)
-    return o, bk[o]
+def buckets(node_type, batch_index):
+    bucket_ids = batch_index * NUM_NODE_TYPES + node_type
+    order = torch.argsort(bucket_ids)
+    return order, bucket_ids[order]
 
 
-def same_type_k(targets, nt, bt, o, sb, K, gen=None):
-    tb = bt[targets] * NUM_NODE_TYPES + nt[targets]
-    lo = torch.searchsorted(sb, tb, right=False)
-    hi = torch.searchsorted(sb, tb, right=True)
+def same_type_k(targets, node_type, batch_index, order, sorted_buckets, num_neg, gen=None):
+    target_buckets = batch_index[targets] * NUM_NODE_TYPES + node_type[targets]
+    lo = torch.searchsorted(sorted_buckets, target_buckets, right=False)
+    hi = torch.searchsorted(sorted_buckets, target_buckets, right=True)
     span = (hi - lo).clamp(min=1).float()
-    r = torch.rand(targets.numel(), K, device=targets.device, generator=gen)
-    pick = (r * span.unsqueeze(1)).long() + lo.unsqueeze(1)
-    return o[pick.clamp(max=o.numel() - 1)]
+    rand = torch.rand(targets.numel(), num_neg, device=targets.device, generator=gen)
+    picks = (rand * span.unsqueeze(1)).long() + lo.unsqueeze(1)
+    return order[picks.clamp(max=order.numel() - 1)]
 
 
-def readout_step(enc, scorer, b, device, train, cfg, gen=None, mask_ratio=None):
-    b = b.to(device)
-    nt, eid, numf, ei, et, bt = b.node_type, b.entity_id, b.numfeat, b.edge_index, b.edge_type, b.batch
-    E = ei.size(1)
-    if E < 2:
+def readout_step(encoder, scorer, batch, device, training, cfg, gen=None, mask_ratio=None):
+    batch = batch.to(device)
+    node_type, entity_id, numfeat = batch.node_type, batch.entity_id, batch.numfeat
+    edge_index, edge_type, batch_index = batch.edge_index, batch.edge_type, batch.batch
+    num_edges = edge_index.size(1)
+    if num_edges < 2:
         return None
     ratio = mask_ratio if mask_ratio is not None else cfg.edge_mask   # (v13) mask schedule: held-edge fraction
-    perm = torch.randperm(E, device=device, generator=gen)
-    k = max(1, min(E - 1, int(ratio * E)))
-    hold = perm[:k]
-    obs = perm[k:]
+    perm = torch.randperm(num_edges, device=device, generator=gen)
+    num_held = max(1, min(num_edges - 1, int(ratio * num_edges)))
+    held = perm[:num_held]
+    observed = perm[num_held:]
     if cfg.use_scores:
-        oei, oet, oef = add_inverses(ei[:, obs], et[obs], b.edge_feat[obs])   # observed-only -> held-out scores never seen (no leak)
+        obs_edge_index, obs_edge_type, obs_edge_feat = add_inverses(
+            edge_index[:, observed], edge_type[observed], batch.edge_feat[observed])   # observed-only -> held-out scores never seen (no leak)
     else:
-        oei, oet = add_inverses(ei[:, obs], et[obs])
-        oef = None
-    ctxmgr = torch.enable_grad() if (train and not cfg.freeze_encoder) else torch.no_grad()
-    with ctxmgr:
-        h = enc(nt, eid, numf, oei, oet, oef, b.sem_id)
-    pu, pv, pr = ei[0, hold], ei[1, hold], et[hold]
-    o, sb = buckets(nt, bt)
-    nvk = same_type_k(pv, nt, bt, o, sb, cfg.neg_k, gen=gen)
-    Pn = pu.numel()
-    u_rep = pu.unsqueeze(1).expand(Pn, cfg.neg_k).reshape(-1)
-    r_rep = pr.unsqueeze(1).expand(Pn, cfg.neg_k).reshape(-1)
-    pos = scorer(h, pu, pv, pr).view(Pn, 1)
-    neg = scorer(h, u_rep, nvk.reshape(-1), r_rep).view(Pn, cfg.neg_k)
-    logits = torch.cat([pos, neg], 1) / cfg.temp
-    logits[:, 1:][nvk == pv.unsqueeze(1)] = -1e9
+        obs_edge_index, obs_edge_type = add_inverses(edge_index[:, observed], edge_type[observed])
+        obs_edge_feat = None
+    grad_mode = torch.enable_grad() if (training and not cfg.freeze_encoder) else torch.no_grad()
+    with grad_mode:
+        hidden = encoder(node_type, entity_id, numfeat, obs_edge_index, obs_edge_type, obs_edge_feat, batch.sem_id)
+    held_src, held_dst, held_rel = edge_index[0, held], edge_index[1, held], edge_type[held]
+    order, sorted_buckets = buckets(node_type, batch_index)
+    neg_dst = same_type_k(held_dst, node_type, batch_index, order, sorted_buckets, cfg.neg_k, gen=gen)
+    num_pos = held_src.numel()
+    src_expanded = held_src.unsqueeze(1).expand(num_pos, cfg.neg_k).reshape(-1)
+    rel_expanded = held_rel.unsqueeze(1).expand(num_pos, cfg.neg_k).reshape(-1)
+    pos_scores = scorer(hidden, held_src, held_dst, held_rel).view(num_pos, 1)
+    neg_scores = scorer(hidden, src_expanded, neg_dst.reshape(-1), rel_expanded).view(num_pos, cfg.neg_k)
+    logits = torch.cat([pos_scores, neg_scores], 1) / cfg.temp
+    logits[:, 1:][neg_dst == held_dst.unsqueeze(1)] = -1e9
     if cfg.loss == "bce":
-        pos1 = pos.squeeze(1)
-        neg1 = neg[:, 0]
-        logits_bce = torch.cat([pos1, neg1])
-        labels = torch.cat([torch.ones_like(pos1), torch.zeros_like(neg1)])
+        pos_flat = pos_scores.squeeze(1)
+        neg_flat = neg_scores[:, 0]
+        logits_bce = torch.cat([pos_flat, neg_flat])
+        labels = torch.cat([torch.ones_like(pos_flat), torch.zeros_like(neg_flat)])
         loss = F.binary_cross_entropy_with_logits(logits_bce, labels)
     else:
         if cfg.target_weight != 1.0:                                 # (v13) upweight the 4 inferred relations
-            ce = F.cross_entropy(logits, torch.zeros(Pn, dtype=torch.long, device=device), reduction='none')
-            is_t = torch.isin(pr, torch.tensor(sorted(TARGET_REL_IDS), device=device))
-            w = torch.where(is_t, torch.full((Pn,), cfg.target_weight, device=device), torch.ones(Pn, device=device))
-            loss = (ce * w).sum() / w.sum()
+            per_edge_ce = F.cross_entropy(logits, torch.zeros(num_pos, dtype=torch.long, device=device), reduction='none')
+            is_target = torch.isin(held_rel, torch.tensor(sorted(TARGET_REL_IDS), device=device))
+            weights = torch.where(is_target, torch.full((num_pos,), cfg.target_weight, device=device),
+                                  torch.ones(num_pos, device=device))
+            loss = (per_edge_ce * weights).sum() / weights.sum()
         else:
-            loss = F.cross_entropy(logits, torch.zeros(Pn, dtype=torch.long, device=device))
-    qsig = (int(hold.sum().item()) * 1000003 + int(nvk.reshape(-1).sum().item()) + E * 7919) if gen is not None else 0
-    return loss, pos.squeeze(1).detach(), neg[:, 0].detach(), (nt[pu] != 0).detach(), (h.detach(), pu, pv, pr, nt, bt, qsig)
+            loss = F.cross_entropy(logits, torch.zeros(num_pos, dtype=torch.long, device=device))
+    qsig = (int(held.sum().item()) * 1000003 + int(neg_dst.reshape(-1).sum().item()) + num_edges * 7919) if gen is not None else 0
+    return (loss, pos_scores.squeeze(1).detach(), neg_scores[:, 0].detach(), (node_type[held_src] != 0).detach(),
+            (hidden.detach(), held_src, held_dst, held_rel, node_type, batch_index, qsig))
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
@@ -219,188 +229,190 @@ def main(argv=None):
     logger.info(f"[ENTRY] ENTITY-NOTE v16 | data={cfg.data_repo} use_note={cfg.use_note} ground_by={cfg.ground_by} embed_dim={cfg.embed_dim} numeric_dim={cfg.numeric_dim} use_scores={cfg.use_scores} prune_no_evidence={cfg.prune_no_evidence} mask_schedule={cfg.mask_schedule}[{cfg.mask_lo},{cfg.mask_hi}] target_weight={cfg.target_weight} cascade={cfg.run_cascade} order={cfg.cascade_order} jepa_ep={cfg.jepa_epochs} readout_ep={cfg.readout_epochs} loo_cap={cfg.loo_cap} run_eir={cfg.run_eir} "
                 f"hid={cfg.hid} node_mask={cfg.node_mask} edge_mask={cfg.edge_mask} entity_emb={cfg.use_entity_emb} decoder={cfg.decoder} loss={cfg.loss} neg_k={cfg.neg_k} freeze_eval={cfg.freeze_eval} deterministic={cfg.deterministic} val={cfg.val_frac} test={cfg.test_frac} seed={cfg.seed}")
     set_seed(cfg)
-    dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    logger.info(f"[GPU] {dev}" + (f" {torch.cuda.get_device_name(0)}" if dev.type == 'cuda' else ""))
-    raw, demo = load_full_dataset(cfg)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    logger.info(f"[GPU] {device}" + (f" {torch.cuda.get_device_name(0)}" if device.type == 'cuda' else ""))
+    raw, demographics = load_full_dataset(cfg)
     if cfg.prune_no_evidence:
-        tot_llm = sum(1 for g in raw for e in g.get("edges", []) if e.get("evidence") == "llm")
-        no_ev = sum(1 for g in raw for e in g.get("edges", [])
-                    if e.get("evidence") == "llm" and not has_evidence(e.get("labels")))
-        logger.info(f"[PRUNE] LLM edges={tot_llm} no-evidence(pruned)={no_ev} ({100.0*no_ev/max(tot_llm,1):.1f}%) | backbone + evidenced LLM kept")
+        total_llm = sum(1 for g in raw for e in g.get("edges", []) if e.get("evidence") == "llm")
+        no_evidence = sum(1 for g in raw for e in g.get("edges", [])
+                          if e.get("evidence") == "llm" and not has_evidence(e.get("labels")))
+        logger.info(f"[PRUNE] LLM edges={total_llm} no-evidence(pruned)={no_evidence} ({100.0*no_evidence/max(total_llm,1):.1f}%) | backbone + evidenced LLM kept")
     # vocab audit (fail loud)
-    rels = set()
-    types = set()
+    seen_relations = set()
+    seen_types = set()
     for g in raw:
         for n in g.get("nodes", []):
-            types.add(n.get("type"))
+            seen_types.add(n.get("type"))
         for e in g.get("edges", []):
-            rels.add(e.get("relation"))
-    ur = sorted(r for r in rels if r and r not in (set(RELATION_CANONICAL) | set(RELATION_ALIASES)))
-    ut = sorted(t for t in types if t and t not in NODE_TYPES)
-    logger.info(f"[VOCAB] rel={len(rels)} type={len(types)} unknown_rel={len(ur)} unknown_type={len(ut)}")
-    if ur or ut:
-        raise RuntimeError(f"[FAILURE] unknown relations={ur} types={ut}; no fallback.")
+            seen_relations.add(e.get("relation"))
+    unknown_relations = sorted(r for r in seen_relations
+                               if r and r not in (set(RELATION_CANONICAL) | set(RELATION_ALIASES)))
+    unknown_types = sorted(t for t in seen_types if t and t not in NODE_TYPES)
+    logger.info(f"[VOCAB] rel={len(seen_relations)} type={len(seen_types)} unknown_rel={len(unknown_relations)} unknown_type={len(unknown_types)}")
+    if unknown_relations or unknown_types:
+        raise RuntimeError(f"[FAILURE] unknown relations={unknown_relations} types={unknown_types}; no fallback.")
     items = []
     for g in raw:
-        d = to_data(g, demo, cfg)
+        d = to_data(g, demographics, cfg)
         if d.num_nodes >= 3 and d.edge_index.size(1) >= 4:
             items.append((d, g))   # keep raw graph alongside for the EIR eval
     if cfg.use_note:
-        ng = sum(int(d.n_grounded[0]) for d, _ in items)
-        n_nodes = sum(int(d.num_nodes) for d, _ in items)
-        logger.info(f"[NOTE] ground_by={cfg.ground_by} grounded entities={ng}/{n_nodes} ({100.0*ng/max(n_nodes,1):.1f}%) carry the note vector; the rest get a zero note")
+        num_grounded = sum(int(d.n_grounded[0]) for d, _ in items)
+        total_nodes = sum(int(d.num_nodes) for d, _ in items)
+        logger.info(f"[NOTE] ground_by={cfg.ground_by} grounded entities={num_grounded}/{total_nodes} ({100.0*num_grounded/max(total_nodes,1):.1f}%) carry the note vector; the rest get a zero note")
     rng = np.random.RandomState(cfg.seed)
-    idx = rng.permutation(len(items))
-    nte = int(cfg.test_frac * len(items))
-    nval = int(cfg.val_frac * len(items))
-    te_pairs = [items[i] for i in idx[:nte]]
-    val_pairs = [items[i] for i in idx[nte:nte + nval]]
-    tr_pairs = [items[i] for i in idx[nte + nval:]]
-    te = [d for d, _ in te_pairs]
-    val = [d for d, _ in val_pairs]
-    tr = [d for d, _ in tr_pairs]
-    logger.info(f"[DATA] graphs={len(items)} -> TRAIN={len(tr)} VAL={len(val)} TEST={len(te)} (seeded split)")
+    shuffled = rng.permutation(len(items))
+    num_test = int(cfg.test_frac * len(items))
+    num_val = int(cfg.val_frac * len(items))
+    test_pairs = [items[i] for i in shuffled[:num_test]]
+    val_pairs = [items[i] for i in shuffled[num_test:num_test + num_val]]
+    train_pairs = [items[i] for i in shuffled[num_test + num_val:]]
+    test_graphs = [d for d, _ in test_pairs]
+    val_graphs = [d for d, _ in val_pairs]
+    train_graphs = [d for d, _ in train_pairs]
+    logger.info(f"[DATA] graphs={len(items)} -> TRAIN={len(train_graphs)} VAL={len(val_graphs)} TEST={len(test_graphs)} (seeded split)")
 
     # ---- PHASE 1: JEPA world-model pretraining ----
-    model = JEPA(cfg).to(dev)
-    opt = torch.optim.Adam([p for p in model.ctx.parameters() if p.requires_grad]
-                           + list(model.pred.parameters()) + list(model.slot_rel.parameters()), lr=cfg.lr)
-    logger.info(f"[MODEL] JEPA params={sum(p.numel() for p in model.parameters()):,} edge_dim={model.ctx.edim}")
-    tl = DataLoader(tr, batch_size=cfg.batch, shuffle=True)
-    for ep in range(1, cfg.jepa_epochs + 1):
+    model = JEPA(cfg).to(device)
+    optimizer = torch.optim.Adam([p for p in model.ctx.parameters() if p.requires_grad]
+                                 + list(model.pred.parameters()) + list(model.slot_rel.parameters()), lr=cfg.lr)
+    logger.info(f"[MODEL] JEPA params={sum(p.numel() for p in model.parameters()):,} edge_dim={model.ctx.edge_dim}")
+    jepa_loader = DataLoader(train_graphs, batch_size=cfg.batch, shuffle=True)
+    for epoch in range(1, cfg.jepa_epochs + 1):
         model.ctx.train()
-        model.ema = cfg.ema_final - (cfg.ema_final - cfg.ema_base) * (math.cos(math.pi * (ep - 1) / max(cfg.jepa_epochs, 1)) + 1) / 2
-        t0 = time.perf_counter()
-        tot = ts = nb = 0
-        for b in tl:
-            opt.zero_grad()
-            loss, es = jepa_step(model, b, dev, cfg)
+        model.ema = cfg.ema_final - (cfg.ema_final - cfg.ema_base) * (math.cos(math.pi * (epoch - 1) / max(cfg.jepa_epochs, 1)) + 1) / 2
+        start = time.perf_counter()
+        total_loss = total_std = num_batches = 0
+        for batch in jepa_loader:
+            optimizer.zero_grad()
+            loss, emb_std = jepa_step(model, batch, device, cfg)
             loss.backward()
-            opt.step()
+            optimizer.step()
             model.update()
-            tot += loss.item()
-            ts += es.item()
-            nb += 1
-        if ep % 10 == 0 or ep == cfg.jepa_epochs:
-            logger.info(f"[LATENCY] JEPA epoch={ep}/{cfg.jepa_epochs} loss={tot/nb:.4f} emb_std={ts/nb:.4f} ema={model.ema:.4f} took={(time.perf_counter()-t0)*1000:.0f}ms")
+            total_loss += loss.item()
+            total_std += emb_std.item()
+            num_batches += 1
+        if epoch % 10 == 0 or epoch == cfg.jepa_epochs:
+            logger.info(f"[LATENCY] JEPA epoch={epoch}/{cfg.jepa_epochs} loss={total_loss/num_batches:.4f} emb_std={total_std/num_batches:.4f} ema={model.ema:.4f} took={(time.perf_counter()-start)*1000:.0f}ms")
 
     # ---- PHASE 2: downstream edge-recovery readout on the (frozen) world-model encoder ----
-    enc = model.ctx
+    encoder = model.ctx
     if cfg.freeze_encoder:
-        for p in enc.parameters():
+        for p in encoder.parameters():
             p.requires_grad_(False)
-        enc.eval()
-    scorer = build_scorer(cfg).to(dev)
-    params = list(scorer.parameters()) + ([] if cfg.freeze_encoder else list(enc.parameters()))
-    ropt = torch.optim.Adam(params, lr=cfg.lr)
-    eb = 1 if cfg.freeze_eval else cfg.batch
-    rl = DataLoader(tr, batch_size=cfg.batch, shuffle=True)
-    vl = DataLoader(val, batch_size=eb, shuffle=False)
-    el = DataLoader(te, batch_size=eb, shuffle=False)
+        encoder.eval()
+    scorer = build_scorer(cfg).to(device)
+    params = list(scorer.parameters()) + ([] if cfg.freeze_encoder else list(encoder.parameters()))
+    readout_opt = torch.optim.Adam(params, lr=cfg.lr)
+    eval_batch = 1 if cfg.freeze_eval else cfg.batch
+    readout_loader = DataLoader(train_graphs, batch_size=cfg.batch, shuffle=True)
+    val_loader = DataLoader(val_graphs, batch_size=eval_batch, shuffle=False)
+    test_loader = DataLoader(test_graphs, batch_size=eval_batch, shuffle=False)
     best = {"auc": 0.0}
     best_state = None
-    for ep in range(1, cfg.readout_epochs + 1):
+    for epoch in range(1, cfg.readout_epochs + 1):
         scorer.train()
         if not cfg.freeze_encoder:
-            enc.train()
-        t0 = time.perf_counter()
-        tot = nb = 0
-        for b in rl:
-            mr = (cfg.mask_lo + (cfg.mask_hi - cfg.mask_lo) * float(torch.rand(1).item())) if cfg.mask_schedule else None   # (B) sampled context density per step
-            r = readout_step(enc, scorer, b, dev, True, cfg, mask_ratio=mr)
-            if r is None:
+            encoder.train()
+        start = time.perf_counter()
+        total_loss = num_batches = 0
+        for batch in readout_loader:
+            sampled_ratio = (cfg.mask_lo + (cfg.mask_hi - cfg.mask_lo) * float(torch.rand(1).item())) if cfg.mask_schedule else None   # (B) sampled context density per step
+            step_out = readout_step(encoder, scorer, batch, device, True, cfg, mask_ratio=sampled_ratio)
+            if step_out is None:
                 continue
-            ropt.zero_grad()
-            r[0].backward()
-            ropt.step()
-            tot += r[0].item()
-            nb += 1
-        if ep % 5 == 0 or ep == cfg.readout_epochs:
-            vm = evaluate(enc, scorer, vl, dev, cfg)
-            logger.info(f"[LATENCY] READOUT epoch={ep}/{cfg.readout_epochs} loss={tot/max(nb,1):.4f} took={(time.perf_counter()-t0)*1000:.0f}ms "
-                        f"| VAL auc={vm['auc']:.3f} nonobv={vm['auc_nonobvious']:.3f} MRR={vm['mrr']:.3f} H@1={vm['hits1']:.3f} H@10={vm['hits10']:.3f}")
-            if vm["auc"] > best["auc"]:
-                best = {**vm, "epoch": ep}
+            readout_opt.zero_grad()
+            step_out[0].backward()
+            readout_opt.step()
+            total_loss += step_out[0].item()
+            num_batches += 1
+        if epoch % 5 == 0 or epoch == cfg.readout_epochs:
+            val_metrics = evaluate(encoder, scorer, val_loader, device, cfg)
+            logger.info(f"[LATENCY] READOUT epoch={epoch}/{cfg.readout_epochs} loss={total_loss/max(num_batches,1):.4f} took={(time.perf_counter()-start)*1000:.0f}ms "
+                        f"| VAL auc={val_metrics['auc']:.3f} nonobv={val_metrics['auc_nonobvious']:.3f} MRR={val_metrics['mrr']:.3f} H@1={val_metrics['hits1']:.3f} H@10={val_metrics['hits10']:.3f}")
+            if val_metrics["auc"] > best["auc"]:
+                best = {**val_metrics, "epoch": epoch}
                 best_state = copy.deepcopy(scorer.state_dict())
 
     if best_state is not None:
         scorer.load_state_dict(best_state)
-    tm = evaluate(enc, scorer, el, dev, cfg)
-    logger.info(f"[RESULT] TEST (val-selected) | auc={tm['auc']:.3f} ap={tm['ap']:.3f} non-obvious_auc={tm['auc_nonobvious']:.3f} "
-                f"MRR={tm['mrr']:.3f} Hits@1={tm['hits1']:.3f} Hits@3={tm['hits3']:.3f} Hits@10={tm['hits10']:.3f} (n_mrr={tm['n_mrr']}) quiz_sig={tm['qsig']} frozen={cfg.freeze_eval} scores={cfg.use_scores}")
+    test_metrics = evaluate(encoder, scorer, test_loader, device, cfg)
+    logger.info(f"[RESULT] TEST (val-selected) | auc={test_metrics['auc']:.3f} ap={test_metrics['ap']:.3f} non-obvious_auc={test_metrics['auc_nonobvious']:.3f} "
+                f"MRR={test_metrics['mrr']:.3f} Hits@1={test_metrics['hits1']:.3f} Hits@3={test_metrics['hits3']:.3f} Hits@10={test_metrics['hits10']:.3f} (n_mrr={test_metrics['n_mrr']}) quiz_sig={test_metrics['qsig']} frozen={cfg.freeze_eval} scores={cfg.use_scores}")
     logger.info("[PER-REL] ONE shared latent, edge recovery by relation (sorted by edge count):")
-    for rr_ in tm["per_rel"]:
-        flag = " <== ABOVE chance" if rr_["mrr"] > 1.5 * rr_["chance_mrr"] else (" <== ~chance" if rr_["mrr"] < 1.2 * rr_["chance_mrr"] else "")
-        logger.info(f"[PER-REL] {rr_['rel']:<22} n={rr_['n']:<5} C={rr_['C']:.0f}  MRR={rr_['mrr']:.3f} (chance {rr_['chance_mrr']:.3f})  H@1={rr_['h1']:.3f}  H@10={rr_['h10']:.3f}{flag}")
+    for rel_row in test_metrics["per_rel"]:
+        flag = " <== ABOVE chance" if rel_row["mrr"] > 1.5 * rel_row["chance_mrr"] else (" <== ~chance" if rel_row["mrr"] < 1.2 * rel_row["chance_mrr"] else "")
+        logger.info(f"[PER-REL] {rel_row['rel']:<22} n={rel_row['n']:<5} C={rel_row['C']:.0f}  MRR={rel_row['mrr']:.3f} (chance {rel_row['chance_mrr']:.3f})  H@1={rel_row['h1']:.3f}  H@10={rel_row['h10']:.3f}{flag}")
 
     # ---- (v12) LEAVE-ONE-OUT edge recovery: mask ONE edge, keep the rest, recover it (full context, filtered) ----
-    loo = loo_evaluate(enc, scorer, te, dev, cfg)
+    loo = loo_evaluate(encoder, scorer, test_graphs, device, cfg)
     logger.info(f"[LOO] leave-one-out (mask 1 edge, full context, filtered) | MRR={loo['mrr']:.3f} H@1={loo['hits1']:.3f} H@3={loo['hits3']:.3f} H@10={loo['hits10']:.3f} over {loo['n']} edges")
     logger.info("[LOO] edge recovery by relation (one edge masked at a time, full surrounding context):")
-    for rr_ in loo["per_rel"]:
-        flag = " <== ABOVE chance" if rr_["mrr"] > 1.5 * rr_["chance_mrr"] else (" <== ~chance" if rr_["mrr"] < 1.2 * rr_["chance_mrr"] else "")
-        logger.info(f"[LOO] {rr_['rel']:<22} n={rr_['n']:<5} C={rr_['C']:.0f}  MRR={rr_['mrr']:.3f} (chance {rr_['chance_mrr']:.3f})  H@1={rr_['h1']:.3f}  H@10={rr_['h10']:.3f}{flag}")
-    bm = {x["rel"]: x for x in tm["per_rel"]}
-    lo = {x["rel"]: x for x in loo["per_rel"]}
+    for rel_row in loo["per_rel"]:
+        flag = " <== ABOVE chance" if rel_row["mrr"] > 1.5 * rel_row["chance_mrr"] else (" <== ~chance" if rel_row["mrr"] < 1.2 * rel_row["chance_mrr"] else "")
+        logger.info(f"[LOO] {rel_row['rel']:<22} n={rel_row['n']:<5} C={rel_row['C']:.0f}  MRR={rel_row['mrr']:.3f} (chance {rel_row['chance_mrr']:.3f})  H@1={rel_row['h1']:.3f}  H@10={rel_row['h10']:.3f}{flag}")
+    batchmask_by_rel = {x["rel"]: x for x in test_metrics["per_rel"]}
+    loo_by_rel = {x["rel"]: x for x in loo["per_rel"]}
     logger.info("[CONTRAST] 4 inferred LLM edges — 30%-batch-mask MRR -> leave-one-out MRR (gain from keeping full context):")
     for rel in sorted(TARGET_RELS):
-        a = bm.get(rel)
-        c = lo.get(rel)
-        if a and c:
-            logger.info(f"[CONTRAST] {rel:<16} {a['mrr']:.3f} -> {c['mrr']:.3f}  ({c['mrr']-a['mrr']:+.3f})  | H@1 {a['h1']:.3f} -> {c['h1']:.3f}")
+        batchmask_row = batchmask_by_rel.get(rel)
+        loo_row = loo_by_rel.get(rel)
+        if batchmask_row and loo_row:
+            logger.info(f"[CONTRAST] {rel:<16} {batchmask_row['mrr']:.3f} -> {loo_row['mrr']:.3f}  ({loo_row['mrr']-batchmask_row['mrr']:+.3f})  | H@1 {batchmask_row['h1']:.3f} -> {loo_row['h1']:.3f}")
 
     # ---- (v13) CASCADE: backbone-only FLOOR -> ordered cascade -> LOO ceiling (does order matter?) ----
-    casc = None
+    cascade_results = None
     if cfg.run_cascade:
         order_ids = [resolve_rel(x) for x in cfg.cascade_order]
-        rev_ids = list(reversed(order_ids))
-        c1 = cascade_evaluate(enc, scorer, te, order_ids, dev, cfg)
-        c2 = cascade_evaluate(enc, scorer, te, rev_ids, dev, cfg)
-        casc = {"forward": c1, "reverse": c2}
-        logger.info(f"[CASCADE] order = {' -> '.join(c1['order'])}  (oracle: earlier relations' GOLD edges added to context)")
+        reversed_ids = list(reversed(order_ids))
+        forward_cascade = cascade_evaluate(encoder, scorer, test_graphs, order_ids, device, cfg)
+        reverse_cascade = cascade_evaluate(encoder, scorer, test_graphs, reversed_ids, device, cfg)
+        cascade_results = {"forward": forward_cascade, "reverse": reverse_cascade}
+        logger.info(f"[CASCADE] order = {' -> '.join(forward_cascade['order'])}  (oracle: earlier relations' GOLD edges added to context)")
         logger.info("[CASCADE] per relation: FLOOR (backbone-only) -> CASCADE (this order) -> CEILING (LOO, all else present):")
         for rel in cfg.cascade_order:
-            fl = c1["floor"].get(rel)
-            ca = c1["cascade"].get(rel)
-            ce = lo.get(rel)
-            if fl and ca and ce:
-                head = ce["mrr"] - fl["mrr"]
-                got = ca["mrr"] - fl["mrr"]
-                logger.info(f"[CASCADE] {rel:<16} MRR {fl['mrr']:.3f} -> {ca['mrr']:.3f} -> {ce['mrr']:.3f}  (chance {fl['chance_mrr']:.3f}) | H@1 {fl['h1']:.3f} -> {ca['h1']:.3f} -> {ce['h1']:.3f} | recovered {got:+.3f} of {head:+.3f} headroom")
-        logger.info(f"[CASCADE-ORDER] reverse = {' -> '.join(c2['order'])} (order-dependence check):")
+            floor_row = forward_cascade["floor"].get(rel)
+            cascade_row = forward_cascade["cascade"].get(rel)
+            ceiling_row = loo_by_rel.get(rel)
+            if floor_row and cascade_row and ceiling_row:
+                headroom = ceiling_row["mrr"] - floor_row["mrr"]
+                recovered = cascade_row["mrr"] - floor_row["mrr"]
+                logger.info(f"[CASCADE] {rel:<16} MRR {floor_row['mrr']:.3f} -> {cascade_row['mrr']:.3f} -> {ceiling_row['mrr']:.3f}  (chance {floor_row['chance_mrr']:.3f}) | H@1 {floor_row['h1']:.3f} -> {cascade_row['h1']:.3f} -> {ceiling_row['h1']:.3f} | recovered {recovered:+.3f} of {headroom:+.3f} headroom")
+        logger.info(f"[CASCADE-ORDER] reverse = {' -> '.join(reverse_cascade['order'])} (order-dependence check):")
         for rel in cfg.cascade_order:
-            caf = c1["cascade"].get(rel)
-            car = c2["cascade"].get(rel)
-            if caf and car:
-                logger.info(f"[CASCADE-ORDER] {rel:<16} forward {caf['mrr']:.3f}  vs  reverse {car['mrr']:.3f}  ({car['mrr']-caf['mrr']:+.3f})")
+            forward_row = forward_cascade["cascade"].get(rel)
+            reverse_row = reverse_cascade["cascade"].get(rel)
+            if forward_row and reverse_row:
+                logger.info(f"[CASCADE-ORDER] {rel:<16} forward {forward_row['mrr']:.3f}  vs  reverse {reverse_row['mrr']:.3f}  ({reverse_row['mrr']-forward_row['mrr']:+.3f})")
 
     # ---- (v11, optional) EIR batch-holdout uplift — OFF by default (full-gold F1 is hub-dominated; LOO above is the honest measure) ----
     tau = None
     eir = None
     if cfg.run_eir:
-        sup_v = [support_graded(e.get("labels")) for _, g in val_pairs for e in g["edges"] if e.get("evidence") == "llm"]
-        tau = float(np.quantile(sup_v, 0.5)) if sup_v else 0.5
+        val_supports = [support_graded(e.get("labels")) for _, g in val_pairs for e in g["edges"] if e.get("evidence") == "llm"]
+        tau = float(np.quantile(val_supports, 0.5)) if val_supports else 0.5
         logger.info(f"[EIR] gold/keep tau (VAL median graded LLM support) = {tau:.3f} | holdout={cfg.eir_holdout} fuzzy={cfg.eir_fuzzy}")
-        eir = eir_uplift_eval(enc, scorer, te_pairs, tau, dev, cfg)
+        eir = eir_uplift_eval(encoder, scorer, test_pairs, tau, device, cfg)
         logger.info(f"[EIR-UPLIFT] TEST edge-triple vs v8-gold ({eir['n_graphs']} graphs) | RAW P={eir['rawP']:.3f} R={eir['rawR']:.3f} F1={eir['rawF']:.3f}")
         logger.info(f"[EIR-UPLIFT] TEST edge-triple vs v8-gold | REFINED P={eir['refP']:.3f} R={eir['refR']:.3f} F1={eir['refF']:.3f}  (F1 {eir['refF']-eir['rawF']:+.3f} | precision {eir['refP']-eir['rawP']:+.3f} = DISCONNECT, recall {eir['refR']-eir['rawR']:+.3f} = model ADD)")
         logger.info("[EIR-ADD] held-out evidence-supported edges recovered (top-1 same-type), the 4 LLM targets:")
         for rel in sorted(TARGET_RELS):
-            a = eir["add"].get(rel, {"rec": 0, "held": 0, "recall": float('nan')})
-            logger.info(f"[EIR-ADD] {rel:<16} recovered = {a['rec']}/{a['held']} = {(a['recall'] if a['recall']==a['recall'] else 0.0):.3f}")
+            add_row = eir["add"].get(rel, {"rec": 0, "held": 0, "recall": float('nan')})
+            logger.info(f"[EIR-ADD] {rel:<16} recovered = {add_row['rec']}/{add_row['held']} = {(add_row['recall'] if add_row['recall']==add_row['recall'] else 0.0):.3f}")
 
-    ckpt = cfg.checkpoint_name
-    torch.save({"encoder": enc.state_dict(), "scorer": scorer.state_dict(),
+    checkpoint_path = cfg.checkpoint_name
+    torch.save({"encoder": encoder.state_dict(), "scorer": scorer.state_dict(),
                 "config": cfg.checkpoint_dict(),
-                "recovery_test_batchmask": tm, "recovery_test_loo": loo, "cascade": casc, "eir": eir}, ckpt)
+                "recovery_test_batchmask": test_metrics, "recovery_test_loo": loo,
+                "cascade": cascade_results, "eir": eir}, checkpoint_path)
     if not cfg.push:
-        logger.info(f"[DONE] PUSH=0 — saved local {ckpt}")
+        logger.info(f"[DONE] PUSH=0 — saved local {checkpoint_path}")
         return
     from huggingface_hub import HfApi
     api = HfApi()
     api.create_repo(cfg.output_repo, repo_type="model", exist_ok=True, private=True)
-    api.upload_file(path_or_fileobj=ckpt, path_in_repo=ckpt, repo_id=cfg.output_repo, repo_type="model")
-    logger.info(f"[DONE] v16 ENTITY-NOTE -> https://huggingface.co/{cfg.output_repo}/blob/main/{ckpt} | LOO MRR={loo['mrr']:.3f} | use_note={cfg.use_note} ground_by={cfg.ground_by} use_scores={cfg.use_scores}")
+    api.upload_file(path_or_fileobj=checkpoint_path, path_in_repo=checkpoint_path, repo_id=cfg.output_repo, repo_type="model")
+    logger.info(f"[DONE] v16 ENTITY-NOTE -> https://huggingface.co/{cfg.output_repo}/blob/main/{checkpoint_path} | LOO MRR={loo['mrr']:.3f} | use_note={cfg.use_note} ground_by={cfg.ground_by} use_scores={cfg.use_scores}")
 
 
 if __name__ == "__main__":

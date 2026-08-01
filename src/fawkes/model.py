@@ -37,24 +37,24 @@ class Encoder(nn.Module):
         self.rel_emb = nn.Embedding(NUM_RELATIONS, cfg.edge_emb)
         self.score_gate = nn.Sequential(
             nn.Linear(SCORE_DIM, cfg.edge_emb), nn.ReLU(), nn.Linear(cfg.edge_emb, 1))   # (v14) v8 evidence -> per-edge gate
-        self.edim = cfg.edge_emb                            # (v14) gate scales the relation embedding; no concat -> edge_dim unchanged
+        self.edge_dim = cfg.edge_emb                        # (v14) gate scales the relation embedding; no concat -> edge_dim unchanged
         self.convs = nn.ModuleList(
             TransformerConv(cfg.hid, cfg.hid // cfg.heads, heads=cfg.heads, concat=True,
-                            edge_dim=self.edim, dropout=0.0)
+                            edge_dim=self.edge_dim, dropout=0.0)
             for _ in range(cfg.layers))
         self.norms = nn.ModuleList(nn.LayerNorm(cfg.hid) for _ in range(cfg.layers))
 
-    def forward(self, nt, eid, numf, ei, et, efeat=None, sem_id=None):
-        ident = self.entity_emb(eid) if self.cfg.use_entity_emb else 0
-        h = self.type_emb(nt) + ident + self.num_proj(numf)
-        ea = self.rel_emb(et)
+    def forward(self, node_type, entity_id, numfeat, edge_index, edge_type, edge_feat=None, sem_id=None):
+        entity = self.entity_emb(entity_id) if self.cfg.use_entity_emb else 0
+        hidden = self.type_emb(node_type) + entity + self.num_proj(numfeat)
+        edge_attr = self.rel_emb(edge_type)
         if self.cfg.use_scores:
-            if efeat is None:
-                raise ValueError("[FAILURE] USE_SCORES on but efeat not passed to encoder; no fallback.")
-            ea = ea * torch.sigmoid(self.score_gate(efeat))   # (v14) evidence GATE: weak/no-evidence edges contribute less
-        for c, n in zip(self.convs, self.norms):
-            h = F.relu(n(c(h, ei, ea)))
-        return h
+            if edge_feat is None:
+                raise ValueError("[FAILURE] USE_SCORES on but edge_feat not passed to encoder; no fallback.")
+            edge_attr = edge_attr * torch.sigmoid(self.score_gate(edge_feat))   # (v14) evidence GATE: weak/no-evidence edges contribute less
+        for conv, norm in zip(self.convs, self.norms):
+            hidden = F.relu(norm(conv(hidden, edge_index, edge_attr)))
+        return hidden
 
 
 class JEPA(nn.Module):
@@ -73,8 +73,8 @@ class JEPA(nn.Module):
 
     @torch.no_grad()
     def update(self):
-        for pt, pc in zip(self.tgt.parameters(), self.ctx.parameters()):
-            pt.mul_(self.ema).add_(pc, alpha=1 - self.ema)
+        for target_param, context_param in zip(self.tgt.parameters(), self.ctx.parameters()):
+            target_param.mul_(self.ema).add_(context_param, alpha=1 - self.ema)
 
 
 class Scorer(nn.Module):
@@ -85,8 +85,8 @@ class Scorer(nn.Module):
         self.rel = nn.Embedding(NUM_RELATIONS, cfg.hid)
         self.mlp = nn.Sequential(nn.Linear(3 * cfg.hid, cfg.hid), nn.ReLU(), nn.Linear(cfg.hid, 1))
 
-    def forward(self, h, u, v, r):
-        return self.mlp(torch.cat([h[u], h[v], self.rel(r)], -1)).squeeze(-1)
+    def forward(self, hidden, head, tail, relation):
+        return self.mlp(torch.cat([hidden[head], hidden[tail], self.rel(relation)], -1)).squeeze(-1)
 
 
 class DistMult(nn.Module):
@@ -96,8 +96,8 @@ class DistMult(nn.Module):
         super().__init__()
         self.rel = nn.Embedding(NUM_RELATIONS, cfg.hid)
 
-    def forward(self, h, u, v, r):
-        return (h[u] * self.rel(r) * h[v]).sum(-1)
+    def forward(self, hidden, head, tail, relation):
+        return (hidden[head] * self.rel(relation) * hidden[tail]).sum(-1)
 
 
 def build_scorer(cfg):

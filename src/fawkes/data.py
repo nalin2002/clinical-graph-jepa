@@ -60,21 +60,21 @@ EVIDENCE_FEATS = ["drug_link_cos", "dx_disease_cos", "het_treats_ctd", "het_trea
 
 def score_vec(labels):
     labels = labels or {}
-    out = []
-    for k in SCORE_FEATS:
-        v = labels.get(k)
-        if not isinstance(v, (int, float)):
-            v = 0.0
-        if k == "omop_lca_dist":
-            v = math.exp(-float(v) / 5.0) if v else 0.0   # distance -> closeness in (0,1]
-        out.append(float(v))
-    return out
+    values = []
+    for feat in SCORE_FEATS:
+        value = labels.get(feat)
+        if not isinstance(value, (int, float)):
+            value = 0.0
+        if feat == "omop_lca_dist":
+            value = math.exp(-float(value) / 5.0) if value else 0.0   # distance -> closeness in (0,1]
+        values.append(float(value))
+    return values
 
 
 def support_graded(labels):
     """(v11) graded evidence-support in [0,1], non-saturating."""
     labels = labels or {}
-    return max([float(labels.get(k) or 0.0) for k in SUPPORT_FEATS] + [0.0])   # max KB endorsement / provenance ratio (no binary prov->1.0)
+    return max([float(labels.get(feat) or 0.0) for feat in SUPPORT_FEATS] + [0.0])   # max KB endorsement / provenance ratio (no binary prov->1.0)
 
 
 def has_evidence(labels):
@@ -82,9 +82,10 @@ def has_evidence(labels):
     labels = labels or {}
     if labels.get("prov_in_note"):
         return True
-    for k in EVIDENCE_FEATS:
-        v = labels.get(k)
-        if isinstance(v, (int, float)) and v > 0:
+
+    for feat in EVIDENCE_FEATS:
+        value = labels.get(feat)
+        if isinstance(value, (int, float)) and value > 0:
             return True
     return False
 
@@ -94,56 +95,63 @@ def note_grounded_edge(labels):
     return bool((labels or {}).get("prov_in_note"))
 
 
-def normalize_text(t):
+def normalize_text(text):
     """(v16) for GROUND_BY=name, and for EIR triple matching."""
-    return " ".join(str(t or "").lower().split())
+    return " ".join(str(text or "").lower().split())
 
 
 def ehash(name, entity_vocab):
     return int(hashlib.md5(name.encode("utf-8")).hexdigest(), 16) % entity_vocab
 
 
-def resolve_rel(r):
-    if r in RELATION_CANONICAL:
-        return RELATION_CANONICAL[r]
-    if r in RELATION_ALIASES:
-        return RELATION_CANONICAL[RELATION_ALIASES[r]]
-    raise KeyError(f"[FAILURE] unknown relation '{r}'; no fallback.")
+def resolve_rel(relation):
+    if relation in RELATION_CANONICAL:
+        return RELATION_CANONICAL[relation]
+    if relation in RELATION_ALIASES:
+        return RELATION_CANONICAL[RELATION_ALIASES[relation]]
+
+    raise KeyError(f"[FAILURE] unknown relation '{relation}'; no fallback.")
 
 
-def add_inverses(ei, et, ef=None):
-    """(v9) ``ef`` is the (E, SCORE_DIM) feature matrix (or None)."""
-    if ei.size(1) == 0:
-        return (ei, et) if ef is None else (ei, et, ef)
-    ei2 = torch.cat([ei, ei.flip(0)], 1)
-    et2 = torch.cat([et, et + NUM_BASE])
-    if ef is None:
-        return ei2, et2
-    return ei2, et2, torch.cat([ef, ef], 0)                 # inverse edge inherits its forward edge's v8 scores
+def add_inverses(edge_index, edge_type, edge_feat=None):
+    """(v9) ``edge_feat`` is the (E, SCORE_DIM) feature matrix (or None)."""
+    if edge_index.size(1) == 0:
+        return (edge_index, edge_type) if edge_feat is None else (edge_index, edge_type, edge_feat)
+
+    both_index = torch.cat([edge_index, edge_index.flip(0)], 1)
+    both_type = torch.cat([edge_type, edge_type + NUM_BASE])
+
+    if edge_feat is None:
+        return both_index, both_type
+
+    return both_index, both_type, torch.cat([edge_feat, edge_feat], 0)  # inverse edge inherits its forward edge's v8 scores
 
 
 def load_full_dataset(cfg):
     """(v14) ONE dataset: note + MIMIC + nodes + edges(scores) per admission."""
     if cfg.data_path:
-        p = cfg.data_path
-        if not os.path.isfile(p):
-            raise RuntimeError(f"[FAILURE] DATA_PATH not found: {p}")
+        path = cfg.data_path
+        if not os.path.isfile(path):
+            raise RuntimeError(f"[FAILURE] DATA_PATH not found: {path}")
     else:
         from huggingface_hub import hf_hub_download
-        p = hf_hub_download(cfg.data_repo, cfg.data_file, repo_type="dataset")
+        path = hf_hub_download(cfg.data_repo, cfg.data_file, repo_type="dataset")
+
     graphs = []
-    demo = {}
-    for l in open(p):
-        l = l.strip()
-        if not l:
+    demographics = {}
+    for line in open(path):
+        line = line.strip()
+        if not line:
             continue
-        r = json.loads(l)
-        graphs.append(r)
-        demo[str(r.get("subject_id"))] = {"gender": r.get("gender"), "age": r.get("anchor_age")}
+        record = json.loads(line)
+        graphs.append(record)
+        demographics[str(record.get("subject_id"))] = {"gender": record.get("gender"), "age": record.get("anchor_age")}
+
     if not graphs:
         raise RuntimeError(f"[FAILURE] 0 records in {cfg.data_repo}/{cfg.data_file}; no fallback.")
-    logger.info(f"[DATA] {len(graphs)} admission graphs + {len(demo)} subjects from {p}")
-    return graphs, demo
+    logger.info(f"[DATA] {len(graphs)} admission graphs + {len(demographics)} subjects from {path}")
+
+    return graphs, demographics
 
 
 def numeric(demo_rec):
@@ -151,69 +159,79 @@ def numeric(demo_rec):
         return [0.0] * BASE_NUMERIC
     age = demo_rec.get("age")
     age = float(age) / 100.0 if str(age).strip() not in ("", "None") else 0.0
-    g = demo_rec.get("gender")
-    return [age, 1.0 if g == "M" else 0.0, 1.0 if g == "F" else 0.0, 0.0, 0.0, 0.0]   # (v9) age/sex; structure carries the rest (type-only >= full)
+    gender = demo_rec.get("gender")
+    return [age, 1.0 if gender == "M" else 0.0, 1.0 if gender == "F" else 0.0, 0.0, 0.0, 0.0]   # (v9) age/sex; structure carries the rest (type-only >= full)
 
 
-def to_data(g, demo, cfg):
-    sid = str(g.get("subject_id"))
-    drec = demo.get(sid)
-    nodes, edges = g.get("nodes", []), g.get("edges", [])
-    id2i, types, ents, names = {}, [], [], []
-    nf = numeric(drec)
-    for i, n in enumerate(nodes):
-        id2i[n["id"]] = i
-        t = n.get("type")
-        if t not in NODE_TYPES:
-            raise KeyError(f"[FAILURE] unknown node type '{t}' subj {sid}")
-        name = n.get("normalized_name") or n.get("name") or ""
-        types.append(NODE_TYPES[t])
-        ents.append(ehash(name, cfg.entity_vocab))
+def to_data(graph, demographics, cfg):
+    subject_id = str(graph.get("subject_id"))
+    demo_record = demographics.get(subject_id)
+    nodes, edges = graph.get("nodes", []), graph.get("edges", [])
+    id_to_index, type_ids, entity_hashes, names = {}, [], [], []
+    demo_feats = numeric(demo_record)
+    for index, node in enumerate(nodes):
+        id_to_index[node["id"]] = index
+        node_type = node.get("type")
+        if node_type not in NODE_TYPES:
+            raise KeyError(f"[FAILURE] unknown node type '{node_type}' subj {subject_id}")
+        name = node.get("normalized_name") or node.get("name") or ""
+        type_ids.append(NODE_TYPES[node_type])
+        entity_hashes.append(ehash(name, cfg.entity_vocab))
         names.append(name)
-    src, dst, et, feats = [], [], [], []
+
+    src_indices, dst_indices, edge_type_ids, edge_scores = [], [], [], []
     grounded = set()                                             # (v16) ENTITY indices the note grounds (carry the note vector); rest stay zero
-    for e in edges:
-        if cfg.prune_no_evidence and e.get("evidence") == "llm" and not has_evidence(e.get("labels")):
+    for edge in edges:
+        if cfg.prune_no_evidence and edge.get("evidence") == "llm" and not has_evidence(edge.get("labels")):
             continue                                             # (v14) drop no-evidence junk
-        s, d = e["source"], e["target"]
-        if s not in id2i or d not in id2i:
-            raise ValueError(f"[FAILURE] dangling edge subj {sid}")
-        si, di = id2i[s], id2i[d]
-        src.append(si)
-        dst.append(di)
-        et.append(resolve_rel(e.get("relation")))
-        feats.append(score_vec(e.get("labels")))
-        if cfg.use_note and cfg.ground_by == "prov" and note_grounded_edge(e.get("labels")):
-            grounded.update((si, di))                            # (v16) note-grounded edge -> both endpoints
+
+        source_id, target_id = edge["source"], edge["target"]
+
+        if source_id not in id_to_index or target_id not in id_to_index:
+            raise ValueError(f"[FAILURE] dangling edge subj {subject_id}")
+
+        source_index, target_index = id_to_index[source_id], id_to_index[target_id]
+        src_indices.append(source_index)
+        dst_indices.append(target_index)
+        edge_type_ids.append(resolve_rel(edge.get("relation")))
+        edge_scores.append(score_vec(edge.get("labels")))
+
+        if cfg.use_note and cfg.ground_by == "prov" and note_grounded_edge(edge.get("labels")):
+            grounded.update((source_index, target_index))         # (v16) note-grounded edge -> both endpoints
+
     if cfg.use_note and cfg.ground_by == "name":                 # (v16) entity named in the note text
-        ntxt = normalize_text(g.get("note"))
-        for i, nm in enumerate(names):
-            nm2 = normalize_text(nm)
-            if len(nm2) >= 3 and nm2 in ntxt:
-                grounded.add(i)
+        note_text = normalize_text(graph.get("note"))
+        for index, name in enumerate(names):
+            normalized_name = normalize_text(name)
+            if len(normalized_name) >= 3 and normalized_name in note_text:
+                grounded.add(index)
+
     if cfg.use_note and cfg.ground_by == "all":                  # (v16) every non-PATIENT entity (ablation: localized-but-everywhere)
-        grounded = set(i for i in range(len(types)) if types[i] != NODE_TYPES["PATIENT"])
+        grounded = set(i for i in range(len(type_ids)) if type_ids[i] != NODE_TYPES["PATIENT"])
+
     if cfg.use_note:                                             # (v16) note vector LOCALIZED onto grounded entities (NO NOTE node)
-        ne = g.get("note_embedding")
-        if ne is not None and len(ne) != cfg.embed_dim:
-            raise ValueError(f"[FAILURE] note_embedding dim {len(ne)} != EMBED_DIM {cfg.embed_dim} subj {sid}")
-        ne = ne or [0.0] * cfg.embed_dim
+        note_embedding = graph.get("note_embedding")
+        if note_embedding is not None and len(note_embedding) != cfg.embed_dim:
+            raise ValueError(f"[FAILURE] note_embedding dim {len(note_embedding)} != EMBED_DIM {cfg.embed_dim} subj {subject_id}")
+        note_embedding = note_embedding or [0.0] * cfg.embed_dim
         zero_note = [0.0] * cfg.embed_dim
-        numf = [nf + (ne if i in grounded else zero_note) for i in range(len(types))]
+        node_feats = [demo_feats + (note_embedding if i in grounded else zero_note) for i in range(len(type_ids))]
     else:
-        numf = [list(nf) for _ in range(len(types))]
+        node_feats = [list(demo_feats) for _ in range(len(type_ids))]
+
     data = Data()
-    data.num_nodes = len(types)
-    data.n_edges_real = len(src)
-    data.node_type = torch.tensor(types, dtype=torch.long)
-    data.entity_id = torch.tensor(ents, dtype=torch.long)
-    data.numfeat = torch.tensor(numf, dtype=torch.float)
-    data.edge_index = torch.tensor([src, dst], dtype=torch.long) if src else torch.zeros((2, 0), dtype=torch.long)   # FORWARD only
-    data.edge_type = torch.tensor(et, dtype=torch.long) if et else torch.zeros((0,), dtype=torch.long)
-    data.edge_feat = torch.tensor(feats, dtype=torch.float) if feats else torch.zeros((0, SCORE_DIM), dtype=torch.float)   # (v9) per-edge v8 score vector
-    data.sem_id = torch.zeros(len(types), dtype=torch.long)
+    data.num_nodes = len(type_ids)
+    data.n_edges_real = len(src_indices)
+    data.node_type = torch.tensor(type_ids, dtype=torch.long)
+    data.entity_id = torch.tensor(entity_hashes, dtype=torch.long)
+    data.numfeat = torch.tensor(node_feats, dtype=torch.float)
+    data.edge_index = torch.tensor([src_indices, dst_indices], dtype=torch.long) if src_indices else torch.zeros((2, 0), dtype=torch.long)   # FORWARD only
+    data.edge_type = torch.tensor(edge_type_ids, dtype=torch.long) if edge_type_ids else torch.zeros((0,), dtype=torch.long)
+    data.edge_feat = torch.tensor(edge_scores, dtype=torch.float) if edge_scores else torch.zeros((0, SCORE_DIM), dtype=torch.float)   # (v9) per-edge v8 score vector
+    data.sem_id = torch.zeros(len(type_ids), dtype=torch.long)
     data.n_grounded = torch.tensor([len(grounded)], dtype=torch.long)   # (v16) entities carrying the note vector (for the [NOTE] log)
     data.gid = torch.tensor(
-        [int(sid) if str(sid).isdigit() else int(hashlib.md5(str(sid).encode()).hexdigest()[:12], 16)],
+        [int(subject_id) if str(subject_id).isdigit() else int(hashlib.md5(str(subject_id).encode()).hexdigest()[:12], 16)],
         dtype=torch.long)
+
     return data
