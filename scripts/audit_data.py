@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Report JSONL features needed by the three packaged Fawkes models."""
+"""Report the JSONL features each packaged model needs."""
 
 from __future__ import annotations
 
@@ -9,8 +9,11 @@ from collections import Counter
 from pathlib import Path
 
 
+# The dataset present in this working tree. The previous default named
+# data/fawkes_1k_patients/..., which this repository does not contain.
 DEFAULT_PATH = Path(
-    "data/fawkes_1k_patients/fawkes_1k_patients_graphs_260615.jsonl"
+    "data/fawkes-training-graph-embedded-260615/"
+    "fawkes_training_graph_full_embedded_260615.jsonl"
 )
 
 
@@ -48,10 +51,10 @@ def audit(path: Path) -> dict:
         "node_types": dict(sorted(node_types.items())),
         "relations": dict(sorted(relations.items())),
         "compatible": {
-            "v5_without_note": result["graphs"] > 0,
-            "v6_with_note": result["note_embedding"] > 0
+            "clinical-jepa-no-note": result["graphs"] > 0,
+            "clinical-jepa-localized-note": result["note_embedding"] > 0
             and result["note_provenance_edges"] > 0,
-            "paper_v16_with_note": result["note_embedding"] > 0
+            "fawkes-entity-note": result["note_embedding"] > 0
             and result["note_provenance_edges"] > 0,
         },
     }

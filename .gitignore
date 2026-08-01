@@ -9,6 +9,7 @@ wandb/
 # --- MIMIC-IV / PhysioNet DUA-covered artifacts (see docs/DATA.md "Privacy") ---
 # Not redistributable without confirming applicable permissions.
 data/**/*.jsonl
+data/**/*.json
 *.pt
 *.npz
 *.egg-info/

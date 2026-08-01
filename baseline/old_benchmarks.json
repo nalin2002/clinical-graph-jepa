@@ -1,0 +1,634 @@
+{
+ "clinical_jepa_arm": {
+  "graphs": 120,
+  "metrics": {
+   "hits1": 0.2510350838962737,
+   "hits10": 0.9317934190455437,
+   "hits3": 0.6875136195249509,
+   "mrr": 0.4926186097942106,
+   "n": 4589,
+   "per_rel": [
+    {
+     "C": 3.4373024236037937,
+     "chance_h1": 0.29092581238503984,
+     "chance_mrr": 0.5271246929362075,
+     "h1": 0.28626624517035476,
+     "h10": 1.0,
+     "h3": 0.8461538461538461,
+     "mrr": 0.5652064830147022,
+     "n": 2847,
+     "rel": "TAKES_MEDICATION"
+    },
+    {
+     "C": 16.39225712198685,
+     "chance_h1": 0.06100441156811194,
+     "chance_mrr": 0.2058294395656829,
+     "h1": 0.14024835646457268,
+     "h10": 0.8064280496712929,
+     "h3": 0.3608473338203068,
+     "mrr": 0.3227349388904365,
+     "n": 1369,
+     "rel": "MANAGED_FOR"
+    },
+    {
+     "C": 10.115555555555556,
+     "chance_h1": 0.09885764499121265,
+     "chance_mrr": 0.28582457751951024,
+     "h1": 0.4222222222222222,
+     "h10": 0.9022222222222223,
+     "h3": 0.7111111111111111,
+     "mrr": 0.5940205408244623,
+     "n": 225,
+     "rel": "INDICATES"
+    },
+    {
+     "C": 15.583333333333334,
+     "chance_h1": 0.0641711229946524,
+     "chance_mrr": 0.21326643638929965,
+     "h1": 0.3409090909090909,
+     "h10": 0.8181818181818182,
+     "h3": 0.5984848484848485,
+     "mrr": 0.5052055653083976,
+     "n": 132,
+     "rel": "COMPLICATED_BY"
+    },
+    {
+     "C": 17.0,
+     "chance_h1": 0.058823529411764705,
+     "chance_mrr": 0.20061254965036565,
+     "h1": 0.3,
+     "h10": 0.8,
+     "h3": 0.7,
+     "mrr": 0.5318055555555555,
+     "n": 10,
+     "rel": "CONFIRMS"
+    },
+    {
+     "C": 2.0,
+     "chance_h1": 0.5,
+     "chance_mrr": 0.6351735902799727,
+     "h1": 0.3333333333333333,
+     "h10": 1.0,
+     "h3": 1.0,
+     "mrr": 0.6666666666666666,
+     "n": 6,
+     "rel": "TARGETS_ORGANISM"
+    }
+   ]
+  }
+ },
+ "llm": {
+  "jepa_ranks": [
+   1,
+   2,
+   2,
+   1,
+   1,
+   2,
+   1,
+   2,
+   1,
+   1,
+   2,
+   2,
+   2,
+   5,
+   1,
+   1,
+   1,
+   2,
+   2,
+   1,
+   1,
+   1,
+   3,
+   2,
+   2,
+   1,
+   2,
+   1,
+   1,
+   2
+  ],
+  "prompts": [
+   "You are ranking candidate target nodes for a masked clinical KG edge.\nThe original edge has been removed from the graph context.\n\nMasked query:\nMEDICAL_HISTORY: seasonal allergies --CAUSES--> ?\n\nCandidate target nodes:\n1. DIAGNOSIS: type 2 diabetes\n2. DIAGNOSIS: covid-19\n\nGraph context edges:\n- SYMPTOM: nausea --INDICATES--> DIAGNOSIS: covid-19\n- SYMPTOM: headache --INDICATES--> DIAGNOSIS: type 2 diabetes\n- SYMPTOM: sore throat --INDICATES--> DIAGNOSIS: type 2 diabetes\n- SYMPTOM: chest pain --INDICATES--> DIAGNOSIS: covid-19\n- TREATMENT: insulin --TAKEN_FOR--> DIAGNOSIS: covid-19\n- PROCEDURE: blood draw --RULES_OUT--> DIAGNOSIS: covid-19\n- PROCEDURE: chest auscultation --CONFIRMS--> DIAGNOSIS: covid-19\n- MEDICAL_HISTORY: prior pneumonia --CAUSES--> DIAGNOSIS: covid-19\n- LAB_RESULT: high glucose --INDICATES--> DIAGNOSIS: type 2 diabetes\n- LAB_RESULT: elevated wbc --CONFIRMS--> DIAGNOSIS: type 2 diabetes\n- SYMPTOM: nausea --LOCATED_AT--> LOCATION: throat\n- SYMPTOM: headache --LOCATED_AT--> LOCATION: right arm\n- TREATMENT: metformin --TAKEN_FOR--> SYMPTOM: nausea\n- TREATMENT: amoxicillin --TAKEN_FOR--> SYMPTOM: nausea\n\nRank all candidate numbers from most likely to least likely.\nReturn JSON only, exactly like: {\"ranking\":[1,2,3]}",
+   "You are ranking candidate target nodes for a masked clinical KG edge.\nThe original edge has been removed from the graph context.\n\nMasked query:\nMEDICAL_HISTORY: hospital worker --CAUSES--> ?\n\nCandidate target nodes:\n1. DIAGNOSIS: hypertension\n2. DIAGNOSIS: asthma\n\nGraph context edges:\n- SYMPTOM: rash --INDICATES--> DIAGNOSIS: hypertension\n- SYMPTOM: joint pain --INDICATES--> DIAGNOSIS: asthma\n- TREATMENT: acetaminophen --TAKEN_FOR--> DIAGNOSIS: hypertension\n- PROCEDURE: chest auscultation --RULES_OUT--> DIAGNOSIS: asthma\n- PROCEDURE: blood draw --RULES_OUT--> DIAGNOSIS: asthma\n- MEDICAL_HISTORY: seasonal allergies --CAUSES--> DIAGNOSIS: asthma\n- SYMPTOM: rash --LOCATED_AT--> LOCATION: sinuses\n\nRank all candidate numbers from most likely to least likely.\nReturn JSON only, exactly like: {\"ranking\":[1,2,3]}",
+   "You are ranking candidate target nodes for a masked clinical KG edge.\nThe original edge has been removed from the graph context.\n\nMasked query:\nMEDICAL_HISTORY: smoking history --CAUSES--> ?\n\nCandidate target nodes:\n1. DIAGNOSIS: covid-19\n2. DIAGNOSIS: migraine\n\nGraph context edges:\n- SYMPTOM: joint pain --INDICATES--> DIAGNOSIS: covid-19\n- SYMPTOM: chest pain --INDICATES--> DIAGNOSIS: migraine\n- SYMPTOM: dizziness --INDICATES--> DIAGNOSIS: migraine\n- SYMPTOM: dizziness --LOCATED_AT--> LOCATION: chest\n- TREATMENT: acetaminophen --TAKEN_FOR--> SYMPTOM: chest pain\n- TREATMENT: ibuprofen --TAKEN_FOR--> SYMPTOM: joint pain\n- TREATMENT: albuterol inhaler --TAKEN_FOR--> SYMPTOM: dizziness\n\nRank all candidate numbers from most likely to least likely.\nReturn JSON only, exactly like: {\"ranking\":[1,2,3]}",
+   "You are ranking candidate target nodes for a masked clinical KG edge.\nThe original edge has been removed from the graph context.\n\nMasked query:\nMEDICAL_HISTORY: family history of diabetes --CAUSES--> ?\n\nCandidate target nodes:\n1. DIAGNOSIS: migraine\n2. DIAGNOSIS: bronchitis\n\nGraph context edges:\n- SYMPTOM: sore throat --INDICATES--> DIAGNOSIS: bronchitis\n- SYMPTOM: wheezing --INDICATES--> DIAGNOSIS: migraine\n- LAB_RESULT: low oxygen saturation --INDICATES--> DIAGNOSIS: migraine\n- LAB_RESULT: abnormal chest imaging --CONFIRMS--> DIAGNOSIS: bronchitis\n- TREATMENT: amoxicillin --TAKEN_FOR--> SYMPTOM: sore throat\n- TREATMENT: isolation --TAKEN_FOR--> SYMPTOM: wheezing\n\nRank all candidate numbers from most likely to least likely.\nReturn JSON only, exactly like: {\"ranking\":[1,2,3]}",
+   "You are ranking candidate target nodes for a masked clinical KG edge.\nThe original edge has been removed from the graph context.\n\nMasked query:\nMEDICAL_HISTORY: hospital worker --CAUSES--> ?\n\nCandidate target nodes:\n1. DIAGNOSIS: hypertension\n2. DIAGNOSIS: pneumonia\n\nGraph context edges:\n- SYMPTOM: joint pain --INDICATES--> DIAGNOSIS: hypertension\n- SYMPTOM: sore throat --INDICATES--> DIAGNOSIS: pneumonia\n- TREATMENT: amoxicillin --TAKEN_FOR--> DIAGNOSIS: pneumonia\n- PROCEDURE: chest auscultation --RULES_OUT--> DIAGNOSIS: hypertension\n- MEDICAL_HISTORY: prior pneumonia --CAUSES--> DIAGNOSIS: hypertension\n- LAB_RESULT: elevated crp --CONFIRMS--> DIAGNOSIS: hypertension\n- LAB_RESULT: low oxygen saturation --INDICATES--> DIAGNOSIS: pneumonia\n- SYMPTOM: joint pain --LOCATED_AT--> LOCATION: throat\n\nRank all candidate numbers from most likely to least likely.\nReturn JSON only, exactly like: {\"ranking\":[1,2,3]}",
+   "You are ranking candidate target nodes for a masked clinical KG edge.\nThe original edge has been removed from the graph context.\n\nMasked query:\nSYMPTOM: shortness of breath --INDICATES--> ?\n\nCandidate target nodes:\n1. DIAGNOSIS: pneumonia\n2. DIAGNOSIS: bronchitis\n\nGraph context edges:\n- SYMPTOM: abdominal pain --INDICATES--> DIAGNOSIS: bronchitis\n- SYMPTOM: joint pain --INDICATES--> DIAGNOSIS: pneumonia\n- SYMPTOM: cough --INDICATES--> DIAGNOSIS: pneumonia\n- TREATMENT: decongestant --TAKEN_FOR--> DIAGNOSIS: bronchitis\n- TREATMENT: antihistamine --TAKEN_FOR--> DIAGNOSIS: bronchitis\n- TREATMENT: albuterol inhaler --TAKEN_FOR--> DIAGNOSIS: bronchitis\n- PROCEDURE: chest auscultation --RULES_OUT--> DIAGNOSIS: pneumonia\n- MEDICAL_HISTORY: hospital worker --CAUSES--> DIAGNOSIS: bronchitis\n- LAB_RESULT: positive pcr --INDICATES--> DIAGNOSIS: bronchitis\n- SYMPTOM: abdominal pain --LOCATED_AT--> LOCATION: throat\n- SYMPTOM: joint pain --LOCATED_AT--> LOCATION: lungs\n- SYMPTOM: cough --LOCATED_AT--> LOCATION: abdomen\n\nRank all candidate numbers from most likely to least likely.\nReturn JSON only, exactly like: {\"ranking\":[1,2,3]}",
+   "You are ranking candidate target nodes for a masked clinical KG edge.\nThe original edge has been removed from the graph context.\n\nMasked query:\nSYMPTOM: fatigue --INDICATES--> ?\n\nCandidate target nodes:\n1. DIAGNOSIS: pneumonia\n2. DIAGNOSIS: covid-19\n\nGraph context edges:\n- SYMPTOM: fatigue --LOCATED_AT--> LOCATION: right arm\n- TREATMENT: ibuprofen --TAKEN_FOR--> SYMPTOM: fatigue\n- SYMPTOM: joint pain --INDICATES--> DIAGNOSIS: covid-19\n- SYMPTOM: nausea --INDICATES--> DIAGNOSIS: pneumonia\n- SYMPTOM: abdominal pain --INDICATES--> DIAGNOSIS: covid-19\n- TREATMENT: isolation --TAKEN_FOR--> DIAGNOSIS: covid-19\n- PROCEDURE: chest auscultation --RULES_OUT--> DIAGNOSIS: covid-19\n- MEDICAL_HISTORY: seasonal allergies --CAUSES--> DIAGNOSIS: pneumonia\n- SYMPTOM: joint pain --LOCATED_AT--> LOCATION: chest\n\nRank all candidate numbers from most likely to least likely.\nReturn JSON only, exactly like: {\"ranking\":[1,2,3]}",
+   "You are ranking candidate target nodes for a masked clinical KG edge.\nThe original edge has been removed from the graph context.\n\nMasked query:\nLAB_RESULT: low oxygen saturation --INDICATES--> ?\n\nCandidate target nodes:\n1. DIAGNOSIS: influenza\n2. DIAGNOSIS: gastritis\n\nGraph context edges:\n- SYMPTOM: shortness of breath --INDICATES--> DIAGNOSIS: influenza\n- SYMPTOM: abdominal pain --INDICATES--> DIAGNOSIS: influenza\n- TREATMENT: metformin --TAKEN_FOR--> DIAGNOSIS: gastritis\n- MEDICAL_HISTORY: prior pneumonia --CAUSES--> DIAGNOSIS: gastritis\n- LAB_RESULT: positive pcr --INDICATES--> DIAGNOSIS: gastritis\n- SYMPTOM: shortness of breath --LOCATED_AT--> LOCATION: chest\n- SYMPTOM: abdominal pain --LOCATED_AT--> LOCATION: abdomen\n- TREATMENT: isolation --TAKEN_FOR--> SYMPTOM: abdominal pain\n\nRank all candidate numbers from most likely to least likely.\nReturn JSON only, exactly like: {\"ranking\":[1,2,3]}",
+   "You are ranking candidate target nodes for a masked clinical KG edge.\nThe original edge has been removed from the graph context.\n\nMasked query:\nSYMPTOM: nasal congestion --INDICATES--> ?\n\nCandidate target nodes:\n1. DIAGNOSIS: common cold\n2. DIAGNOSIS: hypertension\n\nGraph context edges:\n- SYMPTOM: nasal congestion --LOCATED_AT--> LOCATION: head\n- TREATMENT: metformin --TAKEN_FOR--> SYMPTOM: nasal congestion\n- SYMPTOM: nausea --INDICATES--> DIAGNOSIS: common cold\n- SYMPTOM: fatigue --INDICATES--> DIAGNOSIS: hypertension\n- TREATMENT: albuterol inhaler --TAKEN_FOR--> DIAGNOSIS: common cold\n- PROCEDURE: ecg --CONFIRMS--> DIAGNOSIS: common cold\n- PROCEDURE: covid swab --RULES_OUT--> DIAGNOSIS: common cold\n- LAB_RESULT: elevated wbc --INDICATES--> DIAGNOSIS: common cold\n\nRank all candidate numbers from most likely to least likely.\nReturn JSON only, exactly like: {\"ranking\":[1,2,3]}",
+   "You are ranking candidate target nodes for a masked clinical KG edge.\nThe original edge has been removed from the graph context.\n\nMasked query:\nSYMPTOM: fatigue --INDICATES--> ?\n\nCandidate target nodes:\n1. DIAGNOSIS: common cold\n2. DIAGNOSIS: hypertension\n\nGraph context edges:\n- SYMPTOM: nausea --INDICATES--> DIAGNOSIS: common cold\n- SYMPTOM: nasal congestion --INDICATES--> DIAGNOSIS: hypertension\n- TREATMENT: albuterol inhaler --TAKEN_FOR--> DIAGNOSIS: common cold\n- PROCEDURE: ecg --CONFIRMS--> DIAGNOSIS: common cold\n- PROCEDURE: covid swab --RULES_OUT--> DIAGNOSIS: common cold\n- LAB_RESULT: elevated wbc --INDICATES--> DIAGNOSIS: common cold\n- SYMPTOM: nasal congestion --LOCATED_AT--> LOCATION: head\n- TREATMENT: metformin --TAKEN_FOR--> SYMPTOM: nasal congestion\n\nRank all candidate numbers from most likely to least likely.\nReturn JSON only, exactly like: {\"ranking\":[1,2,3]}",
+   "You are ranking candidate target nodes for a masked clinical KG edge.\nThe original edge has been removed from the graph context.\n\nMasked query:\nSYMPTOM: headache --LOCATED_AT--> ?\n\nCandidate target nodes:\n1. LOCATION: throat\n2. LOCATION: right arm\n\nGraph context edges:\n- SYMPTOM: headache --INDICATES--> DIAGNOSIS: type 2 diabetes\n- SYMPTOM: nausea --LOCATED_AT--> LOCATION: throat\n- SYMPTOM: nausea --INDICATES--> DIAGNOSIS: covid-19\n- SYMPTOM: sore throat --INDICATES--> DIAGNOSIS: type 2 diabetes\n- SYMPTOM: chest pain --INDICATES--> DIAGNOSIS: covid-19\n- TREATMENT: metformin --TAKEN_FOR--> SYMPTOM: nausea\n- TREATMENT: insulin --TAKEN_FOR--> DIAGNOSIS: covid-19\n- TREATMENT: amoxicillin --TAKEN_FOR--> SYMPTOM: nausea\n- PROCEDURE: blood draw --RULES_OUT--> DIAGNOSIS: covid-19\n- PROCEDURE: chest auscultation --CONFIRMS--> DIAGNOSIS: covid-19\n- MEDICAL_HISTORY: seasonal allergies --CAUSES--> DIAGNOSIS: covid-19\n- MEDICAL_HISTORY: prior pneumonia --CAUSES--> DIAGNOSIS: covid-19\n- LAB_RESULT: high glucose --INDICATES--> DIAGNOSIS: type 2 diabetes\n- LAB_RESULT: elevated wbc --CONFIRMS--> DIAGNOSIS: type 2 diabetes\n\nRank all candidate numbers from most likely to least likely.\nReturn JSON only, exactly like: {\"ranking\":[1,2,3]}",
+   "You are ranking candidate target nodes for a masked clinical KG edge.\nThe original edge has been removed from the graph context.\n\nMasked query:\nSYMPTOM: fever --LOCATED_AT--> ?\n\nCandidate target nodes:\n1. LOCATION: throat\n2. LOCATION: lungs\n\nGraph context edges:\n- SYMPTOM: fever --INDICATES--> DIAGNOSIS: covid-19\n- TREATMENT: decongestant --TAKEN_FOR--> SYMPTOM: fever\n- TREATMENT: isolation --TAKEN_FOR--> SYMPTOM: fever\n- SYMPTOM: dizziness --LOCATED_AT--> LOCATION: throat\n- SYMPTOM: nasal congestion --INDICATES--> DIAGNOSIS: covid-19\n- SYMPTOM: abdominal pain --INDICATES--> DIAGNOSIS: covid-19\n- SYMPTOM: dizziness --INDICATES--> DIAGNOSIS: covid-19\n- PROCEDURE: ecg --RULES_OUT--> DIAGNOSIS: covid-19\n- PROCEDURE: blood draw --RULES_OUT--> DIAGNOSIS: covid-19\n- LAB_RESULT: positive pcr --INDICATES--> DIAGNOSIS: covid-19\n\nRank all candidate numbers from most likely to least likely.\nReturn JSON only, exactly like: {\"ranking\":[1,2,3]}",
+   "You are ranking candidate target nodes for a masked clinical KG edge.\nThe original edge has been removed from the graph context.\n\nMasked query:\nSYMPTOM: fever --LOCATED_AT--> ?\n\nCandidate target nodes:\n1. LOCATION: right arm\n2. LOCATION: abdomen\n\nGraph context edges:\n- SYMPTOM: fever --INDICATES--> DIAGNOSIS: influenza\n- TREATMENT: ibuprofen --TAKEN_FOR--> SYMPTOM: fever\n- SYMPTOM: wheezing --LOCATED_AT--> LOCATION: abdomen\n- SYMPTOM: wheezing --INDICATES--> DIAGNOSIS: influenza\n- SYMPTOM: loss of taste --INDICATES--> DIAGNOSIS: influenza\n- SYMPTOM: rash --INDICATES--> DIAGNOSIS: influenza\n- PROCEDURE: spirometry --CONFIRMS--> DIAGNOSIS: influenza\n- MEDICAL_HISTORY: prior pneumonia --CAUSES--> DIAGNOSIS: influenza\n- MEDICAL_HISTORY: seasonal allergies --CAUSES--> DIAGNOSIS: influenza\n- LAB_RESULT: high glucose --INDICATES--> DIAGNOSIS: influenza\n\nRank all candidate numbers from most likely to least likely.\nReturn JSON only, exactly like: {\"ranking\":[1,2,3]}",
+   "You are ranking candidate target nodes for a masked clinical KG edge.\nThe original edge has been removed from the graph context.\n\nMasked query:\nSYMPTOM: joint pain --LOCATED_AT--> ?\n\nCandidate target nodes:\n1. LOCATION: abdomen\n2. LOCATION: sinuses\n3. LOCATION: head\n4. LOCATION: sinuses\n5. LOCATION: sinuses\n\nGraph context edges:\n- SYMPTOM: joint pain --INDICATES--> DIAGNOSIS: type 2 diabetes\n- SYMPTOM: abdominal pain --LOCATED_AT--> LOCATION: sinuses\n- SYMPTOM: rash --LOCATED_AT--> LOCATION: sinuses\n- SYMPTOM: chest pain --LOCATED_AT--> LOCATION: sinuses\n- SYMPTOM: wheezing --LOCATED_AT--> LOCATION: head\n- SYMPTOM: abdominal pain --INDICATES--> DIAGNOSIS: type 2 diabetes\n- SYMPTOM: rash --INDICATES--> DIAGNOSIS: type 2 diabetes\n- SYMPTOM: chest pain --INDICATES--> DIAGNOSIS: type 2 diabetes\n- SYMPTOM: wheezing --INDICATES--> DIAGNOSIS: type 2 diabetes\n- TREATMENT: rest and fluids --TAKEN_FOR--> SYMPTOM: chest pain\n- TREATMENT: albuterol inhaler --TAKEN_FOR--> DIAGNOSIS: type 2 diabetes\n- TREATMENT: isolation --TAKEN_FOR--> SYMPTOM: wheezing\n- PROCEDURE: chest auscultation --RULES_OUT--> DIAGNOSIS: type 2 diabetes\n- MEDICAL_HISTORY: prior pneumonia --CAUSES--> DIAGNOSIS: type 2 diabetes\n\nRank all candidate numbers from most likely to least likely.\nReturn JSON only, exactly like: {\"ranking\":[1,2,3]}",
+   "You are ranking candidate target nodes for a masked clinical KG edge.\nThe original edge has been removed from the graph context.\n\nMasked query:\nSYMPTOM: abdominal pain --LOCATED_AT--> ?\n\nCandidate target nodes:\n1. LOCATION: head\n2. LOCATION: right arm\n\nGraph context edges:\n- SYMPTOM: abdominal pain --INDICATES--> DIAGNOSIS: asthma\n- SYMPTOM: shortness of breath --LOCATED_AT--> LOCATION: right arm\n- SYMPTOM: joint pain --INDICATES--> DIAGNOSIS: hypertension\n- SYMPTOM: shortness of breath --INDICATES--> DIAGNOSIS: hypertension\n- SYMPTOM: fever --INDICATES--> DIAGNOSIS: hypertension\n- TREATMENT: isolation --TAKEN_FOR--> SYMPTOM: joint pain\n- TREATMENT: ibuprofen --TAKEN_FOR--> SYMPTOM: joint pain\n\nRank all candidate numbers from most likely to least likely.\nReturn JSON only, exactly like: {\"ranking\":[1,2,3]}",
+   "You are ranking candidate target nodes for a masked clinical KG edge.\nThe original edge has been removed from the graph context.\n\nMasked query:\nPROCEDURE: chest auscultation --RULES_OUT--> ?\n\nCandidate target nodes:\n1. DIAGNOSIS: pneumonia\n2. DIAGNOSIS: bronchitis\n\nGraph context edges:\n- SYMPTOM: abdominal pain --INDICATES--> DIAGNOSIS: bronchitis\n- SYMPTOM: joint pain --INDICATES--> DIAGNOSIS: pneumonia\n- SYMPTOM: cough --INDICATES--> DIAGNOSIS: pneumonia\n- SYMPTOM: shortness of breath --INDICATES--> DIAGNOSIS: pneumonia\n- TREATMENT: decongestant --TAKEN_FOR--> DIAGNOSIS: bronchitis\n- TREATMENT: antihistamine --TAKEN_FOR--> DIAGNOSIS: bronchitis\n- TREATMENT: albuterol inhaler --TAKEN_FOR--> DIAGNOSIS: bronchitis\n- MEDICAL_HISTORY: hospital worker --CAUSES--> DIAGNOSIS: bronchitis\n- LAB_RESULT: positive pcr --INDICATES--> DIAGNOSIS: bronchitis\n- SYMPTOM: abdominal pain --LOCATED_AT--> LOCATION: throat\n- SYMPTOM: joint pain --LOCATED_AT--> LOCATION: lungs\n- SYMPTOM: cough --LOCATED_AT--> LOCATION: abdomen\n\nRank all candidate numbers from most likely to least likely.\nReturn JSON only, exactly like: {\"ranking\":[1,2,3]}",
+   "You are ranking candidate target nodes for a masked clinical KG edge.\nThe original edge has been removed from the graph context.\n\nMasked query:\nPROCEDURE: ct scan --RULES_OUT--> ?\n\nCandidate target nodes:\n1. DIAGNOSIS: common cold\n2. DIAGNOSIS: pneumonia\n\nGraph context edges:\n- SYMPTOM: nasal congestion --INDICATES--> DIAGNOSIS: common cold\n- SYMPTOM: dizziness --INDICATES--> DIAGNOSIS: pneumonia\n- SYMPTOM: chest pain --INDICATES--> DIAGNOSIS: common cold\n- SYMPTOM: loss of taste --INDICATES--> DIAGNOSIS: pneumonia\n- SYMPTOM: wheezing --INDICATES--> DIAGNOSIS: pneumonia\n- TREATMENT: rest and fluids --TAKEN_FOR--> DIAGNOSIS: pneumonia\n- TREATMENT: acetaminophen --TAKEN_FOR--> DIAGNOSIS: common cold\n- MEDICAL_HISTORY: family history of diabetes --CAUSES--> DIAGNOSIS: pneumonia\n- LAB_RESULT: positive pcr --CONFIRMS--> DIAGNOSIS: common cold\n- LAB_RESULT: low oxygen saturation --INDICATES--> DIAGNOSIS: pneumonia\n- SYMPTOM: chest pain --LOCATED_AT--> LOCATION: throat\n- SYMPTOM: loss of taste --LOCATED_AT--> LOCATION: throat\n- SYMPTOM: wheezing --LOCATED_AT--> LOCATION: sinuses\n- TREATMENT: metformin --TAKEN_FOR--> SYMPTOM: wheezing\n\nRank all candidate numbers from most likely to least likely.\nReturn JSON only, exactly like: {\"ranking\":[1,2,3]}",
+   "You are ranking candidate target nodes for a masked clinical KG edge.\nThe original edge has been removed from the graph context.\n\nMasked query:\nPROCEDURE: chest auscultation --RULES_OUT--> ?\n\nCandidate target nodes:\n1. DIAGNOSIS: asthma\n2. DIAGNOSIS: hypertension\n\nGraph context edges:\n- SYMPTOM: rash --INDICATES--> DIAGNOSIS: hypertension\n- SYMPTOM: joint pain --INDICATES--> DIAGNOSIS: asthma\n- TREATMENT: acetaminophen --TAKEN_FOR--> DIAGNOSIS: hypertension\n- PROCEDURE: blood draw --RULES_OUT--> DIAGNOSIS: asthma\n- MEDICAL_HISTORY: hospital worker --CAUSES--> DIAGNOSIS: asthma\n- MEDICAL_HISTORY: seasonal allergies --CAUSES--> DIAGNOSIS: asthma\n- SYMPTOM: rash --LOCATED_AT--> LOCATION: sinuses\n\nRank all candidate numbers from most likely to least likely.\nReturn JSON only, exactly like: {\"ranking\":[1,2,3]}",
+   "You are ranking candidate target nodes for a masked clinical KG edge.\nThe original edge has been removed from the graph context.\n\nMasked query:\nPROCEDURE: blood draw --RULES_OUT--> ?\n\nCandidate target nodes:\n1. DIAGNOSIS: hypertension\n2. DIAGNOSIS: asthma\n\nGraph context edges:\n- SYMPTOM: rash --INDICATES--> DIAGNOSIS: hypertension\n- SYMPTOM: joint pain --INDICATES--> DIAGNOSIS: asthma\n- TREATMENT: acetaminophen --TAKEN_FOR--> DIAGNOSIS: hypertension\n- PROCEDURE: chest auscultation --RULES_OUT--> DIAGNOSIS: asthma\n- MEDICAL_HISTORY: hospital worker --CAUSES--> DIAGNOSIS: asthma\n- MEDICAL_HISTORY: seasonal allergies --CAUSES--> DIAGNOSIS: asthma\n- SYMPTOM: rash --LOCATED_AT--> LOCATION: sinuses\n\nRank all candidate numbers from most likely to least likely.\nReturn JSON only, exactly like: {\"ranking\":[1,2,3]}",
+   "You are ranking candidate target nodes for a masked clinical KG edge.\nThe original edge has been removed from the graph context.\n\nMasked query:\nPROCEDURE: chest auscultation --RULES_OUT--> ?\n\nCandidate target nodes:\n1. DIAGNOSIS: pneumonia\n2. DIAGNOSIS: covid-19\n\nGraph context edges:\n- SYMPTOM: fatigue --INDICATES--> DIAGNOSIS: pneumonia\n- SYMPTOM: joint pain --INDICATES--> DIAGNOSIS: covid-19\n- SYMPTOM: nausea --INDICATES--> DIAGNOSIS: pneumonia\n- SYMPTOM: abdominal pain --INDICATES--> DIAGNOSIS: covid-19\n- TREATMENT: isolation --TAKEN_FOR--> DIAGNOSIS: covid-19\n- MEDICAL_HISTORY: seasonal allergies --CAUSES--> DIAGNOSIS: pneumonia\n- SYMPTOM: fatigue --LOCATED_AT--> LOCATION: right arm\n- SYMPTOM: joint pain --LOCATED_AT--> LOCATION: chest\n- TREATMENT: ibuprofen --TAKEN_FOR--> SYMPTOM: fatigue\n\nRank all candidate numbers from most likely to least likely.\nReturn JSON only, exactly like: {\"ranking\":[1,2,3]}",
+   "You are ranking candidate target nodes for a masked clinical KG edge.\nThe original edge has been removed from the graph context.\n\nMasked query:\nTREATMENT: amoxicillin --TAKEN_FOR--> ?\n\nCandidate target nodes:\n1. SYMPTOM: headache\n2. SYMPTOM: shortness of breath\n\nGraph context edges:\n- SYMPTOM: headache --INDICATES--> DIAGNOSIS: common cold\n- SYMPTOM: shortness of breath --INDICATES--> DIAGNOSIS: common cold\n- TREATMENT: ibuprofen --TAKEN_FOR--> SYMPTOM: headache\n- TREATMENT: metformin --TAKEN_FOR--> DIAGNOSIS: common cold\n- PROCEDURE: blood draw --CONFIRMS--> DIAGNOSIS: common cold\n- LAB_RESULT: low oxygen saturation --INDICATES--> DIAGNOSIS: common cold\n- LAB_RESULT: elevated wbc --INDICATES--> DIAGNOSIS: common cold\n\nRank all candidate numbers from most likely to least likely.\nReturn JSON only, exactly like: {\"ranking\":[1,2,3]}",
+   "You are ranking candidate target nodes for a masked clinical KG edge.\nThe original edge has been removed from the graph context.\n\nMasked query:\nTREATMENT: metformin --TAKEN_FOR--> ?\n\nCandidate target nodes:\n1. SYMPTOM: dizziness\n2. SYMPTOM: nasal congestion\n3. SYMPTOM: chest pain\n4. SYMPTOM: wheezing\n5. SYMPTOM: loss of taste\n\nGraph context edges:\n- SYMPTOM: nasal congestion --INDICATES--> DIAGNOSIS: common cold\n- SYMPTOM: dizziness --INDICATES--> DIAGNOSIS: pneumonia\n- SYMPTOM: chest pain --INDICATES--> DIAGNOSIS: common cold\n- SYMPTOM: chest pain --LOCATED_AT--> LOCATION: throat\n- SYMPTOM: loss of taste --INDICATES--> DIAGNOSIS: pneumonia\n- SYMPTOM: loss of taste --LOCATED_AT--> LOCATION: throat\n- SYMPTOM: wheezing --INDICATES--> DIAGNOSIS: pneumonia\n- SYMPTOM: wheezing --LOCATED_AT--> LOCATION: sinuses\n- TREATMENT: rest and fluids --TAKEN_FOR--> DIAGNOSIS: pneumonia\n- TREATMENT: acetaminophen --TAKEN_FOR--> DIAGNOSIS: common cold\n- PROCEDURE: ct scan --RULES_OUT--> DIAGNOSIS: common cold\n- MEDICAL_HISTORY: family history of diabetes --CAUSES--> DIAGNOSIS: pneumonia\n- LAB_RESULT: positive pcr --CONFIRMS--> DIAGNOSIS: common cold\n- LAB_RESULT: low oxygen saturation --INDICATES--> DIAGNOSIS: pneumonia\n\nRank all candidate numbers from most likely to least likely.\nReturn JSON only, exactly like: {\"ranking\":[1,2,3]}",
+   "You are ranking candidate target nodes for a masked clinical KG edge.\nThe original edge has been removed from the graph context.\n\nMasked query:\nTREATMENT: ibuprofen --TAKEN_FOR--> ?\n\nCandidate target nodes:\n1. SYMPTOM: abdominal pain\n2. SYMPTOM: fatigue\n3. SYMPTOM: nausea\n4. SYMPTOM: joint pain\n\nGraph context edges:\n- SYMPTOM: fatigue --INDICATES--> DIAGNOSIS: pneumonia\n- SYMPTOM: fatigue --LOCATED_AT--> LOCATION: right arm\n- SYMPTOM: joint pain --INDICATES--> DIAGNOSIS: covid-19\n- SYMPTOM: joint pain --LOCATED_AT--> LOCATION: chest\n- SYMPTOM: nausea --INDICATES--> DIAGNOSIS: pneumonia\n- SYMPTOM: abdominal pain --INDICATES--> DIAGNOSIS: covid-19\n- TREATMENT: isolation --TAKEN_FOR--> DIAGNOSIS: covid-19\n- PROCEDURE: chest auscultation --RULES_OUT--> DIAGNOSIS: covid-19\n- MEDICAL_HISTORY: seasonal allergies --CAUSES--> DIAGNOSIS: pneumonia\n\nRank all candidate numbers from most likely to least likely.\nReturn JSON only, exactly like: {\"ranking\":[1,2,3]}",
+   "You are ranking candidate target nodes for a masked clinical KG edge.\nThe original edge has been removed from the graph context.\n\nMasked query:\nTREATMENT: metformin --TAKEN_FOR--> ?\n\nCandidate target nodes:\n1. SYMPTOM: fever\n2. SYMPTOM: wheezing\n\nGraph context edges:\n- SYMPTOM: wheezing --INDICATES--> DIAGNOSIS: influenza\n- SYMPTOM: wheezing --LOCATED_AT--> LOCATION: chest\n- SYMPTOM: fever --INDICATES--> DIAGNOSIS: bronchitis\n- SYMPTOM: fever --LOCATED_AT--> LOCATION: right arm\n- TREATMENT: rest and fluids --TAKEN_FOR--> SYMPTOM: fever\n- TREATMENT: antihistamine --TAKEN_FOR--> DIAGNOSIS: bronchitis\n- PROCEDURE: spirometry --CONFIRMS--> DIAGNOSIS: bronchitis\n- LAB_RESULT: elevated wbc --INDICATES--> DIAGNOSIS: influenza\n\nRank all candidate numbers from most likely to least likely.\nReturn JSON only, exactly like: {\"ranking\":[1,2,3]}",
+   "You are ranking candidate target nodes for a masked clinical KG edge.\nThe original edge has been removed from the graph context.\n\nMasked query:\nTREATMENT: isolation --TAKEN_FOR--> ?\n\nCandidate target nodes:\n1. SYMPTOM: wheezing\n2. SYMPTOM: sore throat\n\nGraph context edges:\n- SYMPTOM: sore throat --INDICATES--> DIAGNOSIS: bronchitis\n- SYMPTOM: wheezing --INDICATES--> DIAGNOSIS: migraine\n- TREATMENT: amoxicillin --TAKEN_FOR--> SYMPTOM: sore throat\n- MEDICAL_HISTORY: family history of diabetes --CAUSES--> DIAGNOSIS: bronchitis\n- LAB_RESULT: low oxygen saturation --INDICATES--> DIAGNOSIS: migraine\n- LAB_RESULT: abnormal chest imaging --CONFIRMS--> DIAGNOSIS: bronchitis\n\nRank all candidate numbers from most likely to least likely.\nReturn JSON only, exactly like: {\"ranking\":[1,2,3]}",
+   "You are ranking candidate target nodes for a masked clinical KG edge.\nThe original edge has been removed from the graph context.\n\nMasked query:\nPROCEDURE: spirometry --CONFIRMS--> ?\n\nCandidate target nodes:\n1. DIAGNOSIS: common cold\n2. DIAGNOSIS: hypertension\n\nGraph context edges:\n- SYMPTOM: rash --INDICATES--> DIAGNOSIS: hypertension\n- SYMPTOM: fever --INDICATES--> DIAGNOSIS: common cold\n- SYMPTOM: wheezing --INDICATES--> DIAGNOSIS: hypertension\n- TREATMENT: insulin --TAKEN_FOR--> DIAGNOSIS: hypertension\n- TREATMENT: acetaminophen --TAKEN_FOR--> DIAGNOSIS: hypertension\n- PROCEDURE: ct scan --CONFIRMS--> DIAGNOSIS: common cold\n- LAB_RESULT: abnormal chest imaging --CONFIRMS--> DIAGNOSIS: hypertension\n- LAB_RESULT: elevated wbc --CONFIRMS--> DIAGNOSIS: hypertension\n\nRank all candidate numbers from most likely to least likely.\nReturn JSON only, exactly like: {\"ranking\":[1,2,3]}",
+   "You are ranking candidate target nodes for a masked clinical KG edge.\nThe original edge has been removed from the graph context.\n\nMasked query:\nPROCEDURE: chest auscultation --CONFIRMS--> ?\n\nCandidate target nodes:\n1. DIAGNOSIS: covid-19\n2. DIAGNOSIS: common cold\n\nGraph context edges:\n- SYMPTOM: dizziness --INDICATES--> DIAGNOSIS: common cold\n- SYMPTOM: wheezing --INDICATES--> DIAGNOSIS: common cold\n- TREATMENT: decongestant --TAKEN_FOR--> DIAGNOSIS: covid-19\n- PROCEDURE: ecg --CONFIRMS--> DIAGNOSIS: common cold\n- MEDICAL_HISTORY: smoking history --CAUSES--> DIAGNOSIS: common cold\n- LAB_RESULT: positive pcr --CONFIRMS--> DIAGNOSIS: covid-19\n- LAB_RESULT: elevated wbc --CONFIRMS--> DIAGNOSIS: common cold\n- TREATMENT: albuterol inhaler --TAKEN_FOR--> SYMPTOM: dizziness\n- TREATMENT: rest and fluids --TAKEN_FOR--> SYMPTOM: dizziness\n\nRank all candidate numbers from most likely to least likely.\nReturn JSON only, exactly like: {\"ranking\":[1,2,3]}",
+   "You are ranking candidate target nodes for a masked clinical KG edge.\nThe original edge has been removed from the graph context.\n\nMasked query:\nLAB_RESULT: elevated wbc --CONFIRMS--> ?\n\nCandidate target nodes:\n1. DIAGNOSIS: common cold\n2. DIAGNOSIS: covid-19\n\nGraph context edges:\n- SYMPTOM: dizziness --INDICATES--> DIAGNOSIS: common cold\n- SYMPTOM: wheezing --INDICATES--> DIAGNOSIS: common cold\n- TREATMENT: decongestant --TAKEN_FOR--> DIAGNOSIS: covid-19\n- PROCEDURE: ecg --CONFIRMS--> DIAGNOSIS: common cold\n- PROCEDURE: chest auscultation --CONFIRMS--> DIAGNOSIS: common cold\n- MEDICAL_HISTORY: smoking history --CAUSES--> DIAGNOSIS: common cold\n- LAB_RESULT: positive pcr --CONFIRMS--> DIAGNOSIS: covid-19\n- TREATMENT: albuterol inhaler --TAKEN_FOR--> SYMPTOM: dizziness\n- TREATMENT: rest and fluids --TAKEN_FOR--> SYMPTOM: dizziness\n\nRank all candidate numbers from most likely to least likely.\nReturn JSON only, exactly like: {\"ranking\":[1,2,3]}",
+   "You are ranking candidate target nodes for a masked clinical KG edge.\nThe original edge has been removed from the graph context.\n\nMasked query:\nPROCEDURE: spirometry --CONFIRMS--> ?\n\nCandidate target nodes:\n1. DIAGNOSIS: bronchitis\n2. DIAGNOSIS: influenza\n\nGraph context edges:\n- SYMPTOM: wheezing --INDICATES--> DIAGNOSIS: influenza\n- SYMPTOM: fever --INDICATES--> DIAGNOSIS: bronchitis\n- TREATMENT: antihistamine --TAKEN_FOR--> DIAGNOSIS: bronchitis\n- LAB_RESULT: elevated wbc --INDICATES--> DIAGNOSIS: influenza\n- SYMPTOM: wheezing --LOCATED_AT--> LOCATION: chest\n- SYMPTOM: fever --LOCATED_AT--> LOCATION: right arm\n- TREATMENT: metformin --TAKEN_FOR--> SYMPTOM: wheezing\n- TREATMENT: rest and fluids --TAKEN_FOR--> SYMPTOM: fever\n\nRank all candidate numbers from most likely to least likely.\nReturn JSON only, exactly like: {\"ranking\":[1,2,3]}",
+   "You are ranking candidate target nodes for a masked clinical KG edge.\nThe original edge has been removed from the graph context.\n\nMasked query:\nPROCEDURE: covid swab --CONFIRMS--> ?\n\nCandidate target nodes:\n1. DIAGNOSIS: gastritis\n2. DIAGNOSIS: influenza\n\nGraph context edges:\n- SYMPTOM: rash --INDICATES--> DIAGNOSIS: gastritis\n- SYMPTOM: nasal congestion --INDICATES--> DIAGNOSIS: influenza\n- SYMPTOM: sore throat --INDICATES--> DIAGNOSIS: influenza\n- SYMPTOM: headache --INDICATES--> DIAGNOSIS: gastritis\n- SYMPTOM: sore throat --LOCATED_AT--> LOCATION: head\n- SYMPTOM: headache --LOCATED_AT--> LOCATION: chest\n- TREATMENT: acetaminophen --TAKEN_FOR--> SYMPTOM: nasal congestion\n\nRank all candidate numbers from most likely to least likely.\nReturn JSON only, exactly like: {\"ranking\":[1,2,3]}"
+  ],
+  "queries": [
+   [
+    0,
+    11,
+    13,
+    1,
+    0,
+    [
+     0,
+     1
+    ]
+   ],
+   [
+    7,
+    6,
+    8,
+    0,
+    0,
+    [
+     1,
+     0
+    ]
+   ],
+   [
+    13,
+    7,
+    9,
+    0,
+    0,
+    [
+     0,
+     1
+    ]
+   ],
+   [
+    21,
+    4,
+    6,
+    0,
+    0,
+    [
+     1,
+     0
+    ]
+   ],
+   [
+    30,
+    5,
+    7,
+    1,
+    0,
+    [
+     1,
+     0
+    ]
+   ],
+   [
+    1,
+    6,
+    8,
+    1,
+    1,
+    [
+     1,
+     0
+    ]
+   ],
+   [
+    10,
+    0,
+    2,
+    0,
+    1,
+    [
+     0,
+     1
+    ]
+   ],
+   [
+    11,
+    8,
+    10,
+    0,
+    1,
+    [
+     0,
+     1
+    ]
+   ],
+   [
+    26,
+    1,
+    3,
+    1,
+    1,
+    [
+     0,
+     1
+    ]
+   ],
+   [
+    26,
+    3,
+    5,
+    1,
+    1,
+    [
+     0,
+     1
+    ]
+   ],
+   [
+    0,
+    3,
+    4,
+    5,
+    2,
+    [
+     3,
+     5
+    ]
+   ],
+   [
+    19,
+    3,
+    3,
+    4,
+    2,
+    [
+     6,
+     4
+    ]
+   ],
+   [
+    23,
+    4,
+    4,
+    5,
+    2,
+    [
+     5,
+     2
+    ]
+   ],
+   [
+    24,
+    5,
+    5,
+    6,
+    2,
+    [
+     6,
+     8,
+     10,
+     2,
+     4
+    ]
+   ],
+   [
+    29,
+    2,
+    3,
+    4,
+    2,
+    [
+     4,
+     6
+    ]
+   ],
+   [
+    1,
+    10,
+    12,
+    1,
+    3,
+    [
+     1,
+     0
+    ]
+   ],
+   [
+    6,
+    11,
+    13,
+    0,
+    3,
+    [
+     0,
+     1
+    ]
+   ],
+   [
+    7,
+    4,
+    6,
+    0,
+    3,
+    [
+     0,
+     1
+    ]
+   ],
+   [
+    7,
+    5,
+    7,
+    0,
+    3,
+    [
+     1,
+     0
+    ]
+   ],
+   [
+    10,
+    8,
+    10,
+    1,
+    3,
+    [
+     0,
+     1
+    ]
+   ],
+   [
+    4,
+    3,
+    4,
+    1,
+    4,
+    [
+     1,
+     2
+    ]
+   ],
+   [
+    6,
+    10,
+    12,
+    8,
+    4,
+    [
+     3,
+     2,
+     4,
+     8,
+     6
+    ]
+   ],
+   [
+    10,
+    6,
+    8,
+    2,
+    4,
+    [
+     7,
+     2,
+     6,
+     4
+    ]
+   ],
+   [
+    17,
+    5,
+    7,
+    2,
+    4,
+    [
+     4,
+     2
+    ]
+   ],
+   [
+    21,
+    3,
+    5,
+    3,
+    4,
+    [
+     3,
+     2
+    ]
+   ],
+   [
+    5,
+    6,
+    8,
+    1,
+    5,
+    [
+     1,
+     0
+    ]
+   ],
+   [
+    16,
+    6,
+    8,
+    0,
+    5,
+    [
+     1,
+     0
+    ]
+   ],
+   [
+    16,
+    9,
+    11,
+    0,
+    5,
+    [
+     0,
+     1
+    ]
+   ],
+   [
+    17,
+    7,
+    9,
+    0,
+    5,
+    [
+     0,
+     1
+    ]
+   ],
+   [
+    27,
+    7,
+    9,
+    0,
+    5,
+    [
+     0,
+     1
+    ]
+   ]
+  ]
+ },
+ "loo_baseline_symbols": [
+  "LOO_NUMERIC_DIM",
+  "LooDistMult",
+  "LooEncoder",
+  "LooMLPScorer"
+ ],
+ "parse_ranking": {
+  "": [
+   [
+    0,
+    1,
+    2
+   ],
+   false,
+   false
+  ],
+  "I think 2 then 1 then 3": [
+   [
+    1,
+    0,
+    2
+   ],
+   true,
+   true
+  ],
+  "no numbers at all": [
+   [
+    0,
+    1,
+    2
+   ],
+   false,
+   false
+  ],
+  "sure, here you go:\n{\"ranked_candidates\": [\"2\", \"1\"]}\nhope that helps": [
+   [
+    1,
+    0,
+    2
+   ],
+   true,
+   false
+  ],
+  "{\"ranking\":[3,1,2]}": [
+   [
+    2,
+    0,
+    1
+   ],
+   true,
+   true
+  ],
+  "{\"ranking\":[99,2]}": [
+   [
+    1,
+    0,
+    2
+   ],
+   true,
+   false
+  ]
+ },
+ "summaries": {
+  "three_way.llm_rank": {
+   "hits1": 0.2,
+   "hits10": 1.0,
+   "hits3": 0.6,
+   "mrr": 0.44523809523809527,
+   "n": 5,
+   "per_rel": [
+    {
+     "C": 4.0,
+     "chance_h1": 0.25,
+     "chance_mrr": 0.4908735902799727,
+     "h1": 0.5,
+     "h10": 1.0,
+     "h3": 0.5,
+     "mrr": 0.625,
+     "n": 2,
+     "rel": "MANAGED_FOR"
+    },
+    {
+     "C": 4.0,
+     "chance_h1": 0.25,
+     "chance_mrr": 0.4908735902799727,
+     "h1": 0.0,
+     "h10": 1.0,
+     "h3": 1.0,
+     "mrr": 0.41666666666666663,
+     "n": 2,
+     "rel": "INDICATES"
+    },
+    {
+     "C": 4.0,
+     "chance_h1": 0.25,
+     "chance_mrr": 0.4908735902799727,
+     "h1": 0.0,
+     "h10": 1.0,
+     "h3": 0.0,
+     "mrr": 0.14285714285714285,
+     "n": 1,
+     "rel": "CONFIRMS"
+    }
+   ]
+  },
+  "vs_llm.jepa_rank": {
+   "hits1": 0.4,
+   "hits10": 1.0,
+   "hits3": 0.8,
+   "mrr": 0.5952380952380952,
+   "n": 5,
+   "per_rel": [
+    {
+     "C": 4.0,
+     "chance_h1": 0.25,
+     "chance_mrr": 0.4908735902799727,
+     "h1": 0.5,
+     "h10": 1.0,
+     "h3": 1.0,
+     "mrr": 0.75,
+     "n": 2,
+     "rel": "MANAGED_FOR"
+    },
+    {
+     "C": 4.0,
+     "chance_h1": 0.25,
+     "chance_mrr": 0.4908735902799727,
+     "h1": 0.5,
+     "h10": 1.0,
+     "h3": 1.0,
+     "mrr": 0.6666666666666666,
+     "n": 2,
+     "rel": "INDICATES"
+    },
+    {
+     "C": 4.0,
+     "chance_h1": 0.25,
+     "chance_mrr": 0.4908735902799727,
+     "h1": 0.0,
+     "h10": 1.0,
+     "h3": 0.0,
+     "mrr": 0.14285714285714285,
+     "n": 1,
+     "rel": "CONFIRMS"
+    }
+   ]
+  }
+ }
+}

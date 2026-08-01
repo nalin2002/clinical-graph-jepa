@@ -1,0 +1,38 @@
+{
+  "encoder": [
+    "convs.0.lin_edge.weight",
+    "convs.0.lin_key.bias",
+    "convs.0.lin_key.weight",
+    "convs.0.lin_query.bias",
+    "convs.0.lin_query.weight",
+    "convs.0.lin_skip.bias",
+    "convs.0.lin_skip.weight",
+    "convs.0.lin_value.bias",
+    "convs.0.lin_value.weight",
+    "convs.1.lin_edge.weight",
+    "convs.1.lin_key.bias",
+    "convs.1.lin_key.weight",
+    "convs.1.lin_query.bias",
+    "convs.1.lin_query.weight",
+    "convs.1.lin_skip.bias",
+    "convs.1.lin_skip.weight",
+    "convs.1.lin_value.bias",
+    "convs.1.lin_value.weight",
+    "entity_emb.weight",
+    "norms.0.bias",
+    "norms.0.weight",
+    "norms.1.bias",
+    "norms.1.weight",
+    "num_proj.bias",
+    "num_proj.weight",
+    "rel_emb.weight",
+    "score_gate.0.bias",
+    "score_gate.0.weight",
+    "score_gate.2.bias",
+    "score_gate.2.weight",
+    "type_emb.weight"
+  ],
+  "scorer": [
+    "rel.weight"
+  ]
+}

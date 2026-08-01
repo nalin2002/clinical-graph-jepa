@@ -4,6 +4,10 @@
 - [OpenReview record](https://openreview.net/forum?id=HXsMPubPqE)
 - [Paper-to-code implementation map](../docs/PAPER_CODE_MAP.md)
 
+> [!IMPORTANT]
+> The code behind this paper is **`src/fawkes/`**, not `src/clinical_jepa/`.
+> The released checkpoint is `models/fawkes-entity-note/`.
+
 `clinical_jepa.pdf` is an exact copy of the source PDF supplied with this
 workspace. Its SHA-256 checksum is:
 
