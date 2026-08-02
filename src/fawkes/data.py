@@ -139,13 +139,14 @@ def load_full_dataset(cfg):
 
     graphs = []
     demographics = {}
-    for line in open(path):
-        line = line.strip()
-        if not line:
-            continue
-        record = json.loads(line)
-        graphs.append(record)
-        demographics[str(record.get("subject_id"))] = {"gender": record.get("gender"), "age": record.get("anchor_age")}
+    with open(path) as stream:
+        for line in stream:
+            line = line.strip()
+            if not line:
+                continue
+            record = json.loads(line)
+            graphs.append(record)
+            demographics[str(record.get("subject_id"))] = {"gender": record.get("gender"), "age": record.get("anchor_age")}
 
     if not graphs:
         raise RuntimeError(f"[FAILURE] 0 records in {cfg.data_repo}/{cfg.data_file}; no fallback.")
@@ -163,12 +164,9 @@ def numeric(demo_rec):
     return [age, 1.0 if gender == "M" else 0.0, 1.0 if gender == "F" else 0.0, 0.0, 0.0, 0.0]   # (v9) age/sex; structure carries the rest (type-only >= full)
 
 
-def to_data(graph, demographics, cfg):
-    subject_id = str(graph.get("subject_id"))
-    demo_record = demographics.get(subject_id)
-    nodes, edges = graph.get("nodes", []), graph.get("edges", [])
+def _parse_nodes(nodes, subject_id, cfg):
+    """Node records -> (id -> index map, type ids, hashed entity ids, display names)."""
     id_to_index, type_ids, entity_hashes, names = {}, [], [], []
-    demo_feats = numeric(demo_record)
     for index, node in enumerate(nodes):
         id_to_index[node["id"]] = index
         node_type = node.get("type")
@@ -178,9 +176,14 @@ def to_data(graph, demographics, cfg):
         type_ids.append(NODE_TYPES[node_type])
         entity_hashes.append(ehash(name, cfg.entity_vocab))
         names.append(name)
+    return id_to_index, type_ids, entity_hashes, names
 
+
+def _parse_edges(edges, id_to_index, subject_id, cfg):
+    """Edge records -> endpoint indices, relation ids, score vectors, and the
+    prov-grounded entity indices ((v16) both endpoints of any note-grounded edge)."""
     src_indices, dst_indices, edge_type_ids, edge_scores = [], [], [], []
-    grounded = set()                                             # (v16) ENTITY indices the note grounds (carry the note vector); rest stay zero
+    grounded = set()
     for edge in edges:
         if cfg.prune_no_evidence and edge.get("evidence") == "llm" and not has_evidence(edge.get("labels")):
             continue                                             # (v14) drop no-evidence junk
@@ -198,7 +201,16 @@ def to_data(graph, demographics, cfg):
 
         if cfg.use_note and cfg.ground_by == "prov" and note_grounded_edge(edge.get("labels")):
             grounded.update((source_index, target_index))         # (v16) note-grounded edge -> both endpoints
+    return src_indices, dst_indices, edge_type_ids, edge_scores, grounded
 
+
+def _grounded_entities(graph, names, type_ids, grounded, cfg):
+    """(v16) which entity indices carry the note vector, per GROUND_BY.
+
+    ``grounded`` arrives with the prov-grounded indices from the edge pass;
+    ``name`` extends it with entities named in the note text, ``all`` replaces it
+    with every non-PATIENT entity (ablation: localized-but-everywhere).
+    """
     if cfg.use_note and cfg.ground_by == "name":                 # (v16) entity named in the note text
         note_text = normalize_text(graph.get("note"))
         for index, name in enumerate(names):
@@ -206,18 +218,34 @@ def to_data(graph, demographics, cfg):
             if len(normalized_name) >= 3 and normalized_name in note_text:
                 grounded.add(index)
 
-    if cfg.use_note and cfg.ground_by == "all":                  # (v16) every non-PATIENT entity (ablation: localized-but-everywhere)
+    if cfg.use_note and cfg.ground_by == "all":
         grounded = set(i for i in range(len(type_ids)) if type_ids[i] != NODE_TYPES["PATIENT"])
+    return grounded
 
-    if cfg.use_note:                                             # (v16) note vector LOCALIZED onto grounded entities (NO NOTE node)
-        note_embedding = graph.get("note_embedding")
-        if note_embedding is not None and len(note_embedding) != cfg.embed_dim:
-            raise ValueError(f"[FAILURE] note_embedding dim {len(note_embedding)} != EMBED_DIM {cfg.embed_dim} subj {subject_id}")
-        note_embedding = note_embedding or [0.0] * cfg.embed_dim
-        zero_note = [0.0] * cfg.embed_dim
-        node_feats = [demo_feats + (note_embedding if i in grounded else zero_note) for i in range(len(type_ids))]
-    else:
-        node_feats = [list(demo_feats) for _ in range(len(type_ids))]
+
+def _node_features(graph, type_ids, grounded, demo_feats, subject_id, cfg):
+    """Per-node numeric features: demographics, plus — with USE_NOTE — the note
+    vector LOCALIZED onto the grounded entities (NO NOTE node); the rest get zeros."""
+    if not cfg.use_note:
+        return [list(demo_feats) for _ in range(len(type_ids))]
+    note_embedding = graph.get("note_embedding")
+    if note_embedding is not None and len(note_embedding) != cfg.embed_dim:
+        raise ValueError(f"[FAILURE] note_embedding dim {len(note_embedding)} != EMBED_DIM {cfg.embed_dim} subj {subject_id}")
+    note_embedding = note_embedding or [0.0] * cfg.embed_dim
+    zero_note = [0.0] * cfg.embed_dim
+    return [demo_feats + (note_embedding if i in grounded else zero_note) for i in range(len(type_ids))]
+
+
+def to_data(graph, demographics, cfg):
+    """One raw admission graph -> a PyG ``Data`` with FORWARD edges only
+    (inverses are added per use by ``add_inverses``)."""
+    subject_id = str(graph.get("subject_id"))
+    demo_feats = numeric(demographics.get(subject_id))
+    id_to_index, type_ids, entity_hashes, names = _parse_nodes(graph.get("nodes", []), subject_id, cfg)
+    src_indices, dst_indices, edge_type_ids, edge_scores, grounded = _parse_edges(
+        graph.get("edges", []), id_to_index, subject_id, cfg)
+    grounded = _grounded_entities(graph, names, type_ids, grounded, cfg)
+    node_feats = _node_features(graph, type_ids, grounded, demo_feats, subject_id, cfg)
 
     data = Data()
     data.num_nodes = len(type_ids)

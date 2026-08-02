@@ -24,8 +24,9 @@ note vector localized onto the entity nodes the note actually grounds.
 | `config.py` | `Config` — every experiment knob, and `from_env()` |
 | `data.py` | vocabularies, `score_vec`, `load_full_dataset`, `to_data` |
 | `model.py` | `Encoder`, `JEPA`, `DistMult`, `Scorer` |
-| `train.py` | `set_seed`, `jepa_step`, `readout_step`, `main` |
-| `evaluate.py` | `evaluate`, `loo_evaluate`, `cascade_evaluate`, `eir_uplift_eval`, and the checkpoint CLI |
+| `steps.py` | the per-batch tensor work: `jepa_step`, `readout_step`, negative sampling |
+| `train.py` | the experiment run: `set_seed`, data prep/split, the two training phases, reporting, `main` |
+| `evaluate.py` | `evaluate`, `loo_evaluate`, `cascade_evaluate`, `eir_uplift_eval`, the shared ranking helpers, and the checkpoint CLI |
 
 ## Configuration
 

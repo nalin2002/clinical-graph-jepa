@@ -13,6 +13,11 @@ The four evaluators answer different questions and are not interchangeable:
 - ``cascade_evaluate``  (v13) recover the inferred relations in order, adding
                         each one's gold edges to the context before the next.
 - ``eir_uplift_eval``   (v11) refiner precision/recall against v8-gold triples.
+
+They share one ranking protocol, factored into the helpers at the top:
+candidates are same-type nodes in the same graph, other true tails of
+``(src, rel)`` are filtered out, and the rank of the true tail is
+``1 + |strictly better candidates|`` (ties favor the true tail).
 """
 
 from __future__ import annotations
@@ -32,59 +37,122 @@ from .config import Config
 from .data import (NUM_NODE_TYPES, RELATION_CANONICAL, TARGET_RELS, add_inverses, normalize_text,
                    resolve_rel, support_graded, to_data)
 from .model import DistMult, Encoder
-from .train import buckets, readout_step
+from .steps import buckets, readout_step
 
 logger = logging.getLogger("fawkes_jepa")
 
 
-@torch.no_grad()
-def evaluate(encoder, scorer, loader, device, cfg):
-    """Batch-mask edge recovery — the readout's own validation/test metric."""
-    encoder.eval()
-    scorer.eval()
-    pos_batches, neg_batches, nonpat_batches = [], [], []
-    reciprocal_ranks = []
-    hits = {1: 0, 3: 0, 10: 0}
-    num_ranked = 0
-    qsig_total = 0
-    rel_ranks = defaultdict(list)
-    rel_hits = defaultdict(lambda: {1: 0, 3: 0, 10: 0})
-    rel_n = defaultdict(int)
-    rel_candidates = defaultdict(list)
-    for batch in loader:
-        gen = torch.Generator(device=device).manual_seed(int(batch.gid[0]) & 0x7FFFFFFFFFFFFFFF) if cfg.freeze_eval else None
-        step_out = readout_step(encoder, scorer, batch, device, False, cfg, gen=gen)
-        if step_out is None:
+# ---- the shared ranking protocol ----
+
+def chance_mrr(C):
+    """Expected MRR of a uniform ranker over C candidates (harmonic-number approximation)."""
+    return (math.log(C) + 0.5772) / C if C > 1 else 1.0
+
+
+def encode_context_graph(encoder, graph, edge_index, edge_type, edge_feat, cfg):
+    """Encode ``graph`` from the given context edges (inverses added here).
+
+    ``edge_feat`` is only consulted when ``cfg.use_scores`` — the (v14) gated
+    encoder needs the context edges' scores; the structure-only encoder gets None.
+    """
+    if cfg.use_scores:
+        edge_index, edge_type, edge_feat = add_inverses(edge_index, edge_type, edge_feat)
+    else:
+        edge_index, edge_type = add_inverses(edge_index, edge_type)
+        edge_feat = None
+    return encoder(graph.node_type, graph.entity_id, graph.numfeat,
+                   edge_index, edge_type, edge_feat, graph.sem_id)
+
+
+def filtered_candidates(node_type, src, dst, rel, src_nodes, dst_nodes, edge_type):
+    """The filtered ranking pool for (src, rel, dst): every node of dst's type
+    except the head itself and the OTHER true tails of (src, rel)."""
+    candidates = (node_type == node_type[dst]).nonzero(as_tuple=False).view(-1)
+    candidates = candidates[candidates != src]
+    other_tails = dst_nodes[(src_nodes == src) & (edge_type == rel)]
+    other_tails = other_tails[other_tails != dst]
+    if other_tails.numel() > 0:
+        candidates = candidates[~torch.isin(candidates, other_tails)]
+    return candidates
+
+
+def rank_true_tail(scorer, hidden, src, rel, candidates, dst, device):
+    """Score (src, rel, ·) against every candidate; rank of the true tail, ties in its favor."""
+    scores = scorer(hidden, torch.full((candidates.numel(),), src, dtype=torch.long, device=device), candidates,
+                    torch.full((candidates.numel(),), rel, dtype=torch.long, device=device))
+    true_score = scores[(candidates == dst).nonzero(as_tuple=False)[0, 0]]
+    return int((scores > true_score).sum().item()) + 1
+
+
+class RelationStats:
+    """Per-relation rank bookkeeping shared by ``evaluate`` and ``loo_evaluate``."""
+
+    def __init__(self):
+        self.ranks = defaultdict(list)                       # rel -> [1/rank, ...] in query order
+        self.hits = defaultdict(lambda: {1: 0, 3: 0, 10: 0})
+        self.n = defaultdict(int)
+        self.candidates = defaultdict(list)                  # rel -> [pool size per query]
+        self.reciprocal_ranks = []                           # every query, insertion order
+        self.total = 0
+
+    def add(self, rel, rank, num_candidates):
+        self.reciprocal_ranks.append(1.0 / rank)
+        self.ranks[rel].append(1.0 / rank)
+        self.n[rel] += 1
+        self.candidates[rel].append(num_candidates)
+        for k in (1, 3, 10):
+            if rank <= k:
+                self.hits[rel][k] += 1
+        self.total += 1
+
+    def by_count(self):
+        """Relation ids, most-queried first (ties keep first-seen order)."""
+        return sorted(self.n, key=lambda rel: -self.n[rel])
+
+    def total_hits(self, k):
+        return sum(h[k] for h in self.hits.values())
+
+    def per_rel_rows(self, include_h3):
+        """The per-relation summary table; ``include_h3`` matches each caller's
+        recorded output (the batch-mask evaluator never reported H@3)."""
+        id_to_rel = {v: k for k, v in RELATION_CANONICAL.items()}
+        rows = []
+        for rel in self.by_count():
+            count = self.n[rel]
+            C = float(np.mean(self.candidates[rel]))
+            row = {"rel": id_to_rel.get(rel, f"rel{rel}"), "n": count,
+                   "mrr": float(np.mean(self.ranks[rel])), "h1": self.hits[rel][1] / count}
+            if include_h3:
+                row["h3"] = self.hits[rel][3] / count
+            row.update({"h10": self.hits[rel][10] / count, "C": C,
+                        "chance_mrr": chance_mrr(C),
+                        "chance_h1": 1.0 / C if C >= 1 else 1.0})
+            rows.append(row)
+        return rows
+
+
+# ---- batch-mask recovery ----
+
+def _rank_held_edges(scorer, extra, stats, cap, device):
+    """Rank each held-out edge of one batch against its same-type, same-graph bucket."""
+    hidden, held_src, held_dst, held_rel, node_type, batch_index, _ = extra
+    order, sorted_buckets = buckets(node_type, batch_index)
+    for i in range(held_src.numel()):
+        if stats.total >= cap:
+            return
+        src, dst, rel = int(held_src[i]), int(held_dst[i]), int(held_rel[i])
+        bucket = int(batch_index[dst]) * NUM_NODE_TYPES + int(node_type[dst])
+        lo = int(torch.searchsorted(sorted_buckets, torch.tensor(bucket, device=device), right=False))
+        hi = int(torch.searchsorted(sorted_buckets, torch.tensor(bucket, device=device), right=True))
+        candidates = order[lo:hi]
+        if candidates.numel() < 2:
             continue
-        _, pos_scores, neg_scores, nonpat, extra = step_out
-        pos_batches.append(pos_scores)
-        neg_batches.append(neg_scores)
-        nonpat_batches.append(nonpat)
-        hidden, held_src, held_dst, held_rel, node_type, batch_index, qsig = extra
-        qsig_total = (qsig_total + qsig) & 0xFFFFFFFFFFFF
-        order, sorted_buckets = buckets(node_type, batch_index)
-        for i in range(held_src.numel()):
-            if num_ranked >= cfg.mrr_cap:
-                break
-            src, dst, rel = int(held_src[i]), int(held_dst[i]), int(held_rel[i])
-            bucket = int(batch_index[dst]) * NUM_NODE_TYPES + int(node_type[dst])
-            lo = int(torch.searchsorted(sorted_buckets, torch.tensor(bucket, device=device), right=False))
-            hi = int(torch.searchsorted(sorted_buckets, torch.tensor(bucket, device=device), right=True))
-            candidates = order[lo:hi]
-            if candidates.numel() < 2:
-                continue
-            scores = scorer(hidden, torch.full((candidates.numel(),), src, device=device, dtype=torch.long), candidates,
-                            torch.full((candidates.numel(),), rel, device=device, dtype=torch.long))
-            rank = int((scores > scores[(candidates == dst).nonzero(as_tuple=False)[0, 0]]).sum().item()) + 1
-            reciprocal_ranks.append(1.0 / rank)
-            rel_ranks[rel].append(1.0 / rank)
-            rel_n[rel] += 1
-            rel_candidates[rel].append(int(candidates.numel()))
-            for k in hits:
-                if rank <= k:
-                    hits[k] += 1
-                    rel_hits[rel][k] += 1
-            num_ranked += 1
+        rank = rank_true_tail(scorer, hidden, src, rel, candidates, dst, device)
+        stats.add(rel, rank, int(candidates.numel()))
+
+
+def _classification_metrics(pos_batches, neg_batches, nonpat_batches):
+    """AUC/AP over held edges vs first negatives, plus the non-PATIENT-head AUC."""
     positives = torch.cat(pos_batches).cpu().numpy()
     negatives = torch.cat(neg_batches).cpu().numpy()
     nonpat_mask = torch.cat(nonpat_batches).cpu().numpy()
@@ -98,20 +166,37 @@ def evaluate(encoder, scorer, loader, device, cfg):
         auc_nonobvious = roc_auc_score(nonobvious_labels, nonobvious_scores)
     else:
         auc_nonobvious = float('nan')
-    mrr = float(np.mean(reciprocal_ranks)) if reciprocal_ranks else float('nan')
-    hit_rate = {k: hits[k] / max(num_ranked, 1) for k in hits}
-    ID2REL = {v: k for k, v in RELATION_CANONICAL.items()}
-    per_rel = []
-    for rel in sorted(rel_n, key=lambda x: -rel_n[x]):
-        count = rel_n[rel]
-        C = float(np.mean(rel_candidates[rel]))
-        per_rel.append({"rel": ID2REL.get(rel, f"rel{rel}"), "n": count, "mrr": float(np.mean(rel_ranks[rel])),
-                        "h1": rel_hits[rel][1] / count, "h10": rel_hits[rel][10] / count, "C": C,
-                        "chance_mrr": (math.log(C) + 0.5772) / C if C > 1 else 1.0,
-                        "chance_h1": 1.0 / C if C >= 1 else 1.0})
-    return {"auc": auc, "ap": ap, "auc_nonobvious": auc_nonobvious, "mrr": mrr, "hits1": hit_rate[1],
-            "hits3": hit_rate[3], "hits10": hit_rate[10], "n_mrr": num_ranked, "qsig": qsig_total, "per_rel": per_rel}
+    return auc, ap, auc_nonobvious
 
+
+@torch.no_grad()
+def evaluate(encoder, scorer, loader, device, cfg):
+    """Batch-mask edge recovery — the readout's own validation/test metric."""
+    encoder.eval()
+    scorer.eval()
+    pos_batches, neg_batches, nonpat_batches = [], [], []
+    stats = RelationStats()
+    qsig_total = 0
+    for batch in loader:
+        gen = torch.Generator(device=device).manual_seed(int(batch.gid[0]) & 0x7FFFFFFFFFFFFFFF) if cfg.freeze_eval else None
+        step_out = readout_step(encoder, scorer, batch, device, False, cfg, gen=gen)
+        if step_out is None:
+            continue
+        _, pos_scores, neg_scores, nonpat, extra = step_out
+        pos_batches.append(pos_scores)
+        neg_batches.append(neg_scores)
+        nonpat_batches.append(nonpat)
+        qsig_total = (qsig_total + extra[-1]) & 0xFFFFFFFFFFFF
+        _rank_held_edges(scorer, extra, stats, cfg.mrr_cap, device)
+    auc, ap, auc_nonobvious = _classification_metrics(pos_batches, neg_batches, nonpat_batches)
+    mrr = float(np.mean(stats.reciprocal_ranks)) if stats.reciprocal_ranks else float('nan')
+    hit_rate = {k: stats.total_hits(k) / max(stats.total, 1) for k in (1, 3, 10)}
+    return {"auc": auc, "ap": ap, "auc_nonobvious": auc_nonobvious, "mrr": mrr, "hits1": hit_rate[1],
+            "hits3": hit_rate[3], "hits10": hit_rate[10], "n_mrr": stats.total, "qsig": qsig_total,
+            "per_rel": stats.per_rel_rows(include_h3=False)}
+
+
+# ---- leave-one-out ----
 
 @torch.no_grad()
 def loo_evaluate(encoder, scorer, graphs, device, cfg, cap=None):
@@ -123,13 +208,9 @@ def loo_evaluate(encoder, scorer, graphs, device, cfg, cap=None):
     cap = cfg.loo_cap if cap is None else cap
     encoder.eval()
     scorer.eval()
-    rel_ranks = defaultdict(list)
-    rel_hits = defaultdict(lambda: {1: 0, 3: 0, 10: 0})
-    rel_n = defaultdict(int)
-    rel_candidates = defaultdict(list)
-    num_queries = 0
+    stats = RelationStats()
     for graph in graphs:
-        if num_queries >= cap:
+        if stats.total >= cap:
             break
         graph = graph.to(device)
         edge_index, edge_type, node_type = graph.edge_index, graph.edge_type, graph.node_type
@@ -138,60 +219,62 @@ def loo_evaluate(encoder, scorer, graphs, device, cfg, cap=None):
             continue
         src_nodes, dst_nodes = edge_index[0], edge_index[1]
         for i in range(num_edges):
-            if num_queries >= cap:
+            if stats.total >= cap:
                 break
-            src = int(src_nodes[i])
-            dst = int(dst_nodes[i])
-            rel = int(edge_type[i])
+            src, dst, rel = int(src_nodes[i]), int(dst_nodes[i]), int(edge_type[i])
             if src == dst:
                 continue
             keep_mask = torch.ones(num_edges, dtype=torch.bool, device=device)
             keep_mask[i] = False
-            if cfg.use_scores:                                        # (v14) gated encoder needs the observed edges' scores
-                kept_edge_index, kept_edge_type, kept_edge_feat = add_inverses(
-                    edge_index[:, keep_mask], edge_type[keep_mask], graph.edge_feat[keep_mask])
-            else:
-                kept_edge_index, kept_edge_type = add_inverses(edge_index[:, keep_mask], edge_type[keep_mask])
-                kept_edge_feat = None
-            hidden = encoder(node_type, graph.entity_id, graph.numfeat, kept_edge_index, kept_edge_type,
-                             kept_edge_feat, graph.sem_id)
-            candidates = (node_type == node_type[dst]).nonzero(as_tuple=False).view(-1)
-            candidates = candidates[candidates != src]
-            other_tails = dst_nodes[(src_nodes == src) & (edge_type == rel)]
-            other_tails = other_tails[other_tails != dst]             # filtered: other true tails of (u,rel)
-            if other_tails.numel() > 0:
-                candidates = candidates[~torch.isin(candidates, other_tails)]
+            hidden = encode_context_graph(encoder, graph, edge_index[:, keep_mask], edge_type[keep_mask],
+                                          graph.edge_feat[keep_mask] if cfg.use_scores else None, cfg)
+            candidates = filtered_candidates(node_type, src, dst, rel, src_nodes, dst_nodes, edge_type)
             if candidates.numel() < 2 or int((candidates == dst).sum()) == 0:
                 continue
-            scores = scorer(hidden, torch.full((candidates.numel(),), src, dtype=torch.long, device=device), candidates,
-                            torch.full((candidates.numel(),), rel, dtype=torch.long, device=device))
-            rank = int((scores > scores[(candidates == dst).nonzero(as_tuple=False)[0, 0]]).sum().item()) + 1
-            rel_ranks[rel].append(1.0 / rank)
-            rel_n[rel] += 1
-            rel_candidates[rel].append(int(candidates.numel()))
-            for k in (1, 3, 10):
-                if rank <= k:
-                    rel_hits[rel][k] += 1
-            num_queries += 1
-    ID2REL = {v: k for k, v in RELATION_CANONICAL.items()}
-    per_rel = []
-    all_ranks = []
-    total_hits = {1: 0, 3: 0, 10: 0}
-    total_queries = 0
-    for rel in sorted(rel_n, key=lambda x: -rel_n[x]):
-        count = rel_n[rel]
-        C = float(np.mean(rel_candidates[rel]))
-        all_ranks += rel_ranks[rel]
-        total_queries += count
-        for k in total_hits:
-            total_hits[k] += rel_hits[rel][k]
-        per_rel.append({"rel": ID2REL.get(rel, f"rel{rel}"), "n": count, "mrr": float(np.mean(rel_ranks[rel])),
-                        "h1": rel_hits[rel][1] / count, "h3": rel_hits[rel][3] / count, "h10": rel_hits[rel][10] / count, "C": C,
-                        "chance_mrr": (math.log(C) + 0.5772) / C if C > 1 else 1.0,
-                        "chance_h1": 1.0 / C if C >= 1 else 1.0})
-    return {"mrr": float(np.mean(all_ranks)) if all_ranks else float('nan'), "hits1": total_hits[1] / max(total_queries, 1),
-            "hits3": total_hits[3] / max(total_queries, 1), "hits10": total_hits[10] / max(total_queries, 1),
-            "n": total_queries, "per_rel": per_rel}
+            rank = rank_true_tail(scorer, hidden, src, rel, candidates, dst, device)
+            stats.add(rel, rank, int(candidates.numel()))
+    per_rel = stats.per_rel_rows(include_h3=True)
+    all_ranks = [rr for rel in stats.by_count() for rr in stats.ranks[rel]]
+    return {"mrr": float(np.mean(all_ranks)) if all_ranks else float('nan'),
+            "hits1": stats.total_hits(1) / max(stats.total, 1),
+            "hits3": stats.total_hits(3) / max(stats.total, 1),
+            "hits10": stats.total_hits(10) / max(stats.total, 1),
+            "n": stats.total, "per_rel": per_rel}
+
+
+# ---- cascade ----
+
+def _recover_relation(encoder, scorer, graph, rel_id, ctx_edge_index, ctx_edge_type, ctx_edge_feat,
+                      results, device, cfg):
+    """Rank every (src, rel_id, dst) edge of ``graph`` given only the context edges."""
+    hidden = encode_context_graph(encoder, graph, ctx_edge_index, ctx_edge_type, ctx_edge_feat, cfg)
+    edge_index, edge_type, node_type = graph.edge_index, graph.edge_type, graph.node_type
+    for j in (edge_type == rel_id).nonzero(as_tuple=False).view(-1).tolist():
+        src = int(edge_index[0, j])
+        dst = int(edge_index[1, j])
+        if src == dst:
+            continue
+        candidates = filtered_candidates(node_type, src, dst, rel_id, edge_index[0], edge_index[1], edge_type)
+        if candidates.numel() < 2 or int((candidates == dst).sum()) == 0:
+            continue
+        rank = rank_true_tail(scorer, hidden, src, rel_id, candidates, dst, device)
+        results[rel_id].append((1.0 / rank, rank, int(candidates.numel())))
+
+
+def _aggregate_cascade(results):
+    """(rr, rank, pool-size) tuples -> the per-relation summary keyed by relation name."""
+    id_to_rel = {v: k for k, v in RELATION_CANONICAL.items()}
+    out = {}
+    for rel_id, rows in results.items():
+        if not rows:
+            continue
+        C = float(np.mean([x[2] for x in rows]))
+        out[id_to_rel.get(rel_id, str(rel_id))] = {
+            "n": len(rows), "mrr": float(np.mean([x[0] for x in rows])),
+            "h1": float(np.mean([1.0 if x[1] <= 1 else 0.0 for x in rows])),
+            "h10": float(np.mean([1.0 if x[1] <= 10 else 0.0 for x in rows])), "C": C,
+            "chance_mrr": chance_mrr(C)}
+    return out
 
 
 @torch.no_grad()
@@ -204,40 +287,11 @@ def cascade_evaluate(encoder, scorer, graphs, order_ids, device, cfg):
     scorer.eval()
     target_ids = [RELATION_CANONICAL[x] for x in TARGET_RELS]
     target_ids_tensor = torch.tensor(sorted(set(target_ids)), device=device)
-
-    def recover(rel_id, ctx_edge_index, ctx_edge_type, ctx_edge_feat, graph, node_type, edge_index, edge_type, results):
-        if cfg.use_scores:                                            # (v14) gated encoder needs the context edges' scores
-            enc_edge_index, enc_edge_type, enc_edge_feat = add_inverses(ctx_edge_index, ctx_edge_type, ctx_edge_feat)
-        else:
-            enc_edge_index, enc_edge_type = add_inverses(ctx_edge_index, ctx_edge_type)
-            enc_edge_feat = None
-        hidden = encoder(node_type, graph.entity_id.to(device), graph.numfeat.to(device),
-                         enc_edge_index, enc_edge_type, enc_edge_feat, graph.sem_id.to(device))
-        for j in (edge_type == rel_id).nonzero(as_tuple=False).view(-1).tolist():
-            src = int(edge_index[0, j])
-            dst = int(edge_index[1, j])
-            if src == dst:
-                continue
-            candidates = (node_type == node_type[dst]).nonzero(as_tuple=False).view(-1)
-            candidates = candidates[candidates != src]
-            other_tails = edge_index[1][(edge_index[0] == src) & (edge_type == rel_id)]
-            other_tails = other_tails[other_tails != dst]
-            if other_tails.numel() > 0:
-                candidates = candidates[~torch.isin(candidates, other_tails)]
-            if candidates.numel() < 2 or int((candidates == dst).sum()) == 0:
-                continue
-            scores = scorer(hidden, torch.full((candidates.numel(),), src, dtype=torch.long, device=device), candidates,
-                            torch.full((candidates.numel(),), rel_id, dtype=torch.long, device=device))
-            rank = int((scores > scores[(candidates == dst).nonzero(as_tuple=False)[0, 0]]).sum().item()) + 1
-            results[rel_id].append((1.0 / rank, rank, int(candidates.numel())))
-
     floor = defaultdict(list)
     cascade = defaultdict(list)
     for graph in graphs:
         graph = graph.to(device)
-        edge_index = graph.edge_index
-        edge_type = graph.edge_type
-        node_type = graph.node_type
+        edge_index, edge_type = graph.edge_index, graph.edge_type
         if edge_index.size(1) < 2:
             continue
         edge_feat = graph.edge_feat if cfg.use_scores else None        # (v14) per-edge scores for the gated encoder
@@ -245,37 +299,24 @@ def cascade_evaluate(encoder, scorer, graphs, order_ids, device, cfg):
         backbone_edge_index = edge_index[:, backbone_mask]
         backbone_edge_type = edge_type[backbone_mask]
         backbone_edge_feat = edge_feat[backbone_mask] if cfg.use_scores else None
-        for rel_id in target_ids:
-            recover(rel_id, backbone_edge_index, backbone_edge_type, backbone_edge_feat,
-                    graph, node_type, edge_index, edge_type, floor)    # FLOOR: backbone-only context
-        ctx_edge_index = backbone_edge_index
+        for rel_id in target_ids:                                      # FLOOR: backbone-only context
+            _recover_relation(encoder, scorer, graph, rel_id, backbone_edge_index, backbone_edge_type,
+                              backbone_edge_feat, floor, device, cfg)
+        ctx_edge_index = backbone_edge_index                           # CASCADE: add each relation's gold in order
         ctx_edge_type = backbone_edge_type
-        ctx_edge_feat = backbone_edge_feat                             # CASCADE: add each relation's gold in order
+        ctx_edge_feat = backbone_edge_feat
         for rel_id in order_ids:
-            recover(rel_id, ctx_edge_index, ctx_edge_type, ctx_edge_feat,
-                    graph, node_type, edge_index, edge_type, cascade)
+            _recover_relation(encoder, scorer, graph, rel_id, ctx_edge_index, ctx_edge_type,
+                              ctx_edge_feat, cascade, device, cfg)
             gold_edges = (edge_type == rel_id).nonzero(as_tuple=False).view(-1)
             if gold_edges.numel() > 0:
                 ctx_edge_index = torch.cat([ctx_edge_index, edge_index[:, gold_edges]], 1)
                 ctx_edge_type = torch.cat([ctx_edge_type, edge_type[gold_edges]])
                 if cfg.use_scores:
                     ctx_edge_feat = torch.cat([ctx_edge_feat, edge_feat[gold_edges]], 0)
-    ID2REL = {v: k for k, v in RELATION_CANONICAL.items()}
-
-    def agg(results):
-        out = {}
-        for rel_id, rows in results.items():
-            if not rows:
-                continue
-            C = float(np.mean([x[2] for x in rows]))
-            out[ID2REL.get(rel_id, str(rel_id))] = {
-                "n": len(rows), "mrr": float(np.mean([x[0] for x in rows])),
-                "h1": float(np.mean([1.0 if x[1] <= 1 else 0.0 for x in rows])),
-                "h10": float(np.mean([1.0 if x[1] <= 10 else 0.0 for x in rows])), "C": C,
-                "chance_mrr": (math.log(C) + 0.5772) / C if C > 1 else 1.0}
-        return out
-
-    return {"floor": agg(floor), "cascade": agg(cascade), "order": [ID2REL.get(r, str(r)) for r in order_ids]}
+    id_to_rel = {v: k for k, v in RELATION_CANONICAL.items()}
+    return {"floor": _aggregate_cascade(floor), "cascade": _aggregate_cascade(cascade),
+            "order": [id_to_rel.get(r, str(r)) for r in order_ids]}
 
 
 # ---- (v11) EIR scoring method (kg_similarity_scorer.py) + the refiner uplift eval ----
@@ -293,10 +334,67 @@ def edge_prf(pred, gold):
     return precision, recall, f1
 
 
+def _edge_records(graph, names, id_to_index):
+    """One record per resolvable edge: endpoints, relation, LLM/support status, and
+    the normalized (src_text, REL, dst_text) triple used for set matching."""
+    records = []
+    for edge in graph["edges"]:
+        if edge["source"] not in id_to_index or edge["target"] not in id_to_index:
+            continue
+        try:
+            rel_id = resolve_rel(edge.get("relation"))
+        except Exception:
+            continue
+        src = id_to_index[edge["source"]]
+        dst = id_to_index[edge["target"]]
+        rel_name = str(edge.get("relation", "")).upper()
+        is_llm = (edge.get("evidence") == "llm")
+        support = support_graded(edge.get("labels")) if is_llm else 1.0
+        records.append({"src": src, "dst": dst, "rel_name": rel_name, "rel_id": rel_id,
+                        "is_llm": is_llm, "support": support,
+                        "triple": (normalize_text(names[src]), rel_name, normalize_text(names[dst]))})
+    return records
+
+
+def _encode_kept_edges(encoder, data, kept, node_type, device):
+    """Encode the graph from the kept edges only (held-out LLM edges never seen)."""
+    if kept:
+        kept_edge_index = torch.tensor([[r["src"] for r in kept], [r["dst"] for r in kept]],
+                                       dtype=torch.long, device=device)
+        kept_edge_type = torch.tensor([r["rel_id"] for r in kept], dtype=torch.long, device=device)
+    else:
+        kept_edge_index = torch.zeros((2, 0), dtype=torch.long, device=device)
+        kept_edge_type = torch.zeros((0,), dtype=torch.long, device=device)
+    kept_edge_index, kept_edge_type = add_inverses(kept_edge_index, kept_edge_type)
+    return encoder(node_type, data.entity_id.to(device), data.numfeat.to(device),
+                   kept_edge_index, kept_edge_type, None, data.sem_id.to(device))
+
+
+def _model_added_triples(scorer, hidden, held, names, node_type_list, add_counts, device):
+    """Top-1 same-type prediction for each held-out edge; returns the ADDed triples
+    and tallies recovered/held per relation into ``add_counts``."""
+    added = set()
+    for record in held:
+        candidates = [j for j in range(len(node_type_list))
+                      if node_type_list[j] == node_type_list[record["dst"]] and j != record["src"]]
+        add_counts[record["rel_name"]][1] += 1
+        if not candidates:
+            continue
+        cand_tensor = torch.tensor(candidates, dtype=torch.long, device=device)
+        scores = scorer(hidden, torch.full((len(candidates),), record["src"], dtype=torch.long, device=device), cand_tensor,
+                        torch.full((len(candidates),), record["rel_id"], dtype=torch.long, device=device))
+        predicted_dst = candidates[int(scores.argmax())]
+        added.add((normalize_text(names[record["src"]]), record["rel_name"], normalize_text(names[predicted_dst])))
+        if predicted_dst == record["dst"]:
+            add_counts[record["rel_name"]][0] += 1
+    return added
+
+
 @torch.no_grad()
 def eir_uplift_eval(encoder, scorer, pairs, tau, device, cfg):
-    # refiner per TEST graph: GOLD = backbone + LLM edges with graded support>=tau; hold out EIR_HOLDOUT of gold LLM
-    # edges; RAW = draft - held; REFINED = (keep supported, drop unsupported) + model-ADD (recover held-out top-1).
+    """Refiner uplift per TEST graph: GOLD = backbone + LLM edges with graded support>=tau;
+    hold out EIR_HOLDOUT of gold LLM edges; RAW = draft - held;
+    REFINED = (keep supported, drop unsupported) + model-ADD (recover held-out top-1)."""
     encoder.eval()
     scorer.eval()
     graph_metrics = defaultdict(list)
@@ -305,22 +403,7 @@ def eir_uplift_eval(encoder, scorer, pairs, tau, device, cfg):
         nodes = graph["nodes"]
         names = [(n.get("normalized_name") or n.get("name") or "") for n in nodes]
         id_to_index = {n["id"]: i for i, n in enumerate(nodes)}
-        records = []
-        for edge in graph["edges"]:
-            if edge["source"] not in id_to_index or edge["target"] not in id_to_index:
-                continue
-            try:
-                rel_id = resolve_rel(edge.get("relation"))
-            except Exception:
-                continue
-            src = id_to_index[edge["source"]]
-            dst = id_to_index[edge["target"]]
-            rel_name = str(edge.get("relation", "")).upper()
-            is_llm = (edge.get("evidence") == "llm")
-            support = support_graded(edge.get("labels")) if is_llm else 1.0
-            records.append({"src": src, "dst": dst, "rel_name": rel_name, "rel_id": rel_id,
-                            "is_llm": is_llm, "support": support,
-                            "triple": (normalize_text(names[src]), rel_name, normalize_text(names[dst]))})
+        records = _edge_records(graph, names, id_to_index)
         gold = set(r["triple"] for r in records if (not r["is_llm"]) or r["support"] >= tau)
         gold_llm = [r for r in records if r["is_llm"] and r["support"] >= tau]
         if not gold or int(data.num_nodes) < 3:
@@ -334,29 +417,8 @@ def eir_uplift_eval(encoder, scorer, pairs, tau, device, cfg):
         kept_set = set(r["triple"] for r in kept)
         node_type = data.node_type.to(device)
         node_type_list = node_type.tolist()
-        if kept:
-            kept_edge_index = torch.tensor([[r["src"] for r in kept], [r["dst"] for r in kept]],
-                                           dtype=torch.long, device=device)
-            kept_edge_type = torch.tensor([r["rel_id"] for r in kept], dtype=torch.long, device=device)
-        else:
-            kept_edge_index = torch.zeros((2, 0), dtype=torch.long, device=device)
-            kept_edge_type = torch.zeros((0,), dtype=torch.long, device=device)
-        kept_edge_index, kept_edge_type = add_inverses(kept_edge_index, kept_edge_type)
-        hidden = encoder(node_type, data.entity_id.to(device), data.numfeat.to(device),
-                         kept_edge_index, kept_edge_type, None, data.sem_id.to(device))
-        added = set()
-        for record in held:
-            candidates = [j for j in range(len(nodes)) if node_type_list[j] == node_type_list[record["dst"]] and j != record["src"]]
-            add_counts[record["rel_name"]][1] += 1
-            if not candidates:
-                continue
-            cand_tensor = torch.tensor(candidates, dtype=torch.long, device=device)
-            scores = scorer(hidden, torch.full((len(candidates),), record["src"], dtype=torch.long, device=device), cand_tensor,
-                            torch.full((len(candidates),), record["rel_id"], dtype=torch.long, device=device))
-            predicted_dst = candidates[int(scores.argmax())]
-            added.add((normalize_text(names[record["src"]]), record["rel_name"], normalize_text(names[predicted_dst])))
-            if predicted_dst == record["dst"]:
-                add_counts[record["rel_name"]][0] += 1
+        hidden = _encode_kept_edges(encoder, data, kept, node_type, device)
+        added = _model_added_triples(scorer, hidden, held, names, node_type_list, add_counts, device)
         refined = kept_set | added
         raw_p, raw_r, raw_f = edge_prf(raw_set, gold)
         ref_p, ref_r, ref_f = edge_prf(refined, gold)
