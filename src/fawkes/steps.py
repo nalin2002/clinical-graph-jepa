@@ -6,9 +6,11 @@ point — previously a circular import that ``train.main`` worked around with a
 deferred import.
 
 Everything here is deterministic given the RNG state: the only random draws are
-the node mask in ``jepa_step`` and the edge permutation / negative sampling in
-``readout_step``, in that order. ``tests/test_fawkes.py`` pins both steps
-bit-for-bit against the recorded trainer.
+the node mask in ``jepa_step`` (Bernoulli by default; the BFS patch mask from
+``patches.py`` when ``cfg.mask_strategy == "patch"``) and the edge permutation /
+negative sampling in ``readout_step``, in that order. ``tests/test_fawkes.py``
+pins both steps bit-for-bit against the recorded trainer (under the default
+``mask_strategy="random"``).
 """
 
 from __future__ import annotations
@@ -19,6 +21,7 @@ from torch_geometric.nn import global_mean_pool
 from torch_geometric.utils import subgraph
 
 from .data import NUM_BASE, NUM_NODE_TYPES, TARGET_REL_IDS, add_inverses
+from .patches import patch_mask
 
 
 # ---- PHASE 1: JEPA masked-node latent prediction ----
@@ -100,7 +103,10 @@ def jepa_step(model, batch, device, cfg):
     batch_index = batch.batch
     num_nodes = batch.node_type.size(0)
     num_graphs = int(batch_index.max().item()) + 1
-    target_mask = valid_mask(batch_index, num_graphs, cfg.node_mask, device)
+    if cfg.mask_strategy == "patch":                             # (v18) mask whole BFS-balanced patches
+        target_mask = patch_mask(batch.ptr, batch.edge_index, cfg.node_mask, cfg.jepa_patches, device)
+    else:
+        target_mask = valid_mask(batch_index, num_graphs, cfg.node_mask, device)
     context_mask = ~target_mask
     context_nodes = context_mask.nonzero(as_tuple=False).view(-1)
     context_repr = _encode_context(model, batch, context_nodes, num_nodes, cfg)

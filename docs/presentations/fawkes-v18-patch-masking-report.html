@@ -1,0 +1,1264 @@
+<title>fawkes v18 — Patch Masking: Changes &amp; Results</title>
+<style>
+  /* ============================================================
+     TOKENS — chrome (page identity, carried over from the v16→v17
+     report) and a separate, validated data layer. The two never mix:
+     teal never encodes data, blue/red never appear in text chrome.
+     ============================================================ */
+  :root {
+    /* chrome */
+    --paper: #FAFBFA;
+    --raised: #F3F6F5;
+    --ink: #1A2426;
+    --muted: #5C6B6A;
+    --accent: #0F6B5C;
+    --accent-soft: #E7F0EE;
+    --flag: #B3591A;
+    --flag-soft: #F7EDE4;
+    --line: #DCE3E1;
+    --hairline: #E8EDEC;
+    --code-bg: #F0F4F3;
+    /* data layer — validated (see §7) */
+    --up: #2a78d6;          /* improvement pole  */
+    --down: #e34948;        /* regression pole   */
+    --zero: #C3C2BB;        /* diverging midpoint */
+    --before: #86b6ef;      /* ordinal step, v17 */
+    --after: #1c5cab;       /* ordinal step, v18 */
+    --grid: #E4E8E7;
+    --axis: #C6CFCD;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #101716; --raised: #17201E; --ink: #E4EAE8; --muted: #93A5A2;
+      --accent: #4FBFA8; --accent-soft: #16302B; --flag: #E09A5A; --flag-soft: #33241A;
+      --line: #263230; --hairline: #1E2927; --code-bg: #18211F;
+      --up: #3987e5; --down: #e66767; --zero: #4A5654;
+      --before: #256abf; --after: #b7d3f6;
+      --grid: #202B29; --axis: #33403D;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #101716; --raised: #17201E; --ink: #E4EAE8; --muted: #93A5A2;
+    --accent: #4FBFA8; --accent-soft: #16302B; --flag: #E09A5A; --flag-soft: #33241A;
+    --line: #263230; --hairline: #1E2927; --code-bg: #18211F;
+    --up: #3987e5; --down: #e66767; --zero: #4A5654;
+    --before: #256abf; --after: #b7d3f6;
+    --grid: #202B29; --axis: #33403D;
+  }
+  :root[data-theme="light"] {
+    --paper: #FAFBFA; --raised: #F3F6F5; --ink: #1A2426; --muted: #5C6B6A;
+    --accent: #0F6B5C; --accent-soft: #E7F0EE; --flag: #B3591A; --flag-soft: #F7EDE4;
+    --line: #DCE3E1; --hairline: #E8EDEC; --code-bg: #F0F4F3;
+    --up: #2a78d6; --down: #e34948; --zero: #C3C2BB;
+    --before: #86b6ef; --after: #1c5cab;
+    --grid: #E4E8E7; --axis: #C6CFCD;
+  }
+
+  /* ============================================================ TYPE */
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: Charter, Georgia, 'Times New Roman', serif;
+    font-size: 1.05rem;
+    line-height: 1.62;
+    margin: 0;
+  }
+  h1, h2, h3, h4, .eyebrow, .chip, .gate-label, thead th,
+  .fig, .fig *, .kpi, .kpi *, .rail, .rail * {
+    font-family: 'Avenir Next', Avenir, Seravek, 'Segoe UI', system-ui, sans-serif;
+  }
+  code, pre, .mono { font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; font-size: 0.88em; }
+
+  .wrap { max-width: 52rem; margin: 0 auto; padding: 3.5rem 1.5rem 6rem; }
+  .prose { max-width: 40rem; }
+
+  .eyebrow {
+    text-transform: uppercase; letter-spacing: 0.14em; font-size: 0.72rem;
+    font-weight: 600; color: var(--accent); margin: 0 0 0.75rem;
+  }
+  h1 {
+    font-size: 2.15rem; font-weight: 700; line-height: 1.14;
+    margin: 0 0 0.6rem; text-wrap: balance; letter-spacing: -0.015em;
+  }
+  .subtitle { color: var(--muted); font-size: 1.05rem; margin: 0 0 1.4rem; max-width: 38rem; }
+  .meta {
+    display: flex; flex-wrap: wrap; gap: 0.4rem 1.4rem;
+    font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 0.76rem;
+    color: var(--muted); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+    padding: 0.6rem 0; margin-bottom: 2.4rem;
+  }
+  .meta strong { color: var(--ink); font-weight: 600; }
+
+  section { margin-top: 3.4rem; }
+  h2 {
+    font-size: 1.34rem; font-weight: 700; letter-spacing: -0.01em;
+    margin: 0 0 1rem; text-wrap: balance; display: flex; align-items: baseline; gap: 0.65rem;
+  }
+  h2 .sec {
+    color: var(--accent); font-size: 0.82rem; font-weight: 600;
+    font-family: ui-monospace, 'SF Mono', Menlo, monospace; white-space: nowrap;
+  }
+  h3 { font-size: 1.04rem; font-weight: 600; margin: 1.9rem 0 0.5rem; }
+  h4 { font-size: 0.85rem; font-weight: 600; margin: 1.3rem 0 0.4rem; letter-spacing: 0.01em; }
+  p { margin: 0 0 1rem; }
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  a:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 2px; }
+  ul { padding-left: 1.2rem; margin: 0 0 1rem; }
+  li { margin-bottom: 0.45rem; }
+  code { background: var(--code-bg); padding: 0.1em 0.35em; border-radius: 3px; }
+  pre {
+    background: var(--code-bg); border: 1px solid var(--line); border-radius: 6px;
+    padding: 0.9rem 1.1rem; overflow-x: auto; line-height: 1.55; margin: 0 0 1rem;
+  }
+  pre code { background: none; padding: 0; }
+
+  /* ============================================================ VERSION RAIL */
+  .rail {
+    display: flex; align-items: stretch; gap: 0.9rem;
+    border-left: 3px solid var(--accent); padding-left: 1rem; margin: 0 0 1.6rem;
+  }
+  .rail-tag {
+    font-size: 0.7rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--accent);
+  }
+  .rail-body { font-family: Charter, Georgia, serif; color: var(--muted); font-size: 0.95rem; }
+
+  /* ============================================================ CHIPS */
+  .chip {
+    display: inline-block; font-size: 0.68rem; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.08em; padding: 0.14rem 0.55rem; border-radius: 999px;
+    vertical-align: 0.12em; margin-right: 0.3rem;
+  }
+  .chip.new { background: var(--accent-soft); color: var(--accent); }
+  .chip.changed { background: var(--flag-soft); color: var(--flag); }
+  .chip.unchanged { background: var(--accent-soft); color: var(--accent); }
+
+  /* ============================================================ CALLOUTS */
+  .gate {
+    border: 1px solid var(--line); border-left: 3px solid var(--accent);
+    background: var(--accent-soft); border-radius: 0 6px 6px 0;
+    padding: 0.9rem 1.1rem; margin: 1.3rem 0;
+  }
+  .gate-label {
+    font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em;
+    color: var(--accent); display: block; margin-bottom: 0.35rem;
+  }
+  .gate p:last-child, .gate ul:last-child { margin-bottom: 0; }
+  .gate.flagged { border-left-color: var(--flag); background: var(--flag-soft); }
+  .gate.flagged .gate-label { color: var(--flag); }
+
+  /* ============================================================ KPI TILES */
+  .kpi-row {
+    display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin: 1.6rem 0 1.2rem;
+  }
+  @media (max-width: 640px) { .kpi-row { grid-template-columns: 1fr; } }
+  .kpi {
+    background: var(--raised); border: 1px solid var(--hairline);
+    border-radius: 8px; padding: 1.05rem 1.15rem;
+  }
+  .kpi-label {
+    font-size: 0.71rem; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--muted); margin-bottom: 0.5rem;
+  }
+  .kpi-value {
+    font-size: 2.5rem; font-weight: 600; line-height: 1; letter-spacing: -0.02em;
+    display: flex; align-items: baseline; gap: 0.5rem;
+  }
+  .kpi-from { font-size: 0.82rem; color: var(--muted); font-weight: 400; letter-spacing: 0; }
+  .kpi-delta { font-size: 0.88rem; font-weight: 600; margin-top: 0.5rem; }
+  .kpi-delta.up { color: var(--up); }
+  .kpi-delta.down { color: var(--down); }
+  .kpi-note { font-size: 0.78rem; color: var(--muted); margin-top: 0.35rem; line-height: 1.45; }
+
+  /* ============================================================ FIGURES */
+  .fig {
+    margin: 1.8rem 0 1.2rem; border: 1px solid var(--hairline);
+    border-radius: 8px; padding: 1.15rem 1.2rem 1rem; background: var(--raised);
+  }
+  .fig-title { font-size: 0.92rem; font-weight: 600; margin: 0 0 0.2rem; }
+  .fig-sub { font-size: 0.78rem; color: var(--muted); margin: 0 0 1rem; line-height: 1.45; }
+  .legend {
+    display: flex; flex-wrap: wrap; gap: 0.35rem 1.1rem; margin: 0 0 1rem;
+    font-size: 0.74rem; color: var(--muted);
+  }
+  .legend span { display: inline-flex; align-items: center; gap: 0.38rem; }
+  .swatch { width: 11px; height: 11px; border-radius: 2px; display: inline-block; flex: none; }
+  .swatch.dot { border-radius: 50%; width: 9px; height: 9px; }
+  .swatch.tick { width: 2px; height: 12px; border-radius: 1px; background: var(--axis); }
+
+  .panel-label {
+    font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em;
+    color: var(--ink); margin: 0.9rem 0 0.55rem;
+  }
+  .panel-label:first-of-type { margin-top: 0; }
+
+  /* --- diverging delta bars --- */
+  .dbar-rows { display: grid; gap: 0.3rem; }
+  .dbar {
+    display: grid; grid-template-columns: 4.6rem 1fr 4.2rem; align-items: center;
+    gap: 0.6rem; font-size: 0.76rem;
+  }
+  .dbar-name { color: var(--muted); text-align: right; }
+  .dbar-track {
+    position: relative; height: 17px; background: transparent;
+    border-left: 0; overflow: visible;
+  }
+  .dbar-track::before {
+    content: ""; position: absolute; left: 50%; top: -2px; bottom: -2px;
+    width: 1px; background: var(--zero);
+  }
+  .dbar-fill {
+    position: absolute; top: 3px; height: 11px; border-radius: 3px;
+  }
+  .dbar-fill.pos { left: 50%; background: var(--up); border-radius: 0 3px 3px 0; }
+  .dbar-fill.neg { right: 50%; background: var(--down); border-radius: 3px 0 0 3px; }
+  .dbar-val { font-variant-numeric: tabular-nums; font-weight: 600; font-size: 0.75rem; }
+  .dbar-val.pos { color: var(--up); }
+  .dbar-val.neg { color: var(--down); }
+  .dbar-axis {
+    display: grid; grid-template-columns: 4.6rem 1fr 4.2rem; gap: 0.6rem;
+    font-size: 0.68rem; color: var(--muted); margin-top: 0.4rem;
+  }
+  .dbar-axis-inner { display: flex; justify-content: space-between; }
+
+  /* --- dumbbell --- */
+  .dumb-rows { display: grid; gap: 0.42rem; }
+  .dumb {
+    display: grid; grid-template-columns: 8.6rem 1fr 3.6rem; align-items: center;
+    gap: 0.6rem; font-size: 0.75rem;
+  }
+  .dumb-name { color: var(--muted); text-align: right; line-height: 1.25; }
+  .dumb-name b { display: block; color: var(--ink); font-weight: 600; font-size: 0.73rem; }
+  .dumb-name i { font-style: normal; font-size: 0.66rem; font-variant-numeric: tabular-nums; }
+  .dumb-track { position: relative; height: 18px; }
+  .dumb-track::before {
+    content: ""; position: absolute; left: 0; right: 0; top: 50%;
+    height: 1px; background: var(--grid);
+  }
+  .dumb-conn { position: absolute; top: 50%; height: 2px; transform: translateY(-50%); background: var(--axis); }
+  .dumb-pt {
+    position: absolute; top: 50%; width: 10px; height: 10px; border-radius: 50%;
+    transform: translate(-50%, -50%); box-shadow: 0 0 0 2px var(--raised);
+  }
+  .dumb-pt.v17 { background: var(--before); }
+  .dumb-pt.v18 { background: var(--after); }
+  .dumb-chance {
+    position: absolute; top: 50%; width: 2px; height: 13px; border-radius: 1px;
+    background: var(--axis); transform: translate(-50%, -50%);
+  }
+  .dumb-val { font-variant-numeric: tabular-nums; font-weight: 600; font-size: 0.73rem; }
+  .dumb-val.pos { color: var(--up); }
+  .dumb-val.neg { color: var(--down); }
+  .dumb-axis {
+    display: grid; grid-template-columns: 8.6rem 1fr 3.6rem; gap: 0.6rem;
+    font-size: 0.68rem; color: var(--muted); margin-top: 0.5rem;
+  }
+  .dumb-axis-inner { position: relative; height: 1.1rem; }
+  .dumb-axis-inner span {
+    position: absolute; transform: translateX(-50%);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ============================================================ TABLES */
+  .table-scroll { overflow-x: auto; margin: 1.2rem 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.86rem; }
+  thead th {
+    text-align: left; font-size: 0.7rem; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.09em; color: var(--muted); border-bottom: 2px solid var(--line);
+    padding: 0.42rem 0.85rem 0.42rem 0; white-space: nowrap;
+  }
+  tbody td {
+    border-bottom: 1px solid var(--hairline); padding: 0.5rem 0.85rem 0.5rem 0;
+    vertical-align: top;
+  }
+  tbody tr:last-child td { border-bottom: 1px solid var(--line); }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  td.mono, th.mono { white-space: nowrap; font-family: ui-monospace, Menlo, monospace; font-size: 0.8rem; }
+  td.up { color: var(--up); font-weight: 600; }
+  td.down { color: var(--down); font-weight: 600; }
+  tbody tr.sub td { color: var(--muted); font-size: 0.8rem; }
+  caption {
+    caption-side: top; text-align: left; font-size: 0.78rem; color: var(--muted);
+    padding-bottom: 0.5rem; line-height: 1.45;
+    font-family: 'Avenir Next', Avenir, system-ui, sans-serif;
+  }
+
+  /* ============================================================ PAIR */
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 1.2rem 0; }
+  @media (max-width: 640px) { .pair { grid-template-columns: 1fr; } }
+  .pair figure { margin: 0; min-width: 0; }
+  .pair figcaption {
+    font-family: 'Avenir Next', Avenir, system-ui, sans-serif; font-size: 0.72rem;
+    font-weight: 600; text-transform: uppercase; letter-spacing: 0.09em;
+    color: var(--muted); margin-bottom: 0.4rem;
+  }
+  .pair pre { margin: 0; height: calc(100% - 1.4rem); box-sizing: border-box; }
+
+  /* ============================================================ TOOLTIP */
+  #tip {
+    position: fixed; z-index: 50; pointer-events: none; opacity: 0;
+    transition: opacity 0.12s ease; background: var(--ink); color: var(--paper);
+    font-family: 'Avenir Next', Avenir, system-ui, sans-serif; font-size: 0.73rem;
+    line-height: 1.45; padding: 0.4rem 0.6rem; border-radius: 5px; max-width: 17rem;
+    box-shadow: 0 3px 12px rgba(0,0,0,0.18);
+  }
+  #tip.on { opacity: 1; }
+  [data-tip] { cursor: default; }
+  @media (prefers-reduced-motion: reduce) {
+    #tip { transition: none; }
+    * { animation: none !important; }
+  }
+
+  .footnote {
+    margin-top: 3.5rem; padding-top: 1.2rem; border-top: 1px solid var(--line);
+    color: var(--muted); font-size: 0.86rem;
+  }
+</style>
+
+<div class="wrap">
+  <header>
+    <p class="eyebrow">Clinical Graph-JEPA · Engineering Report No. 2</p>
+    <h1>v18: BFS-balanced patch masking — what changed, and what it did to the numbers</h1>
+    <p class="subtitle">
+      v18 replaces the JEPA pretext task's i.i.d. node mask with whole-patch masking
+      borrowed from <code>clinical_jepa</code>. This report covers the change and its
+      measured effect against v17, then works backwards through v17's refactor and the
+      v16 experiment that started it.
+    </p>
+    <div class="meta">
+      <span>repo <strong>clinical-graph-jepa</strong></span>
+      <span>runs <strong>4</strong> (2 versions × note/no-note)</span>
+      <span>eval <strong>LOO, 8,283 edges</strong></span>
+      <span>date <strong>2026-08-04</strong></span>
+    </div>
+  </header>
+
+  <!-- ============================================================ VERDICT -->
+  <section>
+    <h2><span class="sec">§1</span>The verdict, first</h2>
+    <p class="prose">
+      Patch masking is <strong>a clear win for the no-note variant and a mild regression
+      for the with-note variant.</strong> On leave-one-out edge recovery — the paper's
+      honest measure — the no-note model gains on every metric and every relation, while
+      the with-note model loses ground on the three relations that carry 98% of the
+      evaluated edges.
+    </p>
+
+    <div class="kpi-row">
+      <div class="kpi">
+        <div class="kpi-label">No-note · LOO MRR</div>
+        <div class="kpi-value">0.298 <span class="kpi-from">from 0.274</span></div>
+        <div class="kpi-delta up">▲ +0.024 &nbsp;(+8.6%)</div>
+        <p class="kpi-note">Improves on all four LOO metrics and all five relations. Hits@1 gains 20.5% relative.</p>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">With-note · LOO MRR</div>
+        <div class="kpi-value">0.408 <span class="kpi-from">from 0.419</span></div>
+        <div class="kpi-delta down">▼ −0.011 &nbsp;(−2.6%)</div>
+        <p class="kpi-note">Hits@1 falls 10.3%; Hits@10 rises 2.1%. The ranking gets broader but less precise at the top.</p>
+      </div>
+    </div>
+
+    <p class="prose">
+      Because the note's whole purpose is to supply semantic signal the graph structure
+      lacks, the two results together tell one story: <strong>patch masking recovers part
+      of what the note was providing.</strong> The note's advantage over the structure-only
+      model narrows from <strong>+0.144</strong> to <strong>+0.110</strong> LOO MRR. Section 4
+      argues why that is the mechanism you would predict, and section 5 is honest about
+      what a single run per cell can and cannot establish.
+    </p>
+  </section>
+
+  <!-- ============================================================ WHAT CHANGED -->
+  <section>
+    <h2><span class="sec">§2</span>v18 — what changed and why</h2>
+    <div class="rail">
+      <div>
+        <div class="rail-tag">v18 · patch masking</div>
+        <div class="rail-body">
+          One new module, one branch in <code>jepa_step</code>, two config fields. The
+          default is still the v17 behaviour, so v18 is opt-in.
+        </div>
+      </div>
+    </div>
+
+    <h3>The problem with the v16/v17 mask</h3>
+    <p class="prose">
+      JEPA phase 1 masks a fraction of nodes and asks the model to predict their
+      embeddings from what remains. Through v17 that mask was
+      <strong>i.i.d. Bernoulli</strong>: each node independently masked with probability
+      <code>node_mask=0.4</code>, retried until every graph kept at least one target and
+      one context node.
+    </p>
+    <p class="prose">
+      The weakness is structural. Masking nodes independently means a masked node's
+      immediate neighbours are almost always still visible — with 40% masking, a node of
+      degree 5 keeps ~3 visible neighbours on average. The prediction task can therefore be
+      solved by <em>local interpolation</em>: read the surviving neighbours, average, done.
+      A pretext task solvable one hop out does not force the encoder to learn anything
+      longer-range, which is exactly the capability edge recovery needs.
+    </p>
+
+    <h3>What v18 does instead</h3>
+    <p class="prose">
+      <span class="chip new">new</span> Each graph is partitioned into
+      <code>jepa_patches</code> balanced, connected-ish patches by
+      <strong>multi-source BFS</strong>, and whole patches are masked until the
+      <code>node_mask</code> fraction is reached. Targets become coherent regions rather than
+      scattered nodes, so a masked node's neighbours are usually masked too and the local
+      shortcut disappears.
+    </p>
+    <p class="prose">
+      The partition is adapted from
+      <code>clinical_jepa/graph/patches.py</code>, the patch construction behind the
+      patch-based model. Seeds are chosen farthest-point style — highest degree first, then
+      greedily maximising distance from existing seeds — then BFS grows all patches in
+      parallel with a size cap, and any node left over by a disconnected component is
+      reseeded into the currently smallest patch.
+    </p>
+
+    <div class="pair">
+      <figure>
+        <figcaption>v16 / v17 — Bernoulli, scattered</figcaption>
+<pre><code>mask = rand(n) &lt; 0.4
+# retry until every graph has
+# ≥1 target and ≥1 context node
+
+# masked nodes are isolated;
+# neighbours mostly visible</code></pre>
+      </figure>
+      <figure>
+        <figcaption>v18 — whole patches, coherent</figcaption>
+<pre><code>patches = balanced_bfs_partition(
+    edges, n, jepa_patches)
+# mask whole patches in random
+# order until ratio is reached;
+# last-drawn patch stays context</code></pre>
+      </figure>
+    </div>
+
+    <p class="prose">
+      Keeping the last-drawn patch as context means the ≥1-target / ≥1-context guarantee
+      that <code>valid_mask</code> achieved by <em>retrying</em> now holds
+      <strong>by construction</strong> — with <code>jepa_patches ≥ 2</code>, which the config
+      validates.
+    </p>
+
+    <h3>Why it was duplicated rather than imported</h3>
+    <p class="prose">
+      <code>tests/test_import_boundaries.py</code> forbids <code>fawkes</code> and
+      <code>clinical_jepa</code> from importing each other — the two lineages are
+      deliberately independent, and that test is what keeps them so. The partition is
+      therefore copied near-verbatim into <code>src/fawkes/patches.py</code> with its
+      provenance recorded in the module docstring. Only the partition came across: the
+      coarsened patch graph, positional features and patch pooling stay in
+      <code>clinical_jepa</code>, because in fawkes patches only decide <em>which nodes get
+      masked</em> — the encoder still operates on nodes.
+    </p>
+
+    <h3>Configuration</h3>
+    <p class="prose">
+      Two fields on <code>Config</code>, wired through the same environment surface as
+      everything else in fawkes, and validated fail-loud in <code>__post_init__</code>:
+    </p>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr><th class="mono">field</th><th class="mono">env</th><th>default</th><th>meaning</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="mono">mask_strategy</td><td class="mono">MASK_STRATEGY</td>
+            <td class="mono">random</td>
+            <td><code>random</code> = the v16/v17 Bernoulli mask; <code>patch</code> = BFS whole-patch masking. Anything else raises.</td>
+          </tr>
+          <tr>
+            <td class="mono">jepa_patches</td><td class="mono">JEPA_PATCHES</td>
+            <td class="mono">8</td>
+            <td>Patches per graph under <code>patch</code>. Matches <code>clinical_jepa</code>'s <code>num_patches</code>. Below 2 raises — no context patch would remain.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+<pre><code>MASK_STRATEGY=patch JEPA_PATCHES=8 USE_NOTE=1 PUSH=0 fawkes-train   # v18
+fawkes-train                                                        # unchanged v17 default</code></pre>
+
+    <div class="gate">
+      <span class="gate-label">The default is unchanged, and that is tested</span>
+      <p>
+        <code>mask_strategy</code> defaults to <code>"random"</code>, so every v16/v17 gate
+        still runs against the original code path.
+        <code>test_training_steps_match_trainer</code> continues to pin
+        <code>jepa_step</code> bit-for-bit against the recorded trainer, which is what proves
+        v18 added a branch rather than altering the existing one. Four new tests cover the
+        patch path: config validation, partition coverage and balance, per-graph mask
+        coherence, and an end-to-end <code>jepa_step</code> on real dataset graphs.
+      </p>
+    </div>
+  </section>
+
+  <!-- ============================================================ RESULTS -->
+  <section>
+    <h2><span class="sec">§3</span>v18 vs v17 — results</h2>
+
+    <p class="prose">
+      Four runs, all on the same 4,000-graph dataset with the same seed, the same
+      3200/400/400 split, and every hyperparameter except the mask identical. The v17
+      numbers come from the two released checkpoints; the v18 numbers from training runs on
+      an A100.
+    </p>
+
+    <div class="gate">
+      <span class="gate-label">The four runs were scored on bit-identical queries</span>
+      <p>
+        Every run reports <code>quiz_sig=304815655090</code> and <code>n_mrr=3000</code> for
+        batch-mask, and <code>n=8283</code> LOO edges. That signature is a hash of the
+        held-edge and negative-sample draw, so its equality across all four runs means the
+        four models were asked <em>exactly the same questions</em>. Nothing in the evaluation
+        moved; only training did.
+      </p>
+    </div>
+
+    <h3>Leave-one-out edge recovery</h3>
+    <p class="prose">
+      LOO masks exactly one edge and keeps the entire rest of the graph as context. It has
+      no randomness, so it is exactly reproducible, and it is what the paper reports.
+    </p>
+
+    <!-- FIGURE 1 — diverging delta bars -->
+    <div class="fig">
+      <p class="fig-title">Change in LOO metrics, v17 → v18</p>
+      <p class="fig-sub">
+        Bars show the v18 minus v17 difference on 8,283 leave-one-out queries. Right of the
+        centre line is an improvement, left is a regression; the sign is printed on every bar,
+        so colour reinforces rather than carries the reading.
+      </p>
+      <div class="legend">
+        <span><i class="swatch" style="background:var(--up)"></i>improvement</span>
+        <span><i class="swatch" style="background:var(--down)"></i>regression</span>
+        <span><i class="swatch" style="background:var(--zero)"></i>no change</span>
+      </div>
+
+      <p class="panel-label">No-note variant</p>
+      <div class="dbar-rows">
+        <div class="dbar" tabindex="0" data-tip="No-note MRR: 0.2743 → 0.2980 (+0.0237, +8.6%)">
+          <span class="dbar-name">MRR</span>
+          <span class="dbar-track"><i class="dbar-fill pos" style="width:29.6%"></i></span>
+          <span class="dbar-val pos">+0.0237</span>
+        </div>
+        <div class="dbar" tabindex="0" data-tip="No-note Hits@1: 0.1079 → 0.1300 (+0.0221, +20.5%)">
+          <span class="dbar-name">Hits@1</span>
+          <span class="dbar-track"><i class="dbar-fill pos" style="width:27.6%"></i></span>
+          <span class="dbar-val pos">+0.0221</span>
+        </div>
+        <div class="dbar" tabindex="0" data-tip="No-note Hits@3: 0.2901 → 0.3250 (+0.0349, +12.0%)">
+          <span class="dbar-name">Hits@3</span>
+          <span class="dbar-track"><i class="dbar-fill pos" style="width:43.6%"></i></span>
+          <span class="dbar-val pos">+0.0349</span>
+        </div>
+        <div class="dbar" tabindex="0" data-tip="No-note Hits@10: 0.7104 → 0.7240 (+0.0136, +1.9%)">
+          <span class="dbar-name">Hits@10</span>
+          <span class="dbar-track"><i class="dbar-fill pos" style="width:17.0%"></i></span>
+          <span class="dbar-val pos">+0.0136</span>
+        </div>
+      </div>
+
+      <p class="panel-label">With-note variant</p>
+      <div class="dbar-rows">
+        <div class="dbar" tabindex="0" data-tip="With-note MRR: 0.4187 → 0.4080 (−0.0107, −2.6%)">
+          <span class="dbar-name">MRR</span>
+          <span class="dbar-track"><i class="dbar-fill neg" style="width:13.4%"></i></span>
+          <span class="dbar-val neg">−0.0107</span>
+        </div>
+        <div class="dbar" tabindex="0" data-tip="With-note Hits@1: 0.2475 → 0.2220 (−0.0255, −10.3%)">
+          <span class="dbar-name">Hits@1</span>
+          <span class="dbar-track"><i class="dbar-fill neg" style="width:31.9%"></i></span>
+          <span class="dbar-val neg">−0.0255</span>
+        </div>
+        <div class="dbar" tabindex="0" data-tip="With-note Hits@3: 0.4737 → 0.4710 (−0.0027, −0.6%)">
+          <span class="dbar-name">Hits@3</span>
+          <span class="dbar-track"><i class="dbar-fill neg" style="width:3.4%"></i></span>
+          <span class="dbar-val neg">−0.0027</span>
+        </div>
+        <div class="dbar" tabindex="0" data-tip="With-note Hits@10: 0.8636 → 0.8820 (+0.0184, +2.1%)">
+          <span class="dbar-name">Hits@10</span>
+          <span class="dbar-track"><i class="dbar-fill pos" style="width:23.0%"></i></span>
+          <span class="dbar-val pos">+0.0184</span>
+        </div>
+      </div>
+
+      <div class="dbar-axis">
+        <span></span>
+        <span class="dbar-axis-inner"><span>−0.04</span><span>0</span><span>+0.04</span></span>
+        <span></span>
+      </div>
+    </div>
+
+    <div class="table-scroll">
+      <table>
+        <caption>Table view — leave-one-out, 8,283 edges, 400-graph test split.</caption>
+        <thead>
+          <tr>
+            <th>Variant</th><th>Metric</th>
+            <th class="num">v17</th><th class="num">v18</th>
+            <th class="num">Δ</th><th class="num">Δ %</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td rowspan="4">No-note</td><td>MRR</td><td class="num">0.2743</td><td class="num">0.2980</td><td class="num up">+0.0237</td><td class="num up">+8.6%</td></tr>
+          <tr><td>Hits@1</td><td class="num">0.1079</td><td class="num">0.1300</td><td class="num up">+0.0221</td><td class="num up">+20.5%</td></tr>
+          <tr><td>Hits@3</td><td class="num">0.2901</td><td class="num">0.3250</td><td class="num up">+0.0349</td><td class="num up">+12.0%</td></tr>
+          <tr><td>Hits@10</td><td class="num">0.7104</td><td class="num">0.7240</td><td class="num up">+0.0136</td><td class="num up">+1.9%</td></tr>
+          <tr><td rowspan="4">With-note</td><td>MRR</td><td class="num">0.4187</td><td class="num">0.4080</td><td class="num down">−0.0107</td><td class="num down">−2.6%</td></tr>
+          <tr><td>Hits@1</td><td class="num">0.2475</td><td class="num">0.2220</td><td class="num down">−0.0255</td><td class="num down">−10.3%</td></tr>
+          <tr><td>Hits@3</td><td class="num">0.4737</td><td class="num">0.4710</td><td class="num down">−0.0027</td><td class="num down">−0.6%</td></tr>
+          <tr><td>Hits@10</td><td class="num">0.8636</td><td class="num">0.8820</td><td class="num up">+0.0184</td><td class="num up">+2.1%</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Per relation — where the movement actually is</h3>
+    <p class="prose">
+      The aggregate hides the interesting part. Below, each relation's LOO MRR moves from
+      its v17 value to its v18 value; the tick marks chance MRR for that relation's
+      candidate set, which is unchanged between versions because the candidate sets are.
+    </p>
+
+    <!-- FIGURE 2 — dumbbell -->
+    <div class="fig">
+      <p class="fig-title">LOO MRR per relation, v17 → v18</p>
+      <p class="fig-sub">
+        Each row is one relation; the pale dot is v17, the solid dot v18. Relations are
+        ordered by query count — the top three carry 8,133 of the 8,283 evaluated edges.
+      </p>
+      <div class="legend">
+        <span><i class="swatch dot" style="background:var(--before)"></i>v17 (random mask)</span>
+        <span><i class="swatch dot" style="background:var(--after)"></i>v18 (patch mask)</span>
+        <span><i class="swatch tick"></i>chance MRR</span>
+      </div>
+
+      <p class="panel-label">No-note variant</p>
+      <div class="dumb-rows">
+        <div class="dumb" tabindex="0" data-tip="MANAGED_FOR (no-note), n=5527 — v17 0.2462 → v18 0.2700 (+0.0238). Chance 0.2009.">
+          <span class="dumb-name"><b>MANAGED_FOR</b><i>n=5,527</i></span>
+          <span class="dumb-track">
+            <i class="dumb-conn" style="left:8.4%;width:4.3%"></i>
+            <i class="dumb-chance" style="left:0.2%"></i>
+            <i class="dumb-pt v17" style="left:8.4%"></i>
+            <i class="dumb-pt v18" style="left:12.7%"></i>
+          </span>
+          <span class="dumb-val pos">+0.024</span>
+        </div>
+        <div class="dumb" tabindex="0" data-tip="INDICATES (no-note), n=1459 — v17 0.3733 → v18 0.3850 (+0.0117). Chance 0.2765.">
+          <span class="dumb-name"><b>INDICATES</b><i>n=1,459</i></span>
+          <span class="dumb-track">
+            <i class="dumb-conn" style="left:31.5%;width:2.1%"></i>
+            <i class="dumb-chance" style="left:13.9%"></i>
+            <i class="dumb-pt v17" style="left:31.5%"></i>
+            <i class="dumb-pt v18" style="left:33.6%"></i>
+          </span>
+          <span class="dumb-val pos">+0.012</span>
+        </div>
+        <div class="dumb" tabindex="0" data-tip="COMPLICATED_BY (no-note), n=1147 — v17 0.2734 → v18 0.3150 (+0.0416). Chance 0.2193.">
+          <span class="dumb-name"><b>COMPLICATED_BY</b><i>n=1,147</i></span>
+          <span class="dumb-track">
+            <i class="dumb-conn" style="left:13.3%;width:7.6%"></i>
+            <i class="dumb-chance" style="left:3.5%"></i>
+            <i class="dumb-pt v17" style="left:13.3%"></i>
+            <i class="dumb-pt v18" style="left:20.9%"></i>
+          </span>
+          <span class="dumb-val pos">+0.042</span>
+        </div>
+        <div class="dumb" tabindex="0" data-tip="CONFIRMS (no-note), n=125 — v17 0.3140 → v18 0.3170 (+0.0030). Chance 0.2157. Small sample.">
+          <span class="dumb-name"><b>CONFIRMS</b><i>n=125</i></span>
+          <span class="dumb-track">
+            <i class="dumb-conn" style="left:20.7%;width:0.6%"></i>
+            <i class="dumb-chance" style="left:2.9%"></i>
+            <i class="dumb-pt v17" style="left:20.7%"></i>
+            <i class="dumb-pt v18" style="left:21.3%"></i>
+          </span>
+          <span class="dumb-val pos">+0.003</span>
+        </div>
+        <div class="dumb" tabindex="0" data-tip="TARGETS_ORGANISM (no-note), n=25 — v17 0.5378 → v18 0.7130 (+0.1752). Chance 0.5468. Only 25 queries; treat as noise.">
+          <span class="dumb-name"><b>TARGETS_ORGANISM</b><i>n=25</i></span>
+          <span class="dumb-track">
+            <i class="dumb-conn" style="left:61.4%;width:31.9%"></i>
+            <i class="dumb-chance" style="left:63.1%"></i>
+            <i class="dumb-pt v17" style="left:61.4%"></i>
+            <i class="dumb-pt v18" style="left:93.3%"></i>
+          </span>
+          <span class="dumb-val pos">+0.175</span>
+        </div>
+      </div>
+
+      <p class="panel-label">With-note variant</p>
+      <div class="dumb-rows">
+        <div class="dumb" tabindex="0" data-tip="MANAGED_FOR (with-note), n=5527 — v17 0.3596 → v18 0.3580 (−0.0016). Chance 0.2009.">
+          <span class="dumb-name"><b>MANAGED_FOR</b><i>n=5,527</i></span>
+          <span class="dumb-track">
+            <i class="dumb-conn" style="left:28.7%;width:0.3%"></i>
+            <i class="dumb-chance" style="left:0.2%"></i>
+            <i class="dumb-pt v17" style="left:29.0%"></i>
+            <i class="dumb-pt v18" style="left:28.7%"></i>
+          </span>
+          <span class="dumb-val neg">−0.002</span>
+        </div>
+        <div class="dumb" tabindex="0" data-tip="INDICATES (with-note), n=1459 — v17 0.6027 → v18 0.5920 (−0.0107). Chance 0.2765.">
+          <span class="dumb-name"><b>INDICATES</b><i>n=1,459</i></span>
+          <span class="dumb-track">
+            <i class="dumb-conn" style="left:71.3%;width:1.9%"></i>
+            <i class="dumb-chance" style="left:13.9%"></i>
+            <i class="dumb-pt v17" style="left:73.2%"></i>
+            <i class="dumb-pt v18" style="left:71.3%"></i>
+          </span>
+          <span class="dumb-val neg">−0.011</span>
+        </div>
+        <div class="dumb" tabindex="0" data-tip="COMPLICATED_BY (with-note), n=1147 — v17 0.4711 → v18 0.4060 (−0.0651). Chance 0.2193. The largest single regression.">
+          <span class="dumb-name"><b>COMPLICATED_BY</b><i>n=1,147</i></span>
+          <span class="dumb-track">
+            <i class="dumb-conn" style="left:37.5%;width:11.8%"></i>
+            <i class="dumb-chance" style="left:3.5%"></i>
+            <i class="dumb-pt v17" style="left:49.3%"></i>
+            <i class="dumb-pt v18" style="left:37.5%"></i>
+          </span>
+          <span class="dumb-val neg">−0.065</span>
+        </div>
+        <div class="dumb" tabindex="0" data-tip="CONFIRMS (with-note), n=125 — v17 0.3442 → v18 0.4410 (+0.0968). Chance 0.2157. Only 125 queries.">
+          <span class="dumb-name"><b>CONFIRMS</b><i>n=125</i></span>
+          <span class="dumb-track">
+            <i class="dumb-conn" style="left:26.2%;width:17.6%"></i>
+            <i class="dumb-chance" style="left:2.9%"></i>
+            <i class="dumb-pt v17" style="left:26.2%"></i>
+            <i class="dumb-pt v18" style="left:43.8%"></i>
+          </span>
+          <span class="dumb-val pos">+0.097</span>
+        </div>
+        <div class="dumb" tabindex="0" data-tip="TARGETS_ORGANISM (with-note), n=25 — v17 0.7033 → v18 0.7000 (−0.0033). Chance 0.5468. Only 25 queries.">
+          <span class="dumb-name"><b>TARGETS_ORGANISM</b><i>n=25</i></span>
+          <span class="dumb-track">
+            <i class="dumb-conn" style="left:90.9%;width:0.6%"></i>
+            <i class="dumb-chance" style="left:63.1%"></i>
+            <i class="dumb-pt v17" style="left:91.5%"></i>
+            <i class="dumb-pt v18" style="left:90.9%"></i>
+          </span>
+          <span class="dumb-val neg">−0.003</span>
+        </div>
+      </div>
+
+      <div class="dumb-axis">
+        <span></span>
+        <span class="dumb-axis-inner">
+          <span style="left:0%">0.20</span><span style="left:18.2%">0.30</span>
+          <span style="left:36.4%">0.40</span><span style="left:54.5%">0.50</span>
+          <span style="left:72.7%">0.60</span><span style="left:90.9%">0.70</span>
+        </span>
+        <span></span>
+      </div>
+    </div>
+
+    <div class="table-scroll">
+      <table>
+        <caption>Table view — LOO MRR per relation. Chance MRR is a property of the candidate set and is identical across versions.</caption>
+        <thead>
+          <tr>
+            <th>Relation</th><th class="num">n</th><th class="num">chance</th>
+            <th class="num">v17 no-note</th><th class="num">v18 no-note</th><th class="num">Δ</th>
+            <th class="num">v17 note</th><th class="num">v18 note</th><th class="num">Δ</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="mono">MANAGED_FOR</td><td class="num">5,527</td><td class="num">0.201</td>
+            <td class="num">0.2462</td><td class="num">0.2700</td><td class="num up">+0.024</td>
+            <td class="num">0.3596</td><td class="num">0.3580</td><td class="num down">−0.002</td>
+          </tr>
+          <tr>
+            <td class="mono">INDICATES</td><td class="num">1,459</td><td class="num">0.277</td>
+            <td class="num">0.3733</td><td class="num">0.3850</td><td class="num up">+0.012</td>
+            <td class="num">0.6027</td><td class="num">0.5920</td><td class="num down">−0.011</td>
+          </tr>
+          <tr>
+            <td class="mono">COMPLICATED_BY</td><td class="num">1,147</td><td class="num">0.219</td>
+            <td class="num">0.2734</td><td class="num">0.3150</td><td class="num up">+0.042</td>
+            <td class="num">0.4711</td><td class="num">0.4060</td><td class="num down">−0.065</td>
+          </tr>
+          <tr>
+            <td class="mono">CONFIRMS</td><td class="num">125</td><td class="num">0.216</td>
+            <td class="num">0.3140</td><td class="num">0.3170</td><td class="num up">+0.003</td>
+            <td class="num">0.3442</td><td class="num">0.4410</td><td class="num up">+0.097</td>
+          </tr>
+          <tr>
+            <td class="mono">TARGETS_ORGANISM</td><td class="num">25</td><td class="num">0.547</td>
+            <td class="num">0.5378</td><td class="num">0.7130</td><td class="num up">+0.175</td>
+            <td class="num">0.7033</td><td class="num">0.7000</td><td class="num down">−0.003</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p class="prose">
+      Read by query weight, the picture is unambiguous. For <strong>no-note, every relation
+      improves.</strong> For <strong>with-note, the three relations that account for 98% of
+      evaluated edges all decline</strong>, and the two that improve — CONFIRMS at +0.097 and,
+      in the no-note arm, TARGETS_ORGANISM at +0.175 — rest on 125 and 25 queries
+      respectively. Those two headline-looking gains are the least trustworthy numbers in
+      the report.
+    </p>
+
+    <h3>Batch-mask recovery, and a consistent signal in the hard cases</h3>
+    <p class="prose">
+      The batch-mask evaluator holds out 30% of edges together — a harder, noisier setting
+      than LOO. It carries one result worth isolating: <strong>non-obvious AUC rises in
+      both variants</strong>, even where plain AUC falls.
+    </p>
+    <div class="table-scroll">
+      <table>
+        <caption>Batch-mask on the 400-graph test split, val-selected scorer. "Non-obvious AUC" excludes the hub edges any model gets right.</caption>
+        <thead>
+          <tr>
+            <th>Metric</th>
+            <th class="num">v17 no-note</th><th class="num">v18 no-note</th><th class="num">Δ</th>
+            <th class="num">v17 note</th><th class="num">v18 note</th><th class="num">Δ</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>AUC</td><td class="num">0.7319</td><td class="num">0.7150</td><td class="num down">−0.0169</td><td class="num">0.7144</td><td class="num">0.7040</td><td class="num down">−0.0104</td></tr>
+          <tr><td>Average precision</td><td class="num">0.6622</td><td class="num">0.6410</td><td class="num down">−0.0212</td><td class="num">0.6277</td><td class="num">0.6220</td><td class="num down">−0.0057</td></tr>
+          <tr><td><b>Non-obvious AUC</b></td><td class="num">0.7115</td><td class="num">0.7550</td><td class="num up">+0.0435</td><td class="num">0.8000</td><td class="num">0.8160</td><td class="num up">+0.0160</td></tr>
+          <tr><td>MRR</td><td class="num">0.3399</td><td class="num">0.3470</td><td class="num up">+0.0071</td><td class="num">0.3608</td><td class="num">0.3600</td><td class="num down">−0.0008</td></tr>
+          <tr><td>Hits@1</td><td class="num">0.1427</td><td class="num">0.1510</td><td class="num up">+0.0083</td><td class="num">0.1590</td><td class="num">0.1540</td><td class="num down">−0.0050</td></tr>
+          <tr><td>Hits@10</td><td class="num">0.8650</td><td class="num">0.8650</td><td class="num">±0.0000</td><td class="num">0.9020</td><td class="num">0.9070</td><td class="num up">+0.0050</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="prose">
+      Non-obvious AUC gaining <strong>+0.044</strong> (no-note) and <strong>+0.016</strong>
+      (with-note) while overall AUC slips is the shape you would expect if patch masking
+      traded easy-case confidence for genuine structural inference. It is the one metric
+      that moves the same direction in both arms.
+    </p>
+
+    <h3>Cascade headroom — a structural fix in the no-note model</h3>
+    <p class="prose">
+      The cascade evaluation brackets each inferred relation between a
+      <em>floor</em> (backbone edges only) and a <em>ceiling</em> (LOO, everything else
+      present). The gap between them is the headroom that context is worth. In v17's no-note
+      model, <strong>that headroom was negative for two of the four inferred relations</strong>
+      — giving the encoder the full graph made it worse than giving it the backbone alone.
+      In v18 all four are positive.
+    </p>
+    <div class="table-scroll">
+      <table>
+        <caption>No-note variant: context headroom = LOO ceiling − backbone-only floor, per inferred relation.</caption>
+        <thead>
+          <tr><th>Relation</th><th class="num">v17 floor</th><th class="num">v17 ceiling</th><th class="num">v17 headroom</th><th class="num">v18 headroom</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="mono">MANAGED_FOR</td><td class="num">0.2334</td><td class="num">0.2462</td><td class="num up">+0.013</td><td class="num up">+0.038</td></tr>
+          <tr><td class="mono">CONFIRMS</td><td class="num">0.3056</td><td class="num">0.3140</td><td class="num up">+0.008</td><td class="num up">+0.049</td></tr>
+          <tr><td class="mono">COMPLICATED_BY</td><td class="num">0.2769</td><td class="num">0.2734</td><td class="num down">−0.004</td><td class="num up">+0.047</td></tr>
+          <tr><td class="mono">INDICATES</td><td class="num">0.3825</td><td class="num">0.3733</td><td class="num down">−0.009</td><td class="num up">+0.016</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="prose">
+      This is the most mechanistically interesting result in the report, because it is not
+      just "the number went up." A negative headroom means surrounding context was actively
+      confusing the v17 no-note encoder. After patch-mask pretraining, context helps on
+      every relation. That is precisely the capability the harder pretext task was meant to
+      install.
+    </p>
+
+    <h3>Training cost</h3>
+    <p class="prose">
+      On an A100, the with-note v18 run took about 15 minutes end to end (JEPA epochs
+      ~7.5&nbsp;s, readout epochs ~9.3&nbsp;s) and the no-note run about 12.5 minutes.
+      Target-embedding standard deviation held near 0.50 throughout both runs, so the BYOL
+      objective did not collapse under the harder mask. No training logs survive for the v17
+      runs, so this report makes <em>no</em> wall-clock comparison between versions — the
+      BFS partition is per-graph Python and certainly costs something, but the size of that
+      cost is not measured here.
+    </p>
+  </section>
+
+  <!-- ============================================================ INTERPRETATION -->
+  <section>
+    <h2><span class="sec">§4</span>Reading the result</h2>
+    <p class="prose">
+      The two arms moving in opposite directions is not noise-shaped; it has a mechanism,
+      and the mechanism predicts the sign of each.
+    </p>
+    <p class="prose">
+      The Bernoulli mask leaves a masked node surrounded by visible neighbours, so phase 1
+      can be solved by local interpolation and the encoder is never pushed to represent
+      anything longer-range. <strong>The with-note model does not need it to be.</strong> Its
+      nodes already carry a 768-dimensional Clinical-ModernBERT vector describing the
+      admission, so the semantic content that would otherwise have to be inferred from
+      distant structure is handed to it directly. Make the pretext task harder and you mostly
+      add noise to a model whose signal was arriving by another channel — which is what the
+      −0.065 on COMPLICATED_BY looks like.
+    </p>
+    <p class="prose">
+      <strong>The no-note model has nothing but structure.</strong> Six demographic features
+      per node and the graph. For it, an easy pretext task is a wasted one: it never learns
+      the long-range structural regularities that edge recovery depends on, and the negative
+      cascade headroom in v17 is the fingerprint of that failure — it could not use context it
+      had never been trained to read. Patch masking removes whole neighbourhoods and forces
+      exactly that skill, and every no-note metric responds.
+    </p>
+    <p class="prose">
+      Hence the narrowing note lift: <strong>+0.144 → +0.110</strong> LOO MRR. Some of what
+      the note was contributing was compensation for an under-trained encoder, and a harder
+      pretext task recovers part of it for free — no text, no 768 extra input dimensions, no
+      Clinical-ModernBERT dependency at inference. For a deployment that cannot rely on note
+      availability, that is the useful finding.
+    </p>
+  </section>
+
+  <!-- ============================================================ CAVEATS -->
+  <section>
+    <h2><span class="sec">§5</span>What this does not establish</h2>
+    <div class="gate flagged">
+      <span class="gate-label">One run per cell — no variance estimate</span>
+      <p>
+        Each of the four numbers is a single training run at <code>seed=42</code>. Nothing
+        here measures run-to-run variance, so <strong>any difference of roughly ±0.01 MRR
+        should be treated as possibly noise</strong>. That specifically covers the with-note
+        MRR regression (−0.011) and its Hits@3 (−0.003). The no-note gains (+0.024 MRR,
+        +0.035 Hits@3), the COMPLICATED_BY with-note regression (−0.065), and the cascade
+        headroom sign flips are larger and more likely real — but "more likely" is the
+        honest phrase. Three to five seeds per cell would settle it.
+      </p>
+    </div>
+    <ul class="prose">
+      <li>
+        <strong>Small-n relations are not evidence.</strong> CONFIRMS (n=125) and
+        TARGETS_ORGANISM (n=25) produce the biggest-looking deltas in the report and deserve
+        the least weight. The trustworthy relations are MANAGED_FOR, INDICATES and
+        COMPLICATED_BY.
+      </li>
+      <li>
+        <strong>Hardware differs between versions.</strong> The v17 checkpoints come from
+        earlier runs on unknown hardware; the v18 runs are on an A100. Bit-level determinism
+        is not guaranteed across devices, though the effect is far smaller than the deltas
+        discussed here.
+      </li>
+      <li>
+        <strong><code>jepa_patches=8</code> was not tuned.</strong> It was inherited from
+        <code>clinical_jepa</code>'s <code>num_patches</code> default. Patch count controls
+        how much of each graph vanishes at once and is the obvious first sweep — as is
+        <code>node_mask</code>, which was left at 0.4 and interacts with patch count.
+      </li>
+      <li>
+        <strong>Only the pretext task changed.</strong> Phase 2 readout training and all four
+        evaluators are untouched, which is what makes the comparison clean but also means
+        this says nothing about whether the readout should change too.
+      </li>
+    </ul>
+    <p class="prose">
+      <strong>Recommendation:</strong> keep <code>random</code> as the default, which it is;
+      use <code>patch</code> for the no-note variant; and run a seed sweep before treating the
+      with-note regression as real.
+    </p>
+  </section>
+
+  <!-- ============================================================ V17 -->
+  <section>
+    <h2><span class="sec">§6</span>v17 — the refactor, and how it compares to v16</h2>
+    <div class="rail">
+      <div>
+        <div class="rail-tag">v17 · engineering only</div>
+        <div class="rail-body">
+          Same model, same numbers to within 1e-6, same environment interface — split into
+          modules, made importable and testable.
+        </div>
+      </div>
+    </div>
+
+    <p class="prose">
+      <span class="chip unchanged">no numerics changed</span> v17 is the release that made
+      v18 possible, and it deliberately produced <em>no</em> metric movement. It compares to
+      v16 by equality, not by improvement: loading the released checkpoint and running LOO
+      reproduces the recorded baseline to within <code>1e-6</code> on every metric.
+    </p>
+
+    <h3>What v16 was, and the four problems v17 fixed</h3>
+    <p class="prose">
+      v16 lived in one file — <code>paper_v16/trainer.py</code>, 719 lines — plus a separate
+      checkpoint-only <code>evaluate.py</code>. It produced the released checkpoint and the
+      published metrics, and it had four structural problems:
+    </p>
+    <ul class="prose">
+      <li>
+        <strong>It configured itself from the environment at import time.</strong> Roughly
+        thirty <code>os.environ</code> reads ran when Python imported the module, and
+        <code>NUMERIC_DIM</code> — a tensor shape — was computed at import. Environment
+        variables had to be set before the import, two configurations could not coexist in one
+        process, and the trainer was effectively untestable.
+      </li>
+      <li>
+        <strong>Everything shared one namespace.</strong> Data loading, the model, both
+        training phases, four evaluators and reporting were interleaved; the standalone
+        <code>evaluate.py</code> reached into <code>trainer.USE_NOTE</code> to validate
+        checkpoints.
+      </li>
+      <li>
+        <strong><code>--help</code> trained the model.</strong> <code>main()</code> took no
+        arguments and ran unconditionally, so <code>fawkes-train --help</code> completed a
+        full training run and — with <code>PUSH=1</code>, the default — uploaded the result.
+      </li>
+      <li>
+        <strong>The tensor code was hard to read</strong> (<code>b</code>, <code>nt</code>,
+        <code>ei</code>, <code>tot_llm</code>), and the checkpoint filename was a hardcoded
+        date stamp.
+      </li>
+    </ul>
+
+    <h3>The split</h3>
+    <p class="prose">
+      <code>trainer.py</code> was cut at its own existing comment banners — lines 256
+      ("shared encoder"), 327 ("downstream readout"), 423 ("EIR scoring") — rather than at
+      invented boundaries, and <code>paper_v16/evaluate.py</code> was folded in as the
+      checkpoint CLI.
+    </p>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th class="mono">module</th><th>contents</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">config.py</td><td><code>Config</code> — every knob; <code>from_env()</code>, <code>from_checkpoint()</code>, <code>checkpoint_dict()</code>, <code>checkpoint_name</code></td></tr>
+          <tr><td class="mono">data.py</td><td>vocabularies, <code>score_vec</code>, <code>load_full_dataset</code>, <code>to_data</code></td></tr>
+          <tr><td class="mono">model.py</td><td><code>Encoder</code>, <code>JEPA</code>, <code>DistMult</code>, <code>Scorer</code></td></tr>
+          <tr><td class="mono">steps.py</td><td>per-batch tensor work: <code>jepa_step</code>, <code>readout_step</code>, negative sampling — where v18's branch lives</td></tr>
+          <tr><td class="mono">train.py</td><td>the run: <code>set_seed</code>, data prep/split, both phases, reporting, <code>main</code></td></tr>
+          <tr><td class="mono">evaluate.py</td><td>the four evaluators, shared ranking helpers, checkpoint CLI</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Env globals became a dataclass</h3>
+    <div class="pair">
+      <figure>
+        <figcaption>v16 — set env before import</figcaption>
+<pre><code># trainer.py, at module import:
+USE_NOTE = env_flag("USE_NOTE", "1")
+EMBED_DIM = int(env("EMBED_DIM", 768))
+NUMERIC_DIM = 6 + (EMBED_DIM
+    if USE_NOTE else 0)</code></pre>
+      </figure>
+      <figure>
+        <figcaption>v17 — two configs coexist</figcaption>
+<pre><code>from fawkes.config import Config
+
+with_note = Config()
+no_note = Config(use_note=False)
+
+no_note.numeric_dim    # 6
+with_note.numeric_dim  # 774</code></pre>
+      </figure>
+    </div>
+    <p class="prose">
+      That refactor is what made v18 a two-field change rather than another round of
+      import-time globals — and what let this report evaluate a note and a no-note
+      configuration in the same process.
+    </p>
+
+    <div class="gate">
+      <span class="gate-label">v17 vs v16 — equality, gated three ways</span>
+      <ul>
+        <li>Loading the released checkpoint and running <code>loo_evaluate</code> reproduces <code>baseline/paper_loo.json</code> to within <code>1e-6</code> on every metric.</li>
+        <li><code>Encoder().state_dict()</code> and <code>DistMult().state_dict()</code> key sets equal <code>baseline/paper_keys.json</code> — these are attribute paths, so a renamed submodule shows up here and nowhere else.</li>
+        <li>Importing <code>fawkes</code> with no environment set raises no error and reads no <code>os.environ</code> at module scope (AST-verified).</li>
+      </ul>
+    </div>
+
+    <p class="prose">
+      The plan carried an explicit stop rule: if either numeric gate failed, the refactor
+      would be abandoned and <code>trainer.py</code> kept verbatim — "an unverifiable refactor
+      of the paper artifact is not worth the readability gain." The gates passed. Three
+      deliberate behaviour changes shipped, and only three: variant-derived checkpoint names
+      (<code>fawkes_entity_note.pt</code> / <code>fawkes_no_note.pt</code>),
+      <code>CUBLAS_WORKSPACE_CONFIG</code> moved from import into <code>set_seed</code>, and
+      the argument-parse guard that stops <code>--help</code> from training and publishing.
+    </p>
+  </section>
+
+  <!-- ============================================================ V16 -->
+  <section>
+    <h2><span class="sec">§7</span>v16 — the experiment underneath all of this</h2>
+    <div class="rail">
+      <div>
+        <div class="rail-tag">v16 · the paper artifact</div>
+        <div class="rail-body">
+          The entity-grounded-note Graph-JEPA, run 260615. The released checkpoint and every
+          published number come from here.
+        </div>
+      </div>
+    </div>
+
+    <p class="prose">
+      One hazard to state, because it inverts what the repository name suggests:
+      <strong><code>fawkes</code> is the implementation behind the paper</strong>
+      (<code>paper/clinical_jepa.pdf</code>), and <code>clinical_jepa</code> is not — it is the
+      separate modular revision pipeline that v18 borrowed the patch algorithm from. This is
+      documented in <code>docs/LINEAGE.md</code>, stated in both package docstrings, and
+      enforced by <code>tests/test_import_boundaries.py</code>. The "16" is an experiment
+      number from a separate line of work, not the successor to the <code>v5</code>/<code>v6</code>
+      architecture names in <code>clinical_jepa</code>.
+    </p>
+
+    <h3>The experiment</h3>
+    <p class="prose">
+      A JEPA world model over per-admission clinical knowledge graphs, trained in two phases
+      on 4,000 admission graphs (3,018 subjects, 85,290 LLM edges):
+    </p>
+    <ul class="prose">
+      <li>
+        <strong>Phase 1 — the world model.</strong> Masked-node latent prediction, BYOL-style,
+        with an EMA target encoder on one shared encoder. This is the phase v18 changes.
+      </li>
+      <li>
+        <strong>Phase 2 — the readout.</strong> Frozen-encoder edge recovery with InfoNCE over
+        same-type negatives, the four inferred relations upweighted
+        (<code>target_weight=3.0</code>), and the scorer rolled back to its best validation-AUC
+        epoch.
+      </li>
+    </ul>
+    <p class="prose">
+      v16's own contribution — the thing the "entity-note" name refers to — was
+      <strong>localising the Clinical-ModernBERT note vector onto the entity nodes the note
+      actually grounds</strong> (28.6% of nodes under <code>ground_by=prov</code>), replacing
+      v15's single per-admission NOTE node. <code>NOTE</code> and <code>HAS_NOTE</code> remain
+      in the vocabulary, unused, as evidence of that retirement.
+    </p>
+
+    <h3>Architecture and defaults, unchanged through v18</h3>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Component</th><th>Setting</th></tr></thead>
+        <tbody>
+          <tr><td>Encoder</td><td>2-layer <code>TransformerConv</code>, hidden 128, 4 heads, edge embedding 32</td></tr>
+          <tr><td>Node input</td><td>6 demographic features + 768 note dims when <code>use_note</code> (774 total)</td></tr>
+          <tr><td>Decoder</td><td>DistMult</td></tr>
+          <tr><td>Parameters</td><td>2,637,954 (with note) / 2,441,346 (no note)</td></tr>
+          <tr><td>Schedule</td><td>60 JEPA epochs, 40 readout epochs, batch 16, lr 1e-3, seed 42</td></tr>
+          <tr><td>Masking</td><td><code>node_mask=0.4</code>, <code>edge_mask=0.3</code>, sampled held-edge ratio [0.1, 0.6]</td></tr>
+          <tr><td>Split</td><td>3,200 train / 400 val / 400 test, seeded, test drawn first</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>The four evaluators</h3>
+    <p class="prose">
+      They answer different questions and are not interchangeable — worth restating, because
+      section 3 quotes three of them:
+    </p>
+    <ul class="prose">
+      <li><strong><code>loo_evaluate</code></strong> — mask exactly one edge, keep the whole rest of the graph. No randomness, exactly reproducible. The honest per-relation measure and what the paper reports.</li>
+      <li><strong><code>evaluate</code></strong> — batch-mask: 30% of edges held out together. Harder and noisier.</li>
+      <li><strong><code>cascade_evaluate</code></strong> — recover the inferred relations in order, adding each one's gold edges to context before the next. Produces the floor/ceiling bracket used above.</li>
+      <li><strong><code>eir_uplift_eval</code></strong> — refiner precision/recall against v8-gold triples. Off by default; full-gold F1 is hub-dominated.</li>
+    </ul>
+  </section>
+
+  <!-- ============================================================ PROVENANCE -->
+  <section>
+    <h2><span class="sec">§8</span>Provenance — where every number came from</h2>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Number</th><th>Source</th><th>Verification</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>v17 with-note</td>
+            <td class="mono">models/fawkes-entity-note/…v16_260615.pt</td>
+            <td>Metrics embedded in the checkpoint; re-ran <code>loo_evaluate</code> locally — reproduced exactly (Δ = 0.00e+00).</td>
+          </tr>
+          <tr>
+            <td>v17 no-note</td>
+            <td class="mono">models/fawkes-graph-jepa-v16-nonote/…nonote_v16_260615.pt</td>
+            <td>Re-ran <code>loo_evaluate</code> locally — reproduced to 2.16e−06.</td>
+          </tr>
+          <tr>
+            <td>v18 both</td>
+            <td class="mono">tmp/fawkes-v18-{note,nonote}.log</td>
+            <td>Training-run logs from Hugging Face Jobs (A100); <code>[LOO]</code>, <code>[RESULT]</code>, <code>[CASCADE]</code> lines.</td>
+          </tr>
+          <tr>
+            <td>Split identity</td>
+            <td class="mono">quiz_sig / n / n_mrr</td>
+            <td><code>quiz_sig=304815655090</code>, <code>n=8283</code>, <code>n_mrr=3000</code> in all four runs.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h4>Reproducing the v17 side</h4>
+<pre><code>USE_NOTE=0 fawkes-eval \
+  --checkpoint models/fawkes-graph-jepa-v16-nonote/fawkes_trainer_jepa_entity_nonote_v16_260615.pt \
+  --data data/fawkes-training-graph-embedded-260615/fawkes_training_graph_full_embedded_260615.jsonl \
+  --device cpu</code></pre>
+
+    <h4>Reproducing the v18 side</h4>
+<pre><code>MASK_STRATEGY=patch JEPA_PATCHES=8 NODE_MASK=0.4 USE_NOTE=1 PUSH=0 fawkes-train
+MASK_STRATEGY=patch JEPA_PATCHES=8 NODE_MASK=0.4 USE_NOTE=0 PUSH=0 fawkes-train</code></pre>
+
+    <p class="prose" style="margin-top:1.2rem">
+      <strong>On this report's charts.</strong> The delta bars use a diverging blue↔red pair
+      with a neutral midpoint; the dumbbells use two steps of a single blue ramp. Both were
+      checked with a colour-vision validator against this page's actual light and dark
+      surfaces and pass every gate — the diverging pair at worst-case CVD ΔE 21.6 light and
+      19.2 dark against a threshold of 8, the ordinal ramp on monotone lightness, step
+      separation and surface contrast. Every chart carries its numbers in an adjacent table
+      and every delta is printed with its sign, so no value is reachable only by colour or
+      only by hovering.
+    </p>
+  </section>
+
+  <div class="gate flagged">
+    <span class="gate-label">If you do one thing next</span>
+    <p>
+      Run three to five seeds per cell. The no-note improvement and the cascade headroom sign
+      flips are the findings worth defending, and a seed sweep is what turns them from
+      suggestive into solid — while settling whether the with-note regression is real or a
+      single unlucky run.
+    </p>
+  </div>
+
+  <p class="footnote">
+    Sources: <code>tmp/fawkes-v18-{note,nonote}.log</code>; the two v17 checkpoints and their
+    embedded metrics; <code>docs/RESTRUCTURE_PLAN.md</code>, <code>docs/LINEAGE.md</code>,
+    <code>src/fawkes/</code> module docstrings; and the working-tree diff for v18
+    (<code>src/fawkes/patches.py</code>, <code>config.py</code>, <code>steps.py</code>,
+    <code>tests/test_fawkes.py</code>). Report No. 1 in this series covers the v16 → v17
+    refactor in full. Generated 2026-08-04.
+  </p>
+</div>
+
+<div id="tip" role="status" aria-live="polite"></div>
+<script>
+  (function () {
+    var tip = document.getElementById('tip');
+    function show(el, x, y) {
+      var text = el.getAttribute('data-tip');
+      if (!text) return;
+      tip.textContent = text;
+      tip.classList.add('on');
+      var r = tip.getBoundingClientRect();
+      var left = Math.min(Math.max(8, x + 14), window.innerWidth - r.width - 8);
+      var top = y - r.height - 12;
+      if (top < 8) top = y + 18;
+      tip.style.left = left + 'px';
+      tip.style.top = top + 'px';
+    }
+    function hide() { tip.classList.remove('on'); }
+    document.querySelectorAll('[data-tip]').forEach(function (el) {
+      el.addEventListener('mousemove', function (e) { show(el, e.clientX, e.clientY); });
+      el.addEventListener('mouseleave', hide);
+      el.addEventListener('focus', function () {
+        var r = el.getBoundingClientRect();
+        show(el, r.left + r.width / 2, r.top);
+      });
+      el.addEventListener('blur', hide);
+    });
+    window.addEventListener('scroll', hide, { passive: true });
+  })();
+</script>

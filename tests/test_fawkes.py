@@ -35,6 +35,7 @@ from fawkes.data import resolve_rel, to_data
 from fawkes.evaluate import (_load_graphs, cascade_evaluate, eir_uplift_eval, evaluate,
                              loo_evaluate)
 from fawkes.model import JEPA, DistMult, Encoder
+from fawkes.patches import balanced_bfs_partition, patch_mask
 from fawkes.train import jepa_step, readout_step
 
 PIN = "old_fawkes.json"
@@ -354,3 +355,65 @@ def test_to_data_matches_trainer():
     # Named per field too, so a systematic drift reads as "numfeat moved"
     # instead of "record 0 moved, and so did the other 3,999".
     assert {key: fold_digests(values) for key, values in per_key.items()} == pinned["per_key"]
+
+
+# ---- (v17) BFS-balanced patch masking ----
+
+def _path_graph_edges(n, offset=0):
+    src = torch.arange(n - 1) + offset
+    return torch.stack([src, src + 1])
+
+
+def test_mask_strategy_validated():
+    """Unknown strategies and a context-less patch count fail loud at config time."""
+    with pytest.raises(ValueError):
+        Config(mask_strategy="bogus")
+    with pytest.raises(ValueError):
+        Config(mask_strategy="patch", jepa_patches=1)
+
+
+def test_balanced_bfs_partition_covers_and_balances():
+    """Every node lands in exactly one patch; on a path graph the patches are
+    balanced and contiguous (contiguity on a path == connectivity)."""
+    torch.manual_seed(0)
+    patches = balanced_bfs_partition(_path_graph_edges(12), 12, 4)
+    assert sorted(node for patch in patches for node in patch) == list(range(12))
+    assert sorted(len(patch) for patch in patches) == [3, 3, 3, 3]
+    for patch in patches:
+        assert max(patch) - min(patch) + 1 == len(patch), f"patch {patch} not contiguous"
+
+
+def test_patch_mask_masks_whole_local_patches():
+    """Per graph in the batch: >= 1 target, >= 1 context, the node_mask fraction
+    reached, and masked nodes coherent (every masked node has a masked neighbor)
+    rather than the scattered singletons a Bernoulli mask draws. Both node
+    counts divide evenly into the 4 patches — a remainder (e.g. 9 nodes) can
+    legitimately produce a size-1 patch, for which the neighbor check is false."""
+    torch.manual_seed(0)
+    n1, n2 = 12, 8
+    edges = torch.cat([_path_graph_edges(n1), _path_graph_edges(n2, offset=n1)], dim=1)
+    ptr = torch.tensor([0, n1, n1 + n2])
+    mask = patch_mask(ptr, edges, 0.4, 4, torch.device("cpu"))
+    for start, end in ((0, n1), (n1, n1 + n2)):
+        masked = int(mask[start:end].sum())
+        assert 0.4 * (end - start) <= masked < end - start
+    src, dst = edges[0], edges[1]
+    both_masked = mask[src] & mask[dst]
+    has_masked_neighbor = torch.zeros_like(mask)
+    has_masked_neighbor[src[both_masked]] = True
+    has_masked_neighbor[dst[both_masked]] = True
+    assert bool(has_masked_neighbor[mask].all()), "a masked node has no masked neighbor"
+
+
+@requires_data
+def test_jepa_step_runs_with_patch_masking():
+    """The patch strategy composes with the unchanged jepa_step on real graphs."""
+    from torch_geometric.loader import DataLoader
+
+    cfg = Config(mask_strategy="patch", jepa_patches=4)
+    graphs = [d for d, _ in _sample_graphs(cfg, 16)]
+    batch = next(iter(DataLoader(graphs, batch_size=8, shuffle=False)))
+    torch.manual_seed(0)
+    model = JEPA(cfg)
+    loss, emb_std = jepa_step(model, batch, torch.device("cpu"), cfg)
+    assert torch.isfinite(loss) and float(emb_std) > 0

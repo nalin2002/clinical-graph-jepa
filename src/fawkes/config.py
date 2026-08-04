@@ -86,6 +86,8 @@ class Config:
     # ---- JEPA pretraining ----
     node_mask: float = 0.4
     edge_mask: float = 0.3
+    mask_strategy: str = "random"         # (v18) random=i.i.d. Bernoulli node mask (the v16/v17 behaviour) | patch=BFS-balanced whole-patch masking (patches.py)
+    jepa_patches: int = 8                 # (v18) patches per graph when mask_strategy=patch; matches clinical_jepa's num_patches
     ema_base: float = 0.996
     ema_final: float = 0.9999
 
@@ -114,6 +116,10 @@ class Config:
     def __post_init__(self):
         if self.hid % self.heads:
             raise ValueError(f"[FAILURE] HID {self.hid} not divisible by HEADS {self.heads}")
+        if self.mask_strategy not in ("random", "patch"):
+            raise ValueError(f"[FAILURE] MASK_STRATEGY {self.mask_strategy!r} not in ('random', 'patch')")
+        if self.mask_strategy == "patch" and self.jepa_patches < 2:
+            raise ValueError(f"[FAILURE] JEPA_PATCHES {self.jepa_patches} < 2; patch masking needs a context patch")
 
     @property
     def numeric_dim(self) -> int:
@@ -161,6 +167,8 @@ class Config:
             ground_by=os.environ.get("GROUND_BY", "prov").lower(),
             node_mask=float(os.environ.get("NODE_MASK", 0.4)),
             edge_mask=float(os.environ.get("EDGE_MASK", 0.3)),
+            mask_strategy=os.environ.get("MASK_STRATEGY", "random").lower(),
+            jepa_patches=int(os.environ.get("JEPA_PATCHES", 8)),
             ema_base=float(os.environ.get("EMA_BASE", 0.996)),
             ema_final=float(os.environ.get("EMA_FINAL", 0.9999)),
             freeze_encoder=_flag("FREEZE_ENCODER", "1"),

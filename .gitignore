@@ -13,3 +13,5 @@ data/**/*.json
 *.pt
 *.npz
 *.egg-info/
+
+tmp/

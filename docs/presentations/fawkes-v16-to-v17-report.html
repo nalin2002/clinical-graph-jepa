@@ -1,0 +1,600 @@
+<title>fawkes v16 → v17 — Change Report</title>
+<style>
+  :root {
+    --paper: #FAFBFA;
+    --ink: #1A2426;
+    --muted: #5C6B6A;
+    --accent: #0F6B5C;
+    --accent-soft: #E7F0EE;
+    --flag: #B3591A;
+    --flag-soft: #F7EDE4;
+    --line: #DCE3E1;
+    --code-bg: #F0F4F3;
+    --good: #2E6B45;
+    --good-soft: #E8F1EB;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #101716;
+      --ink: #E4EAE8;
+      --muted: #93A5A2;
+      --accent: #4FBFA8;
+      --accent-soft: #16302B;
+      --flag: #E09A5A;
+      --flag-soft: #33241A;
+      --line: #263230;
+      --code-bg: #18211F;
+      --good: #7CC495;
+      --good-soft: #1B2C21;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #101716; --ink: #E4EAE8; --muted: #93A5A2; --accent: #4FBFA8;
+    --accent-soft: #16302B; --flag: #E09A5A; --flag-soft: #33241A;
+    --line: #263230; --code-bg: #18211F; --good: #7CC495; --good-soft: #1B2C21;
+  }
+  :root[data-theme="light"] {
+    --paper: #FAFBFA; --ink: #1A2426; --muted: #5C6B6A; --accent: #0F6B5C;
+    --accent-soft: #E7F0EE; --flag: #B3591A; --flag-soft: #F7EDE4;
+    --line: #DCE3E1; --code-bg: #F0F4F3; --good: #2E6B45; --good-soft: #E8F1EB;
+  }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: Charter, Georgia, 'Times New Roman', serif;
+    font-size: 1.05rem;
+    line-height: 1.62;
+    margin: 0;
+  }
+  .wrap {
+    max-width: 46rem;
+    margin: 0 auto;
+    padding: 3.5rem 1.5rem 6rem;
+  }
+  h1, h2, h3, .eyebrow, .chip, .gate-label, thead {
+    font-family: 'Avenir Next', Avenir, Seravek, 'Segoe UI', system-ui, sans-serif;
+  }
+  code, pre, .mono {
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 0.88em;
+  }
+
+  /* ---- header ---- */
+  .eyebrow {
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--accent);
+    margin: 0 0 0.75rem;
+  }
+  h1 {
+    font-size: 2.1rem;
+    font-weight: 700;
+    line-height: 1.15;
+    margin: 0 0 0.6rem;
+    text-wrap: balance;
+    letter-spacing: -0.015em;
+  }
+  .subtitle {
+    color: var(--muted);
+    font-size: 1.05rem;
+    margin: 0 0 1.4rem;
+    max-width: 38rem;
+  }
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 1.4rem;
+    font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+    font-size: 0.76rem;
+    color: var(--muted);
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+    padding: 0.6rem 0;
+    margin-bottom: 2.8rem;
+  }
+  .meta strong { color: var(--ink); font-weight: 600; }
+
+  /* ---- sections ---- */
+  section { margin-top: 3.2rem; }
+  h2 {
+    font-size: 1.32rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    margin: 0 0 1rem;
+    text-wrap: balance;
+    display: flex;
+    align-items: baseline;
+    gap: 0.65rem;
+  }
+  h2 .sec {
+    color: var(--accent);
+    font-size: 0.82rem;
+    font-weight: 600;
+    font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+    white-space: nowrap;
+  }
+  h3 {
+    font-size: 1.02rem;
+    font-weight: 600;
+    margin: 1.8rem 0 0.5rem;
+  }
+  p { margin: 0 0 1rem; }
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  a:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  ul { padding-left: 1.2rem; margin: 0 0 1rem; }
+  li { margin-bottom: 0.45rem; }
+  code {
+    background: var(--code-bg);
+    padding: 0.1em 0.35em;
+    border-radius: 3px;
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 0.9rem 1.1rem;
+    overflow-x: auto;
+    line-height: 1.55;
+    margin: 0 0 1rem;
+  }
+  pre code { background: none; padding: 0; }
+
+  /* ---- chips ---- */
+  .chip {
+    display: inline-block;
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 0.14rem 0.55rem;
+    border-radius: 999px;
+    vertical-align: 0.12em;
+    margin-right: 0.3rem;
+  }
+  .chip.unchanged { background: var(--good-soft); color: var(--good); }
+  .chip.changed { background: var(--flag-soft); color: var(--flag); }
+  .chip.new { background: var(--accent-soft); color: var(--accent); }
+
+  /* ---- gate callout ---- */
+  .gate {
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--accent);
+    background: var(--accent-soft);
+    border-radius: 0 6px 6px 0;
+    padding: 0.85rem 1.1rem;
+    margin: 1.2rem 0;
+  }
+  .gate-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--accent);
+    display: block;
+    margin-bottom: 0.35rem;
+  }
+  .gate p:last-child, .gate ul:last-child { margin-bottom: 0; }
+  .gate.flagged { border-left-color: var(--flag); background: var(--flag-soft); }
+  .gate.flagged .gate-label { color: var(--flag); }
+
+  /* ---- tables ---- */
+  .table-scroll { overflow-x: auto; margin: 1.2rem 0; }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 0.9rem;
+  }
+  thead th {
+    text-align: left;
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+    color: var(--muted);
+    border-bottom: 2px solid var(--line);
+    padding: 0.4rem 0.9rem 0.4rem 0;
+  }
+  tbody td {
+    border-bottom: 1px solid var(--line);
+    padding: 0.55rem 0.9rem 0.55rem 0;
+    vertical-align: top;
+  }
+  td.mono, th.mono { white-space: nowrap; }
+
+  /* ---- before / after ---- */
+  .pair {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin: 1.2rem 0;
+  }
+  @media (max-width: 640px) { .pair { grid-template-columns: 1fr; } }
+  .pair figure { margin: 0; min-width: 0; }
+  .pair figcaption {
+    font-family: 'Avenir Next', Avenir, system-ui, sans-serif;
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+    color: var(--muted);
+    margin-bottom: 0.4rem;
+  }
+  .pair pre { margin: 0; height: calc(100% - 1.4rem); box-sizing: border-box; }
+
+  .footnote {
+    margin-top: 3.5rem;
+    padding-top: 1.2rem;
+    border-top: 1px solid var(--line);
+    color: var(--muted);
+    font-size: 0.88rem;
+  }
+</style>
+
+<div class="wrap">
+  <header>
+    <p class="eyebrow">Clinical Graph-JEPA · Engineering Report</p>
+    <h1>fawkes v16 → v17: the same model, provably — better software</h1>
+    <p class="subtitle">
+      What changed between the v16 paper artifact (<code>paper_v16/trainer.py</code>) and the current
+      <code>src/fawkes/</code> package, and why each change was made. v17 is an engineering release,
+      not a new experiment: no numerics, defaults, or environment-variable names changed, and every
+      claim of equivalence is gated by a recorded baseline.
+    </p>
+    <div class="meta">
+      <span>repo <strong>clinical-graph-jepa</strong></span>
+      <span>range <strong>f5b1cd6 → 55c27cd</strong> + session tooling</span>
+      <span>date <strong>2026-08-04</strong></span>
+      <span>author <strong>Kushagra</strong></span>
+    </div>
+  </header>
+
+  <section>
+    <h2><span class="sec">§0</span>Orientation: fawkes is the paper implementation</h2>
+    <p>
+      One hazard to state before anything else, because it inverts what the repository name suggests:
+      <strong><code>fawkes</code> is the implementation behind the paper</strong>
+      (<code>paper/clinical_jepa.pdf</code>), and <code>clinical_jepa</code> is not — it is the
+      separate modular revision pipeline. The released checkpoint and every reported number come from
+      <code>fawkes</code>, which keeps its original author's name. This is documented in
+      <code>docs/LINEAGE.md</code>, stated in both package docstrings, and enforced by
+      <code>tests/test_import_boundaries.py</code>, which asserts the two packages never import each other.
+    </p>
+    <p>
+      "v16" below means the frozen experiment <code>paper_v16</code> (run 260615): the
+      entity-grounded-note Graph-JEPA, where the Clinical-ModernBERT note vector is localized onto the
+      entity nodes the note actually grounds. "v17" means the current state of <code>src/fawkes/</code>.
+    </p>
+  </section>
+
+  <section>
+    <h2><span class="sec">§1</span>What v16 was, and why it had to change</h2>
+    <p>
+      v16 lived almost entirely in one file: <code>paper_v16/trainer.py</code>, 719 lines, plus a
+      separate checkpoint-only <code>evaluate.py</code>. It produced the released checkpoint and the
+      published metrics — and it had four structural problems, each of which motivated a specific part
+      of the restructure:
+    </p>
+    <ul>
+      <li>
+        <strong>It configured itself from the environment at import time.</strong> Roughly thirty
+        <code>os.environ</code> reads ran when Python imported the module, and
+        <code>NUMERIC_DIM</code> — a tensor shape — was computed at import. Consequences: environment
+        variables had to be set <em>before</em> the import (hence the env-prefixed commands in the
+        README), two configurations could not coexist in one process, and the trainer was effectively
+        untestable.
+      </li>
+      <li>
+        <strong>Everything shared one namespace.</strong> Data loading, the model, both training
+        phases, four evaluators, and reporting were interleaved in a single module; the standalone
+        <code>evaluate.py</code> reached into it (<code>trainer.USE_NOTE</code>) to validate
+        checkpoints, coupling the CLI to the import-time globals.
+      </li>
+      <li>
+        <strong><code>--help</code> trained the model.</strong> <code>main()</code> took no arguments
+        and ran unconditionally, so <code>fawkes-train --help</code> completed a full training run —
+        and, because <code>PUSH</code> defaults to <code>1</code>, uploaded the result to the
+        Hugging Face <code>OUTPUT_REPO</code>.
+      </li>
+      <li>
+        <strong>The code was hard to read.</strong> Single-letter and abbreviated names
+        (<code>b</code>, <code>nt</code>, <code>ei</code>, <code>tot_llm</code>) throughout the tensor
+        code, and a hardcoded, date-stamped checkpoint filename
+        (<code>fawkes_trainer_jepa_entity_note_v16_260615.pt</code>) at line 704.
+      </li>
+    </ul>
+    <p>
+      The restructure plan (<code>docs/RESTRUCTURE_PLAN.md</code> §5) called this
+      <em>the highest-risk phase</em> of the whole repository restructure, because the file backs the
+      paper: "Splitting it risks silent reproducibility drift in the one artifact that backs the
+      paper." That risk shaped everything in §3 below.
+    </p>
+  </section>
+
+  <section>
+    <h2><span class="sec">§2</span>The split: one module per concern</h2>
+    <p>
+      <code>trainer.py</code> was split at its own existing seams — the comment banners at lines 256
+      ("shared encoder"), 327 ("downstream readout"), and 423 ("EIR scoring") — rather than at
+      invented boundaries. The standalone <code>paper_v16/evaluate.py</code> was folded into
+      <code>fawkes/evaluate.py</code> as the checkpoint CLI at the bottom of that module.
+    </p>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr><th class="mono">v17 module</th><th>Contents</th><th>Came from</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="mono">config.py</td>
+            <td><code>Config</code> — every experiment knob; <code>from_env()</code>, <code>from_checkpoint()</code>, <code>checkpoint_dict()</code>, <code>checkpoint_name</code></td>
+            <td>the ~30 import-time env globals</td>
+          </tr>
+          <tr>
+            <td class="mono">data.py</td>
+            <td>vocabularies, <code>score_vec</code>, <code>load_full_dataset</code>, <code>to_data</code></td>
+            <td>trainer.py data section</td>
+          </tr>
+          <tr>
+            <td class="mono">model.py</td>
+            <td><code>Encoder</code>, <code>JEPA</code>, <code>DistMult</code>, <code>Scorer</code></td>
+            <td>trainer.py "shared encoder" seam</td>
+          </tr>
+          <tr>
+            <td class="mono">steps.py</td>
+            <td>per-batch tensor work: <code>jepa_step</code>, <code>readout_step</code>, <code>valid_mask</code>, <code>buckets</code>, negative sampling</td>
+            <td>extracted later from train.py — see §5</td>
+          </tr>
+          <tr>
+            <td class="mono">train.py</td>
+            <td>the run: <code>set_seed</code>, data prep/split, both training phases, reporting, <code>main</code></td>
+            <td>trainer.py spine</td>
+          </tr>
+          <tr>
+            <td class="mono">evaluate.py</td>
+            <td><code>evaluate</code>, <code>loo_evaluate</code>, <code>cascade_evaluate</code>, <code>eir_uplift_eval</code>, shared ranking helpers, checkpoint CLI</td>
+            <td>trainer.py lines 382–579 + <code>paper_v16/evaluate.py</code></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>
+      The four evaluators answer different questions and are deliberately kept side by side rather
+      than merged: <code>evaluate</code> is batch-mask recovery (30% of edges held out together);
+      <code>loo_evaluate</code> masks exactly one edge with the whole rest of the graph as context —
+      no randomness, exactly reproducible, and what the paper reports; <code>cascade_evaluate</code>
+      recovers the inferred relations in order, feeding each one's gold edges to the next; and
+      <code>eir_uplift_eval</code> measures refiner precision/recall against v8-gold triples. What
+      they share — the ranking protocol (same-type candidates in the same graph, filtered ranking,
+      ties favoring the true tail) — was factored into helpers at the top of the module instead of
+      being copied four times.
+    </p>
+  </section>
+
+  <section>
+    <h2><span class="sec">§3</span>The config refactor: env globals become a dataclass</h2>
+    <p>
+      This is the substantive design change of the release. Every import-time global became a field on
+      a frozen-by-convention <code>Config</code> dataclass, and the environment is now read only on
+      demand by <code>Config.from_env()</code> — with the same variable names, the same defaults, and
+      the same parsing rules (including the truthiness rule <code>"1"/"true"/"yes"</code> for every
+      boolean). The documented invocations work unchanged, and importing the package has no side
+      effects — asserted by an AST walk in <code>tests/test_fawkes.py</code>.
+    </p>
+    <div class="pair">
+      <figure>
+        <figcaption>v16 — set env before import, one config per process</figcaption>
+        <pre><code># trainer.py, at module import:
+USE_NOTE = env_flag("USE_NOTE", "1")
+EMBED_DIM = int(env("EMBED_DIM", 768))
+# tensor shape fixed at import:
+NUMERIC_DIM = 6 + (EMBED_DIM
+    if USE_NOTE else 0)</code></pre>
+      </figure>
+      <figure>
+        <figcaption>v17 — explicit, two configs coexist</figcaption>
+        <pre><code>from fawkes.config import Config
+
+with_note = Config()          # released v16 run
+no_note = Config(use_note=False)
+
+no_note.numeric_dim   # 6
+with_note.numeric_dim # 774 (property)</code></pre>
+      </figure>
+    </div>
+    <p>
+      <code>NUMERIC_DIM</code> became the <code>numeric_dim</code> property
+      (<code>BASE_NUMERIC + embed_dim if use_note else 0</code>) — the tensor shape is now derived
+      from a value you hold, not from whatever the environment happened to say at import. Two smaller
+      pieces round out the config story:
+    </p>
+    <ul>
+      <li>
+        <code>checkpoint_dict()</code> writes a hand-picked subset of fields into the checkpoint
+        (deliberately not <code>asdict()</code> — the released checkpoint carries exactly these keys),
+        and <code>Config.from_checkpoint()</code> rebuilds the architecture-relevant fields from a
+        saved checkpoint, which is what lets a released checkpoint load without setting a single
+        environment variable.
+      </li>
+      <li>
+        The <code>fawkes-eval</code> CLI still refuses to run when <code>use_note</code> /
+        <code>ground_by</code> / <code>embed_dim</code> / <code>use_scores</code> disagree with the
+        checkpoint's saved config — the v16 guard, kept, because those four fields change the
+        architecture (e.g. <code>use_note</code> flips the encoder input projection between 6 and 774
+        features).
+      </li>
+    </ul>
+  </section>
+
+  <section>
+    <h2><span class="sec">§4</span>What did <em>not</em> change — and how that is proven</h2>
+    <p>
+      <span class="chip unchanged">unchanged</span> No numerics, no defaults, no tensor operations,
+      and no environment-variable names. This was the plan's hard constraint, and it is not taken on
+      faith: before the restructure began, Phase 0 froze the old tree beside the new one as an oracle
+      — never edited, not even to import from the new code — and recorded its behavior into
+      <code>baseline/*.json</code>. Every fawkes module is gated against those recordings by
+      <code>tests/test_fawkes.py</code>.
+    </p>
+    <div class="gate">
+      <span class="gate-label">Phase 5 gates — all passed</span>
+      <ul>
+        <li>Loading the released checkpoint and running <code>loo_evaluate</code> reproduces <code>baseline/paper_loo.json</code> to within <code>1e-6</code> on every metric.</li>
+        <li><code>Encoder().state_dict()</code> and <code>DistMult().state_dict()</code> key sets equal <code>baseline/paper_keys.json</code> — attribute paths, which survive class renames but not attribute renames, so this catches exactly the kind of drift a refactor risks.</li>
+        <li>Importing <code>fawkes</code> with no environment variables set raises no error and reads no <code>os.environ</code> at module scope (AST-verified).</li>
+      </ul>
+    </div>
+    <p>
+      The plan also carried an explicit stop rule: if either numeric gate could not be met, the
+      refactor would be abandoned and <code>trainer.py</code> kept verbatim inside the package —
+      "an unverifiable refactor of the paper artifact is not worth the readability gain." The gates
+      passed, so the split stood. Phase 8 then deleted the old tree, having first recorded what it
+      produced into <code>baseline/</code>; <code>baseline/COVERAGE.md</code> lists every gate that
+      lost its oracle in that deletion and what covers the live half now. Checkpoint <em>files</em>
+      also kept their exact names, which keeps every <code>sha256</code> in
+      <code>models/MANIFEST.json</code> byte-stable and makes the model-directory renames provably
+      content-neutral.
+    </p>
+  </section>
+
+  <section>
+    <h2><span class="sec">§5</span>The deliberate behavior changes</h2>
+    <p>
+      <span class="chip changed">changed</span> Three, and only three, intentional differences in
+      behavior — each small, each with a reason:
+    </p>
+    <h3>1. New checkpoints get variant-derived names</h3>
+    <p>
+      New runs save <code>fawkes_entity_note.pt</code> (<code>USE_NOTE=1</code>) or
+      <code>fawkes_no_note.pt</code> (<code>USE_NOTE=0</code>), replacing the hardcoded
+      <code>fawkes_trainer_jepa_entity_note_v16_260615.pt</code>. Why: the date stamp is what made the
+      old name unreadable, and provenance already lives in git history and
+      <code>models/MANIFEST.json</code>; the name now encodes the one thing that matters for loading —
+      which architecture variant the file contains. Existing checkpoint files keep their names and
+      load unchanged; the Hugging Face upload path uses the same new name.
+    </p>
+    <h3>2. <code>CUBLAS_WORKSPACE_CONFIG</code> moved from import to <code>set_seed</code></h3>
+    <p>
+      The original set it at module import with the comment "MUST precede import torch." What actually
+      matters is that it precedes the creation of the first cuBLAS handle; <code>set_seed</code> runs
+      at the top of <code>main</code>, before any tensor work, so the deterministic-kernels effect is
+      unchanged — and the package stays importable without touching the environment.
+    </p>
+    <h3>3. <code>--help</code> can no longer train and publish</h3>
+    <p>
+      <code>fawkes-train</code> now parses arguments before doing anything else, through a parser that
+      deliberately accepts <em>no options</em> (the experiment is configured entirely from the
+      environment). <code>--help</code> prints usage and exits; an unrecognized flag is an error. In
+      v16, either of those would have started a full training run and — with <code>PUSH=1</code>, the
+      default — uploaded a checkpoint to the Hub.
+    </p>
+  </section>
+
+  <section>
+    <h2><span class="sec">§6</span>Post-split refactors: the two August commits</h2>
+    <p>
+      With the baseline gates in place, two further passes cleaned the code the split had preserved
+      verbatim. Both are pinned by the same test strategy — <code>tests/test_fawkes.py</code> holds
+      the training steps bit-for-bit against the recorded trainer — so they are refactors in the
+      strict sense.
+    </p>
+    <h3><code>3fca89f</code> — variable naming</h3>
+    <p>
+      Systematic renames across <code>data.py</code>, <code>evaluate.py</code>, <code>model.py</code>,
+      and <code>train.py</code> (~600 lines touched): <code>b</code> → <code>batch</code>,
+      <code>nt</code> → <code>node_type</code>, <code>ng</code> → <code>num_graphs</code>,
+      <code>tot_llm</code> → <code>total_llm</code>, <code>no_ev</code> → <code>no_evidence</code>,
+      and so on. Signatures became self-documenting —
+      <code>same_type_k(targets, node_type, batch_index, order, sorted_buckets, num_neg)</code>
+      instead of <code>same_type_k(targets, nt, bt, o, sb, K)</code> — with no logic changes.
+    </p>
+    <h3><code>55c27cd</code> — structural refactoring</h3>
+    <ul>
+      <li>
+        <strong><code>steps.py</code> extracted</strong> (209 lines): the per-batch tensor work —
+        <code>jepa_step</code>, <code>readout_step</code>, <code>valid_mask</code>,
+        <code>buckets</code>, negative sampling — moved out of <code>train.py</code>. The concrete
+        reason: <code>evaluate.py</code> reuses <code>readout_step</code> and <code>buckets</code>,
+        which previously forced a circular import that <code>train.main</code> worked around with a
+        deferred import. The cycle is now simply gone.
+      </li>
+      <li>
+        <strong><code>train.py</code> decomposed</strong> from one long <code>main</code> into named
+        stages that read like the experiment's outline: <code>prepare_data</code> (load → audit vocab
+        → convert → seeded split), <code>pretrain_jepa</code> (Phase 1, the JEPA world model),
+        <code>train_readout</code> (Phase 2, frozen-encoder edge recovery with best-VAL-AUC
+        selection), then the reporting helpers (<code>_report_test</code>, <code>_report_loo</code>,
+        <code>_run_cascade</code>, <code>_run_eir</code>) and <code>_save_and_push</code>.
+      </li>
+      <li>
+        <strong><code>evaluate.py</code> reorganized</strong> around the shared ranking helpers, with
+        the four-evaluators contract written into the module docstring so the next reader doesn't have
+        to reverse-engineer which number is "the honest one" (it's LOO).
+      </li>
+    </ul>
+  </section>
+
+  <section>
+    <h2><span class="sec">§7</span>New tooling: training on Hugging Face Jobs</h2>
+    <p>
+      <span class="chip new">new</span> Two PEP 723 uv scripts (currently uncommitted) let a full
+      fawkes run execute on Hugging Face Jobs hardware with no changes to the training code — possible
+      precisely because of §3: the trainer is configured by plain environment variables and already
+      pulls its dataset from, and pushes its checkpoint to, the Hub.
+    </p>
+    <ul>
+      <li>
+        <code>scripts/launch_fawkes_hf_job.py</code> — run locally. Because the GitHub repository is
+        private, a job cannot <code>pip install</code> the code from git; the launcher instead uploads
+        <code>src/fawkes</code> (stamped with the git SHA) to a private Hub model repo, then submits
+        the job via <code>run_uv_job</code>, forwarding the caller's <code>HF_TOKEN</code> as an
+        encrypted secret. It also redirects <code>OUTPUT_REPO</code> to the caller's namespace —
+        the config default points at <code>wmatbooth/…</code>, which the job's token cannot push to,
+        and would otherwise fail only after a complete training run.
+      </li>
+      <li>
+        <code>scripts/hf_job_fawkes_train.py</code> — runs on the job. Declares the runtime
+        dependencies inline, downloads the code repo, puts it on <code>sys.path</code>, and calls the
+        unchanged <code>fawkes.train.main</code>.
+      </li>
+    </ul>
+    <p>
+      Configuration passes through unchanged: <code>-e USE_NOTE=0</code> submits the no-note variant,
+      and a cheap smoke run is <code>-e JEPA_EPOCHS=2 -e READOUT_EPOCHS=2 -e LOO_CAP=200
+      -e RUN_CASCADE=0 -e PUSH=0</code>. Defaults: <code>t4-small</code> hardware (the model is small
+      — a 2-layer encoder at <code>hid=128</code>) and a 2-hour timeout, since the platform default is
+      only 30 minutes.
+    </p>
+  </section>
+
+  <section>
+    <h2><span class="sec">§8</span>Summary</h2>
+    <p>
+      v17 is what v16 looked like all along to the person who wrote it, made legible to everyone else:
+      the same experiment, the same numbers to within <code>1e-6</code>, the same environment
+      interface — now importable without side effects, testable with two configurations in one
+      process, split into modules that match the experiment's actual phases, named so the tensor code
+      can be read, guarded so <code>--help</code> is harmless, and runnable end-to-end on rented
+      hardware with one command. The three behavior changes (checkpoint naming, where the cuBLAS flag
+      is set, the argument-parse guard) are each documented at the point in the code where they
+      happen.
+    </p>
+    <div class="gate flagged">
+      <span class="gate-label">If you read one thing next</span>
+      <p>
+        <code>docs/LINEAGE.md</code> — the durable record of every old-name → new-name mapping.
+        The restructure built the new tree in parallel rather than renaming in place, so
+        <code>git log --follow</code> does not survive it; that file is the provenance.
+      </p>
+    </div>
+  </section>
+
+  <p class="footnote">
+    Sources: <code>docs/RESTRUCTURE_PLAN.md</code> (§2.5, §5, Phase 5), <code>docs/LINEAGE.md</code>,
+    <code>docs/restructure/phase-*.md</code>, <code>src/fawkes/README.md</code>, module docstrings, and
+    the git history (<code>f5b1cd6</code> through <code>55c27cd</code>, plus this session's uncommitted
+    <code>scripts/</code> additions). Generated 2026-08-04.
+  </p>
+</div>
