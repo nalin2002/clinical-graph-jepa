@@ -1,0 +1,1602 @@
+<title>fawkes v19 — JEPA Pretraining Ablation: Changes &amp; Results</title>
+<style>
+  /* ============================================================
+     TOKENS — chrome carried over unchanged from the v18 report, so
+     the three reports read as one series. The data layer is
+     re-validated for v19: the diverging pair is v18's (passes light
+     and dark), the magnitude hue is new because v18's dark step
+     failed the lightness band. Teal never encodes data; blue/red
+     never appear in text chrome.
+     ============================================================ */
+  :root {
+    /* chrome */
+    --paper: #FAFBFA;
+    --raised: #F3F6F5;
+    --ink: #1A2426;
+    --muted: #5C6B6A;
+    --accent: #0F6B5C;
+    --accent-soft: #E7F0EE;
+    --flag: #B3591A;
+    --flag-soft: #F7EDE4;
+    --line: #DCE3E1;
+    --hairline: #E8EDEC;
+    --code-bg: #F0F4F3;
+    /* data layer — validated (see §11) */
+    --up: #2a78d6;          /* ablation arm ahead   */
+    --down: #e34948;        /* paper model ahead    */
+    --zero: #C3C2BB;        /* diverging midpoint   */
+    --data: #1c5cab;        /* single magnitude hue */
+    --grid: #E4E8E7;
+    --axis: #C6CFCD;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #101716; --raised: #17201E; --ink: #E4EAE8; --muted: #93A5A2;
+      --accent: #4FBFA8; --accent-soft: #16302B; --flag: #E09A5A; --flag-soft: #33241A;
+      --line: #263230; --hairline: #1E2927; --code-bg: #18211F;
+      --up: #3987e5; --down: #e66767; --zero: #4A5654; --data: #4f97e4;
+      --grid: #202B29; --axis: #33403D;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #101716; --raised: #17201E; --ink: #E4EAE8; --muted: #93A5A2;
+    --accent: #4FBFA8; --accent-soft: #16302B; --flag: #E09A5A; --flag-soft: #33241A;
+    --line: #263230; --hairline: #1E2927; --code-bg: #18211F;
+    --up: #3987e5; --down: #e66767; --zero: #4A5654; --data: #4f97e4;
+    --grid: #202B29; --axis: #33403D;
+  }
+  :root[data-theme="light"] {
+    --paper: #FAFBFA; --raised: #F3F6F5; --ink: #1A2426; --muted: #5C6B6A;
+    --accent: #0F6B5C; --accent-soft: #E7F0EE; --flag: #B3591A; --flag-soft: #F7EDE4;
+    --line: #DCE3E1; --hairline: #E8EDEC; --code-bg: #F0F4F3;
+    --up: #2a78d6; --down: #e34948; --zero: #C3C2BB; --data: #1c5cab;
+    --grid: #E4E8E7; --axis: #C6CFCD;
+  }
+
+  /* ============================================================ TYPE */
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: Charter, Georgia, 'Times New Roman', serif;
+    font-size: 1.05rem;
+    line-height: 1.62;
+    margin: 0;
+  }
+  h1, h2, h3, h4, .eyebrow, .chip, .gate-label, thead th,
+  .fig, .fig *, .kpi, .kpi *, .rail, .rail * {
+    font-family: 'Avenir Next', Avenir, Seravek, 'Segoe UI', system-ui, sans-serif;
+  }
+  code, pre, .mono { font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; font-size: 0.88em; }
+
+  .wrap { max-width: 52rem; margin: 0 auto; padding: 3.5rem 1.5rem 6rem; }
+  .prose { max-width: 40rem; }
+
+  .eyebrow {
+    text-transform: uppercase; letter-spacing: 0.14em; font-size: 0.72rem;
+    font-weight: 600; color: var(--accent); margin: 0 0 0.75rem;
+  }
+  h1 {
+    font-size: 2.15rem; font-weight: 700; line-height: 1.14;
+    margin: 0 0 0.6rem; text-wrap: balance; letter-spacing: -0.015em;
+  }
+  .subtitle { color: var(--muted); font-size: 1.05rem; margin: 0 0 1.4rem; max-width: 38rem; }
+  .meta {
+    display: flex; flex-wrap: wrap; gap: 0.4rem 1.4rem;
+    font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 0.76rem;
+    color: var(--muted); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+    padding: 0.6rem 0; margin-bottom: 2.4rem;
+  }
+  .meta strong { color: var(--ink); font-weight: 600; }
+
+  section { margin-top: 3.4rem; }
+  h2 {
+    font-size: 1.34rem; font-weight: 700; letter-spacing: -0.01em;
+    margin: 0 0 1rem; text-wrap: balance; display: flex; align-items: baseline; gap: 0.65rem;
+  }
+  h2 .sec {
+    color: var(--accent); font-size: 0.82rem; font-weight: 600;
+    font-family: ui-monospace, 'SF Mono', Menlo, monospace; white-space: nowrap;
+  }
+  h3 { font-size: 1.04rem; font-weight: 600; margin: 1.9rem 0 0.5rem; }
+  h4 { font-size: 0.85rem; font-weight: 600; margin: 1.3rem 0 0.4rem; letter-spacing: 0.01em; }
+  p { margin: 0 0 1rem; }
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  a:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 2px; }
+  ul { padding-left: 1.2rem; margin: 0 0 1rem; }
+  li { margin-bottom: 0.45rem; }
+  code { background: var(--code-bg); padding: 0.1em 0.35em; border-radius: 3px; }
+  pre {
+    background: var(--code-bg); border: 1px solid var(--line); border-radius: 6px;
+    padding: 0.9rem 1.1rem; overflow-x: auto; line-height: 1.55; margin: 0 0 1rem;
+  }
+  pre code { background: none; padding: 0; }
+
+  /* ============================================================ VERSION RAIL */
+  .rail {
+    display: flex; align-items: stretch; gap: 0.9rem;
+    border-left: 3px solid var(--accent); padding-left: 1rem; margin: 0 0 1.6rem;
+  }
+  .rail-tag {
+    font-size: 0.7rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--accent);
+  }
+  .rail-body { font-family: Charter, Georgia, serif; color: var(--muted); font-size: 0.95rem; }
+
+  /* ============================================================ CHIPS */
+  .chip {
+    display: inline-block; font-size: 0.68rem; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.08em; padding: 0.14rem 0.55rem; border-radius: 999px;
+    vertical-align: 0.12em; margin-right: 0.3rem;
+  }
+  .chip.new { background: var(--accent-soft); color: var(--accent); }
+  .chip.changed { background: var(--flag-soft); color: var(--flag); }
+  .chip.unchanged { background: var(--accent-soft); color: var(--accent); }
+
+  /* ============================================================ CALLOUTS */
+  .gate {
+    border: 1px solid var(--line); border-left: 3px solid var(--accent);
+    background: var(--accent-soft); border-radius: 0 6px 6px 0;
+    padding: 0.9rem 1.1rem; margin: 1.3rem 0;
+  }
+  .gate-label {
+    font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em;
+    color: var(--accent); display: block; margin-bottom: 0.35rem;
+  }
+  .gate p:last-child, .gate ul:last-child { margin-bottom: 0; }
+  .gate.flagged { border-left-color: var(--flag); background: var(--flag-soft); }
+  .gate.flagged .gate-label { color: var(--flag); }
+
+  /* ============================================================ KPI TILES */
+  .kpi-row {
+    display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin: 1.6rem 0 1.2rem;
+  }
+  @media (max-width: 640px) { .kpi-row { grid-template-columns: 1fr; } }
+  .kpi {
+    background: var(--raised); border: 1px solid var(--hairline);
+    border-radius: 8px; padding: 1.05rem 1.15rem;
+  }
+  .kpi-label {
+    font-size: 0.71rem; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--muted); margin-bottom: 0.5rem;
+  }
+  .kpi-value {
+    font-size: 2.5rem; font-weight: 600; line-height: 1; letter-spacing: -0.02em;
+    display: flex; align-items: baseline; gap: 0.5rem; flex-wrap: wrap;
+  }
+  .kpi-from { font-size: 0.82rem; color: var(--muted); font-weight: 400; letter-spacing: 0; }
+  .kpi-delta { font-size: 0.88rem; font-weight: 600; margin-top: 0.5rem; }
+  .kpi-delta.up { color: var(--up); }
+  .kpi-delta.down { color: var(--down); }
+  .kpi-delta.flat { color: var(--muted); }
+  .kpi-note { font-size: 0.78rem; color: var(--muted); margin-top: 0.35rem; line-height: 1.45; }
+
+  /* ============================================================ FIGURES */
+  .fig {
+    margin: 1.8rem 0 1.2rem; border: 1px solid var(--hairline);
+    border-radius: 8px; padding: 1.15rem 1.2rem 1rem; background: var(--raised);
+  }
+  .fig-title { font-size: 0.92rem; font-weight: 600; margin: 0 0 0.2rem; }
+  .fig-sub { font-size: 0.78rem; color: var(--muted); margin: 0 0 1rem; line-height: 1.45; }
+  .legend {
+    display: flex; flex-wrap: wrap; gap: 0.35rem 1.1rem; margin: 0 0 1rem;
+    font-size: 0.74rem; color: var(--muted);
+  }
+  .legend span { display: inline-flex; align-items: center; gap: 0.38rem; }
+  .swatch { width: 11px; height: 11px; border-radius: 2px; display: inline-block; flex: none; }
+  .swatch.dot { border-radius: 50%; width: 9px; height: 9px; }
+  .swatch.tick { width: 2px; height: 12px; border-radius: 1px; background: var(--data); }
+  .swatch.rule { width: 2px; height: 12px; border-radius: 1px; background: var(--axis); }
+
+  .panel-label {
+    font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em;
+    color: var(--ink); margin: 0.9rem 0 0.55rem;
+  }
+  .panel-label:first-of-type { margin-top: 0; }
+
+  /* --- ladder: magnitude bars from a zero baseline --- */
+  .lad-rows { display: grid; gap: 0.32rem; }
+  .lad {
+    display: grid; grid-template-columns: 9.4rem 1fr 3.4rem; align-items: center;
+    gap: 0.6rem; font-size: 0.76rem;
+  }
+  .lad-name { color: var(--ink); text-align: right; line-height: 1.25; font-weight: 600; font-size: 0.74rem; }
+  .lad-name i { display: block; font-style: normal; font-weight: 400; font-size: 0.66rem; color: var(--muted); }
+  .lad-track { position: relative; height: 19px; }
+  .lad-track::after {
+    content: ""; position: absolute; left: 39.62%; top: -3px; bottom: -3px;
+    width: 1px; background: var(--axis);
+  }
+  .lad-fill {
+    position: absolute; left: 0; top: 4px; height: 11px;
+    background: var(--data); border-radius: 0 4px 4px 0;
+  }
+  .lad-val { font-variant-numeric: tabular-nums; font-weight: 600; font-size: 0.75rem; color: var(--ink); }
+  .lad-axis {
+    display: grid; grid-template-columns: 9.4rem 1fr 3.4rem; gap: 0.6rem;
+    font-size: 0.68rem; color: var(--muted); margin-top: 0.45rem;
+  }
+  .lad-axis-inner { display: flex; justify-content: space-between; font-variant-numeric: tabular-nums; }
+
+  /* --- diverging delta bars --- */
+  .dbar-rows { display: grid; gap: 0.3rem; }
+  .dbar {
+    display: grid; grid-template-columns: 4.6rem 1fr 4.2rem; align-items: center;
+    gap: 0.6rem; font-size: 0.76rem;
+  }
+  .dbar-name { color: var(--muted); text-align: right; }
+  .dbar-track {
+    position: relative; height: 17px; background: transparent;
+    border-left: 0; overflow: visible;
+  }
+  .dbar-track::before {
+    content: ""; position: absolute; left: 50%; top: -2px; bottom: -2px;
+    width: 1px; background: var(--zero);
+  }
+  .dbar-fill {
+    position: absolute; top: 3px; height: 11px; border-radius: 3px;
+  }
+  .dbar-fill.pos { left: 50%; background: var(--up); border-radius: 0 3px 3px 0; }
+  .dbar-fill.neg { right: 50%; background: var(--down); border-radius: 3px 0 0 3px; }
+  .dbar-val { font-variant-numeric: tabular-nums; font-weight: 600; font-size: 0.75rem; }
+  .dbar-val.pos { color: var(--up); }
+  .dbar-val.neg { color: var(--down); }
+  .dbar-axis {
+    display: grid; grid-template-columns: 4.6rem 1fr 4.2rem; gap: 0.6rem;
+    font-size: 0.68rem; color: var(--muted); margin-top: 0.4rem;
+  }
+  .dbar-axis-inner { display: flex; justify-content: space-between; font-variant-numeric: tabular-nums; }
+
+  /* --- seed strip: per-seed dots with a range line and a mean tick --- */
+  .strip-rows { display: grid; gap: 0.5rem; }
+  .strip {
+    display: grid; grid-template-columns: 9.4rem 1fr 5.4rem; align-items: center;
+    gap: 0.6rem; font-size: 0.75rem;
+  }
+  .strip-name { color: var(--ink); text-align: right; line-height: 1.25; font-weight: 600; font-size: 0.74rem; }
+  .strip-name i { display: block; font-style: normal; font-weight: 400; font-size: 0.66rem; color: var(--muted); }
+  .strip-track { position: relative; height: 20px; }
+  .strip-track::before {
+    content: ""; position: absolute; left: 0; right: 0; top: 50%;
+    height: 1px; background: var(--grid);
+  }
+  .strip-range {
+    position: absolute; top: 50%; height: 2px; transform: translateY(-50%); background: var(--axis);
+  }
+  .strip-dot {
+    position: absolute; top: 50%; width: 10px; height: 10px; border-radius: 50%;
+    background: var(--data); transform: translate(-50%, -50%);
+    box-shadow: 0 0 0 2px var(--raised);
+  }
+  .strip-mean {
+    position: absolute; top: 50%; width: 3px; height: 18px; border-radius: 1.5px;
+    background: var(--data); transform: translate(-50%, -50%);
+    box-shadow: 0 0 0 2px var(--raised);
+  }
+  .strip-val { font-variant-numeric: tabular-nums; font-weight: 600; font-size: 0.73rem; color: var(--ink); }
+  .strip-val i { font-style: normal; font-weight: 400; color: var(--muted); font-size: 0.68rem; }
+  .strip-axis {
+    display: grid; grid-template-columns: 9.4rem 1fr 5.4rem; gap: 0.6rem;
+    font-size: 0.68rem; color: var(--muted); margin-top: 0.5rem;
+  }
+  .strip-axis-inner { display: flex; justify-content: space-between; font-variant-numeric: tabular-nums; }
+
+  /* ============================================================ TABLES */
+  .table-scroll { overflow-x: auto; margin: 1.2rem 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.86rem; }
+  thead th {
+    text-align: left; font-size: 0.7rem; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.09em; color: var(--muted); border-bottom: 2px solid var(--line);
+    padding: 0.42rem 0.85rem 0.42rem 0; white-space: nowrap;
+  }
+  tbody td {
+    border-bottom: 1px solid var(--hairline); padding: 0.5rem 0.85rem 0.5rem 0;
+    vertical-align: top;
+  }
+  tbody tr:last-child td { border-bottom: 1px solid var(--line); }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  td.mono, th.mono { white-space: nowrap; font-family: ui-monospace, Menlo, monospace; font-size: 0.8rem; }
+  td.up { color: var(--up); font-weight: 600; }
+  td.down { color: var(--down); font-weight: 600; }
+  tbody tr.sub td { color: var(--muted); font-size: 0.8rem; }
+  tbody tr.ref td { background: var(--accent-soft); }
+  caption {
+    caption-side: top; text-align: left; font-size: 0.78rem; color: var(--muted);
+    padding-bottom: 0.5rem; line-height: 1.45;
+    font-family: 'Avenir Next', Avenir, system-ui, sans-serif;
+  }
+
+  /* ============================================================ PAIR */
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 1.2rem 0; }
+  @media (max-width: 640px) { .pair { grid-template-columns: 1fr; } }
+  .pair figure { margin: 0; min-width: 0; }
+  .pair figcaption {
+    font-family: 'Avenir Next', Avenir, system-ui, sans-serif; font-size: 0.72rem;
+    font-weight: 600; text-transform: uppercase; letter-spacing: 0.09em;
+    color: var(--muted); margin-bottom: 0.4rem;
+  }
+  .pair pre { margin: 0; height: calc(100% - 1.4rem); box-sizing: border-box; }
+
+  /* ============================================================ TOOLTIP */
+  #tip {
+    position: fixed; z-index: 50; pointer-events: none; opacity: 0;
+    transition: opacity 0.12s ease; background: var(--ink); color: var(--paper);
+    font-family: 'Avenir Next', Avenir, system-ui, sans-serif; font-size: 0.73rem;
+    line-height: 1.45; padding: 0.4rem 0.6rem; border-radius: 5px; max-width: 17rem;
+    box-shadow: 0 3px 12px rgba(0,0,0,0.18);
+  }
+  #tip.on { opacity: 1; }
+  [data-tip] { cursor: default; }
+  @media (prefers-reduced-motion: reduce) {
+    #tip { transition: none; }
+    * { animation: none !important; }
+  }
+
+  .footnote {
+    margin-top: 3.5rem; padding-top: 1.2rem; border-top: 1px solid var(--line);
+    color: var(--muted); font-size: 0.86rem;
+  }
+</style>
+
+<div class="wrap">
+  <header>
+    <p class="eyebrow">Clinical Graph-JEPA · Engineering Report No. 3</p>
+    <h1>v19: the JEPA pretraining ablation — does phase 1 do anything?</h1>
+    <p class="subtitle">
+      A reviewer asked how much of the fawkes result comes from JEPA pretraining rather
+      than from having any graph encoder at all. v19 answers it with six arms across three
+      seeds. The answer is not the one the paper assumes, and this report is where that is
+      written down — then §7–§10 work backwards through v18, v17 and v16 so the whole
+      lineage stays traceable from one document.
+    </p>
+    <div class="meta">
+      <span>repo <strong>clinical-graph-jepa</strong></span>
+      <span>runs <strong>14</strong> (6 arms × seeds)</span>
+      <span>eval <strong>LOO, 7,733–8,283 edges</strong></span>
+      <span>seeds <strong>42 / 43 / 44</strong></span>
+      <span>lineage <strong>v16 → v19</strong></span>
+      <span>date <strong>2026-08-05</strong></span>
+    </div>
+  </header>
+
+  <!-- ============================================================ VERDICT -->
+  <section>
+    <h2><span class="sec">§1</span>The verdict, first</h2>
+    <p class="prose">
+      <strong>Phase 1 is not carrying the result.</strong> On leave-one-out edge recovery —
+      the paper's own measure — a frozen <em>randomly initialised</em> encoder scores the
+      same as the JEPA-pretrained one, and the identical architecture trained end-to-end
+      without phase 1 beats both by roughly <strong>0.31 MRR</strong>. An encoder with its
+      message passing removed entirely still beats the paper model by 0.23.
+    </p>
+
+    <div class="kpi-row">
+      <div class="kpi">
+        <div class="kpi-label">B · no phase 1, frozen random encoder</div>
+        <div class="kpi-value">0.3952 <span class="kpi-from">vs 0.4027 paper</span></div>
+        <div class="kpi-delta flat">≈ −0.008 &nbsp;(±0.018, sign flips)</div>
+        <p class="kpi-note">
+          Three paired seeds give −0.019, +0.013, −0.017. The spread is more than twice the
+          mean: JEPA pretraining is indistinguishable from random initialisation here.
+        </p>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">C · no phase 1, trained end-to-end</div>
+        <div class="kpi-value">0.7135 <span class="kpi-from">vs 0.4027 paper</span></div>
+        <div class="kpi-delta up">▲ +0.3107 &nbsp;(+77%)</div>
+        <p class="kpi-note">
+          The reviewer's literal request — same encoder, same DistMult readout, no
+          pretraining. Positive at every seed. Compute-matching it to 100 epochs (arm Cp)
+          changes nothing: +0.3119.
+        </p>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">D · no message passing at all</div>
+        <div class="kpi-value">0.6293 <span class="kpi-from">vs 0.3962 paper, seed 42</span></div>
+        <div class="kpi-delta up">▲ +0.2331 &nbsp;(+59%)</div>
+        <p class="kpi-note">
+          <code>LAYERS=0</code> empties the conv stack, leaving DistMult over learned
+          type/entity/demographic embeddings. No graph, and still far ahead of the paper model.
+        </p>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">E · phase 1, then fine-tune</div>
+        <div class="kpi-value">0.5442 <span class="kpi-from">vs 0.3962 paper, seed 42</span></div>
+        <div class="kpi-delta up">▲ +0.1480 &nbsp;— but −0.2475 vs C</div>
+        <p class="kpi-note">
+          Unfreezing recovers much of the gap, yet the same architecture <em>without</em>
+          pretraining scores 0.7917 at that seed. The JEPA initialisation is worse than random.
+        </p>
+      </div>
+    </div>
+
+    <p class="prose">
+      Those four facts have one mechanism behind them, argued in §5: under
+      <code>FREEZE_ENCODER=1</code> the 8,192 × 128 entity embedding table is only ever
+      shaped by the pretext task, and in arm B it is never trained at all. The frozen
+      protocol — introduced to make phase 2 a clean test of the representation — is what
+      costs the model 0.31 MRR.
+    </p>
+    <div class="gate flagged">
+      <span class="gate-label">One diagnostic outstanding before this is a finding</span>
+      <p>
+        <code>jepa_step</code> returns <code>emb_std</code> specifically to catch
+        target-encoder collapse. If it decayed toward zero during arm A's 60 pretraining
+        epochs, then "phase 1 adds nothing" is a <strong>training failure, not a property of
+        JEPA</strong> — and A ≈ B together with E &lt; C is exactly the signature collapse
+        would produce. The traces have not been pulled yet. §6 says what to run.
+      </p>
+    </div>
+  </section>
+
+  <!-- ============================================================ WHAT CHANGED -->
+  <section>
+    <h2><span class="sec">§2</span>v19 — what changed and why</h2>
+    <div class="rail">
+      <div>
+        <div class="rail-tag">v19 · ablation harness</div>
+        <div class="rail-body">
+          No new configuration, no new model code. One model-selection bug fixed, one
+          regression test added. The six arms are reachable from the existing environment
+          surface alone.
+        </div>
+      </div>
+    </div>
+
+    <h3>The request</h3>
+    <p class="prose">
+      The reviewer asked for an ablation showing how much of the result comes from JEPA
+      pretraining <em>versus any graph encoder</em> — naming two comparators: the same
+      encoder and readout trained from scratch without phase 1, and a plain typed-GNN plus
+      DistMult baseline. Arm C is both of those at once; the remaining arms bracket it.
+    </p>
+
+    <h3>No new configuration was needed</h3>
+    <p class="prose">
+      <span class="chip unchanged">zero config added</span> Every arm falls out of knobs
+      <code>Config</code> already exposes. <code>JEPA_EPOCHS=0</code> makes
+      <code>pretrain_jepa</code>'s loop body never execute, so it returns a freshly
+      constructed — randomly initialised — encoder. <code>LAYERS=0</code> builds an empty
+      <code>convs</code>/<code>norms</code> <code>ModuleList</code>, so
+      <code>Encoder.forward</code> falls straight through to
+      <code>type_emb + entity_emb + num_proj(numfeat)</code> with no message passing at all.
+      Both were confirmed by running them end-to-end before the fleet was submitted.
+    </p>
+
+    <div class="pair">
+      <figure>
+        <figcaption>Phase 1 skipped — no code branch</figcaption>
+<pre><code>for epoch in range(1, cfg.jepa_epochs + 1):
+    ...
+# JEPA_EPOCHS=0 -> body never runs;
+# model.ctx is the random init</code></pre>
+      </figure>
+      <figure>
+        <figcaption>Message passing removed — no code branch</figcaption>
+<pre><code>for conv, norm in zip(self.convs, self.norms):
+    hidden = F.relu(norm(conv(...)))
+# LAYERS=0 -> empty lists;
+# hidden stays the input sum</code></pre>
+      </figure>
+    </div>
+
+    <h3>The one code change: best-VAL selection had to snapshot the encoder</h3>
+    <p class="prose">
+      <span class="chip changed">fixed</span> <code>train_readout</code> kept the best-VAL
+      scorer and rolled it back at the end, but snapshotted <em>only the scorer</em>. Under
+      <code>FREEZE_ENCODER=1</code> that is correct and complete — the encoder never moves,
+      so the scorer is the whole model. Every arm that trains the encoder, however, got a
+      best-VAL scorer bolted onto a <strong>final-epoch encoder</strong>: a pair that existed
+      at no epoch.
+    </p>
+    <p class="prose">
+      The direction of that bug matters. It degrades exactly the arms the JEPA claim is
+      measured against, so leaving it in would have handicapped the baselines and flattered
+      the paper. It is fixed by also deep-copying the encoder state at the selected epoch,
+      guarded on <code>not cfg.freeze_encoder</code> so the frozen path is untouched.
+    </p>
+    <div class="table-scroll">
+      <table>
+        <caption>Regression test measurement — 64 sampled graphs, 20 readout epochs, unfrozen encoder.</caption>
+        <thead>
+          <tr><th>Quantity</th><th class="num">Value</th><th>Meaning</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Best VAL AUC observed</td><td class="num">0.707434</td><td>Reached at epoch 10 of 20.</td></tr>
+          <tr><td>Returned pair, re-evaluated</td><td class="num">0.705473</td><td>Before the fix — neither the best epoch nor the last.</td></tr>
+          <tr><td>Returned pair, re-evaluated</td><td class="num">0.707434</td><td>After the fix — exactly the selected epoch.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="gate">
+      <span class="gate-label">The frozen path is provably unchanged</span>
+      <p>
+        The encoder snapshot is taken only when <code>freeze_encoder</code> is off, so arms A
+        and B run byte-identical code to v18. All eighteen fawkes gates pass, including
+        <code>test_loo_reproduces_published_test_split</code>, which pins the released
+        checkpoint's LOO metrics to <code>1e-6</code>. The new gate,
+        <code>test_readout_selection_rolls_back_the_encoder_too</code>, records every VAL AUC
+        through a monkeypatched <code>evaluate</code> and asserts the returned pair reproduces
+        the best one; it fails on the old code and passes on the new.
+      </p>
+      <p>
+        Four tests fail elsewhere in the suite —
+        <code>test_benchmarks.py</code> (2) and <code>test_clinical_jepa_train.py</code> (2).
+        Confirmed pre-existing by stashing the change and re-running: they are in the
+        <code>clinical_jepa</code> lineage, which v19 does not touch.
+      </p>
+    </div>
+
+    <h3>The six arms</h3>
+    <div class="table-scroll">
+      <table>
+        <caption>All 14 runs. Everything not listed is the v16 entity-note default: <code>USE_NOTE=1 GROUND_BY=prov EMBED_DIM=768 USE_SCORES=0 PRUNE_NO_EVIDENCE=1 MASK_STRATEGY=random</code>.</caption>
+        <thead>
+          <tr>
+            <th>Arm</th><th>Phase 1</th><th>Phase 2 encoder</th>
+            <th class="num">Epochs</th><th class="mono">Env overrides</th><th>Seeds</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="ref">
+            <td><strong>A</strong> paper</td><td>JEPA, 60 ep</td><td>frozen</td>
+            <td class="num">60 + 40</td><td class="mono">—</td><td>42, 43, 44</td>
+          </tr>
+          <tr>
+            <td><strong>B</strong> random frozen</td><td>none</td><td>frozen (random init)</td>
+            <td class="num">0 + 40</td><td class="mono">JEPA_EPOCHS=0</td><td>42, 43, 44</td>
+          </tr>
+          <tr>
+            <td><strong>C</strong> from scratch</td><td>none</td><td>trained jointly</td>
+            <td class="num">0 + 40</td><td class="mono">JEPA_EPOCHS=0 FREEZE_ENCODER=0</td><td>42, 43, 44</td>
+          </tr>
+          <tr>
+            <td><strong>Cp</strong> compute-matched</td><td>none</td><td>trained jointly</td>
+            <td class="num">0 + 100</td><td class="mono">…&nbsp;READOUT_EPOCHS=100</td><td>42, 43, 44</td>
+          </tr>
+          <tr>
+            <td><strong>D</strong> no graph</td><td>none</td><td>trained, no message passing</td>
+            <td class="num">0 + 40</td><td class="mono">…&nbsp;LAYERS=0</td><td>42</td>
+          </tr>
+          <tr>
+            <td><strong>E</strong> pretrain + finetune</td><td>JEPA, 60 ep</td><td>trained (fine-tuned)</td>
+            <td class="num">60 + 40</td><td class="mono">FREEZE_ENCODER=0</td><td>42</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="prose">
+      <strong>Cp exists because A gets 100 epochs and C gets 40.</strong> Without it the
+      obvious rebuttal is that the gap is training budget rather than pretraining. It is not:
+      giving the from-scratch model the same 100-epoch budget moves the paired mean by
+      +0.0012.
+    </p>
+    <p class="prose">
+      <strong>D is the floor.</strong> With no message passing the model is DistMult over
+      learned entity identity — 2,356,354 parameters against the full encoder's 2,637,954.
+      It establishes how much of any arm's score is graph reasoning and how much is entity
+      memorisation.
+    </p>
+  </section>
+
+  <!-- ============================================================ RESULTS -->
+  <section>
+    <h2><span class="sec">§3</span>Results</h2>
+
+    <p class="prose">
+      All runs on the 4,000-graph embedded dataset via Hugging Face Jobs, submitted with
+      <code>--flavor t4-small</code>. Leave-one-out masks exactly one edge and keeps the
+      whole rest of the graph as context; it draws no randomness, so it is exactly
+      reproducible, and it is what the paper reports.
+    </p>
+
+    <div class="gate">
+      <span class="gate-label">Within a seed, every arm was asked the same questions</span>
+      <p>
+        LOO query counts match across all arms at a given seed — <code>n=8283</code> at seed
+        42, <code>7733</code> at seed 43, <code>8126</code> at seed 44 — because the split,
+        the edge filter and the candidate construction depend only on the seed. Nothing in
+        the evaluation differs between arms; only training does. Across seeds the population
+        genuinely changes, which is why every comparison below is paired within seed.
+      </p>
+    </div>
+
+    <!-- FIGURE 1 — the ladder -->
+    <div class="fig">
+      <p class="fig-title">Figure 1 · LOO MRR, all six arms at seed 42</p>
+      <p class="fig-sub">
+        Seed 42 is the only seed where all six arms exist, so it is the one place the full
+        ordering is visible. Bars start at zero; the vertical rule marks the paper model.
+        Values are printed on every bar and repeated in the table below.
+      </p>
+      <div class="legend">
+        <span><i class="swatch" style="background:var(--data)"></i>LOO MRR</span>
+        <span><i class="swatch rule"></i>arm A, the paper model (0.3962)</span>
+      </div>
+      <div class="lad-rows">
+        <div class="lad" tabindex="0" data-tip="B — no phase 1, frozen random encoder. LOO MRR 0.3775 at seed 42; 0.0187 below the paper model.">
+          <span class="lad-name">B<i>frozen random</i></span>
+          <span class="lad-track"><i class="lad-fill" style="width:37.75%"></i></span>
+          <span class="lad-val">0.3775</span>
+        </div>
+        <div class="lad" tabindex="0" data-tip="A — the paper model: JEPA pretraining then a frozen encoder. LOO MRR 0.3962 at seed 42.">
+          <span class="lad-name">A<i>paper model</i></span>
+          <span class="lad-track"><i class="lad-fill" style="width:39.62%"></i></span>
+          <span class="lad-val">0.3962</span>
+        </div>
+        <div class="lad" tabindex="0" data-tip="E — JEPA pretraining then fine-tuning. LOO MRR 0.5442 at seed 42; +0.148 over the paper model but 0.2475 below arm C.">
+          <span class="lad-name">E<i>pretrain + finetune</i></span>
+          <span class="lad-track"><i class="lad-fill" style="width:54.42%"></i></span>
+          <span class="lad-val">0.5442</span>
+        </div>
+        <div class="lad" tabindex="0" data-tip="D — no message passing whatsoever (LAYERS=0). LOO MRR 0.6293 at seed 42; +0.2331 over the paper model.">
+          <span class="lad-name">D<i>no graph encoder</i></span>
+          <span class="lad-track"><i class="lad-fill" style="width:62.93%"></i></span>
+          <span class="lad-val">0.6293</span>
+        </div>
+        <div class="lad" tabindex="0" data-tip="C — same architecture trained end-to-end, no phase 1. LOO MRR 0.7917 at seed 42; +0.3955 over the paper model.">
+          <span class="lad-name">C<i>from scratch</i></span>
+          <span class="lad-track"><i class="lad-fill" style="width:79.17%"></i></span>
+          <span class="lad-val">0.7917</span>
+        </div>
+        <div class="lad" tabindex="0" data-tip="Cp — arm C at a compute-matched 100 readout epochs. LOO MRR 0.7917 at seed 42, byte-identical to arm C; see §4.">
+          <span class="lad-name">Cp<i>compute-matched</i></span>
+          <span class="lad-track"><i class="lad-fill" style="width:79.17%"></i></span>
+          <span class="lad-val">0.7917</span>
+        </div>
+      </div>
+      <div class="lad-axis">
+        <span></span>
+        <span class="lad-axis-inner"><span>0</span><span>0.25</span><span>0.50</span><span>0.75</span><span>1.00</span></span>
+        <span></span>
+      </div>
+    </div>
+
+    <h3>Every run, every metric</h3>
+    <div class="table-scroll">
+      <table>
+        <caption>Leave-one-out edge recovery on the seeded test split. <code>n</code> varies by seed, not by arm.</caption>
+        <thead>
+          <tr>
+            <th>Run</th><th class="num">MRR</th><th class="num">Hits@1</th>
+            <th class="num">Hits@3</th><th class="num">Hits@10</th><th class="num">n</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="ref"><td>A · seed 42</td><td class="num">0.3962</td><td class="num">0.2195</td><td class="num">0.4343</td><td class="num">0.8682</td><td class="num">8283</td></tr>
+          <tr><td>B · seed 42</td><td class="num">0.3775</td><td class="num">0.1894</td><td class="num">0.4382</td><td class="num">0.8467</td><td class="num">8283</td></tr>
+          <tr><td>C · seed 42</td><td class="num">0.7917</td><td class="num">0.6833</td><td class="num">0.8763</td><td class="num">0.9852</td><td class="num">8283</td></tr>
+          <tr><td>Cp · seed 42</td><td class="num">0.7917</td><td class="num">0.6833</td><td class="num">0.8763</td><td class="num">0.9852</td><td class="num">8283</td></tr>
+          <tr><td>D · seed 42</td><td class="num">0.6293</td><td class="num">0.4722</td><td class="num">0.7265</td><td class="num">0.9519</td><td class="num">8283</td></tr>
+          <tr><td>E · seed 42</td><td class="num">0.5442</td><td class="num">0.3712</td><td class="num">0.6335</td><td class="num">0.9394</td><td class="num">8283</td></tr>
+          <tr class="ref"><td>A · seed 43</td><td class="num">0.4182</td><td class="num">0.2463</td><td class="num">0.4650</td><td class="num">0.8843</td><td class="num">7733</td></tr>
+          <tr><td>B · seed 43</td><td class="num">0.4312</td><td class="num">0.2523</td><td class="num">0.4972</td><td class="num">0.8642</td><td class="num">7733</td></tr>
+          <tr><td>C · seed 43</td><td class="num">0.5507</td><td class="num">0.3667</td><td class="num">0.6520</td><td class="num">0.9542</td><td class="num">7733</td></tr>
+          <tr><td>Cp · seed 43</td><td class="num">0.5507</td><td class="num">0.3667</td><td class="num">0.6520</td><td class="num">0.9542</td><td class="num">7733</td></tr>
+          <tr class="ref"><td>A · seed 44</td><td class="num">0.3938</td><td class="num">0.2240</td><td class="num">0.4399</td><td class="num">0.8490</td><td class="num">8126</td></tr>
+          <tr><td>B · seed 44</td><td class="num">0.3768</td><td class="num">0.1928</td><td class="num">0.4345</td><td class="num">0.8416</td><td class="num">8126</td></tr>
+          <tr><td>C · seed 44</td><td class="num">0.7981</td><td class="num">0.6923</td><td class="num">0.8820</td><td class="num">0.9881</td><td class="num">8126</td></tr>
+          <tr><td>Cp · seed 44</td><td class="num">0.8016</td><td class="num">0.6979</td><td class="num">0.8816</td><td class="num">0.9898</td><td class="num">8126</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>The paired comparison</h3>
+    <p class="prose">
+      Because the seed redraws the split as well as the initialisation, the only sound
+      comparison is within a seed. Below, each bar is one arm minus arm A at the same seed.
+      <strong>Colour encodes which model scored higher, not whether the news is good</strong> —
+      a blue bar means the ablation beat the paper model.
+    </p>
+
+    <!-- FIGURE 2 — paired deltas -->
+    <div class="fig">
+      <p class="fig-title">Figure 2 · LOO MRR, arm minus the paper model, paired within seed</p>
+      <p class="fig-sub">
+        Right of the centre line the ablation arm scored higher; left, the paper model did.
+        Every delta is printed with its sign, so colour reinforces rather than carries the
+        reading.
+      </p>
+      <div class="legend">
+        <span><i class="swatch" style="background:var(--up)"></i>ablation arm ahead</span>
+        <span><i class="swatch" style="background:var(--down)"></i>paper model ahead</span>
+        <span><i class="swatch" style="background:var(--zero)"></i>no difference</span>
+      </div>
+
+      <p class="panel-label">B — no phase 1, frozen random encoder</p>
+      <div class="dbar-rows">
+        <div class="dbar" tabindex="0" data-tip="Seed 42: B 0.3775 vs A 0.3962. The paper model is ahead by 0.0187.">
+          <span class="dbar-name">seed 42</span>
+          <span class="dbar-track"><i class="dbar-fill neg" style="width:2.08%"></i></span>
+          <span class="dbar-val neg">−0.0187</span>
+        </div>
+        <div class="dbar" tabindex="0" data-tip="Seed 43: B 0.4312 vs A 0.4182. The random frozen encoder is ahead by 0.0130 — the sign flips.">
+          <span class="dbar-name">seed 43</span>
+          <span class="dbar-track"><i class="dbar-fill pos" style="width:1.44%"></i></span>
+          <span class="dbar-val pos">+0.0130</span>
+        </div>
+        <div class="dbar" tabindex="0" data-tip="Seed 44: B 0.3768 vs A 0.3938. The paper model is ahead by 0.0170.">
+          <span class="dbar-name">seed 44</span>
+          <span class="dbar-track"><i class="dbar-fill neg" style="width:1.89%"></i></span>
+          <span class="dbar-val neg">−0.0170</span>
+        </div>
+      </div>
+
+      <p class="panel-label">C — no phase 1, trained end-to-end</p>
+      <div class="dbar-rows">
+        <div class="dbar" tabindex="0" data-tip="Seed 42: C 0.7917 vs A 0.3962. From-scratch training is ahead by 0.3955.">
+          <span class="dbar-name">seed 42</span>
+          <span class="dbar-track"><i class="dbar-fill pos" style="width:43.94%"></i></span>
+          <span class="dbar-val pos">+0.3955</span>
+        </div>
+        <div class="dbar" tabindex="0" data-tip="Seed 43: C 0.5507 vs A 0.4182. Ahead by 0.1325 — the smallest gap of the three, on the seed whose split is also the smallest (n=7733).">
+          <span class="dbar-name">seed 43</span>
+          <span class="dbar-track"><i class="dbar-fill pos" style="width:14.72%"></i></span>
+          <span class="dbar-val pos">+0.1325</span>
+        </div>
+        <div class="dbar" tabindex="0" data-tip="Seed 44: C 0.7981 vs A 0.3938. Ahead by 0.4042.">
+          <span class="dbar-name">seed 44</span>
+          <span class="dbar-track"><i class="dbar-fill pos" style="width:44.91%"></i></span>
+          <span class="dbar-val pos">+0.4042</span>
+        </div>
+      </div>
+
+      <p class="panel-label">Cp — the same, compute-matched to 100 epochs</p>
+      <div class="dbar-rows">
+        <div class="dbar" tabindex="0" data-tip="Seed 42: Cp 0.7917 vs A 0.3962. Identical to arm C at this seed — see §4.">
+          <span class="dbar-name">seed 42</span>
+          <span class="dbar-track"><i class="dbar-fill pos" style="width:43.94%"></i></span>
+          <span class="dbar-val pos">+0.3955</span>
+        </div>
+        <div class="dbar" tabindex="0" data-tip="Seed 43: Cp 0.5507 vs A 0.4182. Identical to arm C at this seed — see §4.">
+          <span class="dbar-name">seed 43</span>
+          <span class="dbar-track"><i class="dbar-fill pos" style="width:14.72%"></i></span>
+          <span class="dbar-val pos">+0.1325</span>
+        </div>
+        <div class="dbar" tabindex="0" data-tip="Seed 44: Cp 0.8016 vs A 0.3938. Ahead by 0.4078 — the only seed where the extra 60 epochs found a better validation epoch.">
+          <span class="dbar-name">seed 44</span>
+          <span class="dbar-track"><i class="dbar-fill pos" style="width:45.31%"></i></span>
+          <span class="dbar-val pos">+0.4078</span>
+        </div>
+      </div>
+
+      <div class="dbar-axis">
+        <span></span>
+        <span class="dbar-axis-inner"><span>−0.45</span><span>0</span><span>+0.45</span></span>
+        <span></span>
+      </div>
+    </div>
+
+    <div class="table-scroll">
+      <table>
+        <caption>Table view — paired differences in LOO MRR, arm minus arm A at the same seed.</caption>
+        <thead>
+          <tr>
+            <th>Arm</th><th class="num">seed 42</th><th class="num">seed 43</th>
+            <th class="num">seed 44</th><th class="num">mean</th><th class="num">sd</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>B − A</td><td class="num down">−0.0187</td><td class="num up">+0.0130</td>
+            <td class="num down">−0.0170</td><td class="num">−0.0076</td><td class="num">0.0178</td>
+          </tr>
+          <tr>
+            <td>C − A</td><td class="num up">+0.3955</td><td class="num up">+0.1325</td>
+            <td class="num up">+0.4042</td><td class="num up">+0.3107</td><td class="num">0.1544</td>
+          </tr>
+          <tr>
+            <td>Cp − A</td><td class="num up">+0.3955</td><td class="num up">+0.1325</td>
+            <td class="num up">+0.4078</td><td class="num up">+0.3119</td><td class="num">0.1555</td>
+          </tr>
+          <tr class="sub">
+            <td>D − A</td><td class="num">+0.2331</td><td class="num">—</td>
+            <td class="num">—</td><td class="num">—</td><td class="num">seed 42 only</td>
+          </tr>
+          <tr class="sub">
+            <td>E − A</td><td class="num">+0.1480</td><td class="num">—</td>
+            <td class="num">—</td><td class="num">—</td><td class="num">seed 42 only</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p class="prose">
+      <strong>B − A is −0.008 with a standard deviation of 0.018</strong> and a sign that
+      flips between seeds. That is the whole measured effect of JEPA pretraining. C − A is
+      +0.311, and its smallest single-seed value (+0.1325) is still seven times the
+      magnitude of the B − A mean.
+    </p>
+
+    <h3>How much of that is seed noise</h3>
+
+    <!-- FIGURE 3 — seed spread -->
+    <div class="fig">
+      <p class="fig-title">Figure 3 · Seed spread, the four arms with three seeds each</p>
+      <p class="fig-sub">
+        Each dot is one seed's LOO MRR, the line spans that arm's range and the tall tick is
+        the mean. Arms D and E are omitted: they have a single seed and therefore no spread
+        to show.
+      </p>
+      <div class="legend">
+        <span><i class="swatch dot" style="background:var(--data)"></i>one seed</span>
+        <span><i class="swatch tick"></i>mean of three</span>
+      </div>
+      <div class="strip-rows">
+        <div class="strip" tabindex="0" data-tip="A (paper model): 0.3938 / 0.3962 / 0.4182 across seeds 44 / 42 / 43. Mean 0.4027, sd 0.0134 — the tightest arm.">
+          <span class="strip-name">A<i>paper model</i></span>
+          <span class="strip-track">
+            <i class="strip-range" style="left:8.76%;width:4.88%"></i>
+            <i class="strip-dot" style="left:9.24%"></i>
+            <i class="strip-dot" style="left:13.64%"></i>
+            <i class="strip-dot" style="left:8.76%"></i>
+            <i class="strip-mean" style="left:10.54%"></i>
+          </span>
+          <span class="strip-val">0.4027 <i>±0.013</i></span>
+        </div>
+        <div class="strip" tabindex="0" data-tip="B (frozen random): 0.3768 / 0.3775 / 0.4312. Mean 0.3952, sd 0.0312. Its range overlaps arm A's almost entirely.">
+          <span class="strip-name">B<i>frozen random</i></span>
+          <span class="strip-track">
+            <i class="strip-range" style="left:5.36%;width:10.88%"></i>
+            <i class="strip-dot" style="left:5.50%"></i>
+            <i class="strip-dot" style="left:16.24%"></i>
+            <i class="strip-dot" style="left:5.36%"></i>
+            <i class="strip-mean" style="left:9.04%"></i>
+          </span>
+          <span class="strip-val">0.3952 <i>±0.031</i></span>
+        </div>
+        <div class="strip" tabindex="0" data-tip="C (from scratch): 0.5507 / 0.7917 / 0.7981. Mean 0.7135, sd 0.1410 — seed 43 is a large outlier.">
+          <span class="strip-name">C<i>from scratch</i></span>
+          <span class="strip-track">
+            <i class="strip-range" style="left:40.14%;width:49.48%"></i>
+            <i class="strip-dot" style="left:88.34%"></i>
+            <i class="strip-dot" style="left:40.14%"></i>
+            <i class="strip-dot" style="left:89.62%"></i>
+            <i class="strip-mean" style="left:72.70%"></i>
+          </span>
+          <span class="strip-val">0.7135 <i>±0.141</i></span>
+        </div>
+        <div class="strip" tabindex="0" data-tip="Cp (compute-matched): 0.5507 / 0.7917 / 0.8016. Mean 0.7147, sd 0.1421 — the same shape as arm C.">
+          <span class="strip-name">Cp<i>compute-matched</i></span>
+          <span class="strip-track">
+            <i class="strip-range" style="left:40.14%;width:50.18%"></i>
+            <i class="strip-dot" style="left:88.34%"></i>
+            <i class="strip-dot" style="left:40.14%"></i>
+            <i class="strip-dot" style="left:90.32%"></i>
+            <i class="strip-mean" style="left:72.94%"></i>
+          </span>
+          <span class="strip-val">0.7147 <i>±0.142</i></span>
+        </div>
+      </div>
+      <div class="strip-axis">
+        <span></span>
+        <span class="strip-axis-inner"><span>0.35</span><span>0.50</span><span>0.65</span><span>0.80</span></span>
+        <span></span>
+      </div>
+    </div>
+
+    <p class="prose">
+      Two things are visible here that the means hide. <strong>A and B overlap almost
+      completely</strong> — B's range contains A's mean, which is the graphical form of "no
+      measured effect". And <strong>arm C's spread is enormous</strong>: sd 0.141 against
+      A's 0.0134, driven by seed 43, where every arm behaves differently and the split is
+      also the smallest (n=7733). The ordering is stable across all three seeds; the
+      magnitude is not, which is why §6 asks for more seeds before a number goes in a paper.
+    </p>
+  </section>
+
+  <!-- ============================================================ ANOMALY -->
+  <section>
+    <h2><span class="sec">§4</span>Why C and Cp are identical at two seeds</h2>
+    <p class="prose">
+      At seeds 42 and 43, arms C and Cp agree to four decimal places on all four metrics,
+      and the collection script downloaded no bytes for those two Cp checkpoints — the Hub's
+      content-addressed storage already had the chunks locally. Both facts point the same
+      way: <strong>the files are byte-identical.</strong>
+    </p>
+    <p class="prose">
+      This is the best-VAL rollback behaving correctly, not a submission error. Training is
+      deterministic given the seed, so the first 40 epochs of the 100-epoch run reproduce the
+      40-epoch run exactly. If the best validation AUC falls at or before epoch 40, both runs
+      roll back to <em>the same weights</em>. Seed 44 is the case where the longer run found a
+      better epoch past 40 — 0.8016 against 0.7981 — which simultaneously proves
+      <code>READOUT_EPOCHS=100</code> was passed through correctly and rules out a plumbing
+      fault at the other two seeds.
+    </p>
+    <div class="gate flagged">
+      <span class="gate-label">A checkpoint cannot tell you which arm produced it</span>
+      <p>
+        <code>Config.checkpoint_dict</code> writes a hand-picked subset of fields, and
+        <code>jepa_epochs</code>, <code>readout_epochs</code> and <code>freeze_encoder</code>
+        are not among them. Two arms that differ only in those knobs therefore serialise
+        identically. The job logs and the output repository names are the only provenance
+        record for this experiment — keep them.
+      </p>
+    </div>
+  </section>
+
+  <!-- ============================================================ INTERPRETATION -->
+  <section>
+    <h2><span class="sec">§5</span>Reading the result</h2>
+    <p class="prose">
+      Four separate measurements point at one mechanism, and the mechanism predicts all four.
+    </p>
+
+    <h3>The frozen protocol is what costs the 0.31</h3>
+    <p class="prose">
+      The encoder's input is a sum of three terms: a learned node-type embedding, a learned
+      hashed-entity embedding over 8,192 buckets, and a projection of the demographic and
+      note features. Under <code>FREEZE_ENCODER=1</code> none of those tables receives a
+      gradient during phase 2. In arm A they are shaped only by the pretext task; in arm B
+      they are <strong>never trained at all</strong> and remain at their random
+      initialisation for the whole run.
+    </p>
+    <p class="prose">
+      Arms C, Cp and D train them on edge recovery itself. That single difference is worth
+      +0.31 MRR — far more than anything else measured across the v16 → v19 series. The
+      frozen protocol was adopted so that phase 2 would test the representation rather than
+      let the GNN co-adapt to the decoder; it succeeds at that, and the cost of the
+      guarantee turns out to be most of the achievable performance.
+    </p>
+
+    <h3>D separates memorisation from reasoning</h3>
+    <p class="prose">
+      Arm D has no message passing, so its 0.6293 is what learned entity identity alone
+      buys: DistMult over a table that has seen which entities plausibly attach to which
+      relations across 3,200 training admissions. Because leave-one-out ranks the true tail
+      against <em>same-type candidates within the same graph</em>, a strong entity prior — this
+      medication is commonly prescribed, this organism is commonly cultured — does a great
+      deal of the work without any patient-specific reasoning.
+    </p>
+    <p class="prose">
+      The honest decomposition at seed 42 is therefore: <strong>0.6293 from entity
+      memorisation, +0.1624 from message passing on top of it</strong> (arm C), and the paper
+      model at 0.3962 below both. Message passing contributes real signal; the paper's
+      pipeline is not the configuration that lets it show.
+    </p>
+
+    <h3>The JEPA initialisation is worse than random</h3>
+    <p class="prose">
+      Arm E takes the pretrained encoder and fine-tunes it — the same freedom arm C has,
+      from a supposedly better starting point. It scores 0.5442 where C scores 0.7917 at the
+      same seed. Pretraining is not merely uninformative for this task; as an initialisation
+      it is <strong>0.2475 MRR worse than random</strong>. A representation that were simply
+      neutral would land on top of C, not a quarter of an MRR below it.
+    </p>
+    <p class="prose">
+      That is the observation that makes the collapse check in §6 urgent rather than
+      pedantic. A phase 1 that converged to a degenerate latent space would produce exactly
+      this pattern: no benefit when frozen (A ≈ B), and active harm when used as an
+      initialisation (E &lt; C).
+    </p>
+
+    <h3>What survives</h3>
+    <p class="prose">
+      The graph construction, the typed schema, the evidence pruning, the note localisation
+      and the leave-one-out protocol are untouched by any of this — no arm varies them, so
+      nothing here speaks against them. What does not survive, on the current evidence, is
+      the claim that the JEPA world model is what produces the numbers. Either the
+      contribution is restated around the parts that are actually load-bearing, or phase 1
+      is fixed and re-measured.
+    </p>
+  </section>
+
+  <!-- ============================================================ CAVEATS -->
+  <section>
+    <h2><span class="sec">§6</span>What this does not establish</h2>
+
+    <div class="gate flagged">
+      <span class="gate-label">Collapse has not been ruled out — do this first</span>
+      <p>
+        <code>emb_std</code> is logged every ten epochs by <code>pretrain_jepa</code> and
+        exists precisely to detect a target encoder collapsing to a constant. If it decayed
+        toward zero in the arm A runs, phase 1 never learned anything and the correct
+        conclusion is "the pretraining run is broken", not "pretraining does not help".
+      </p>
+<pre><code>hf jobs ls                                   # find the A-s42/43/44 job IDs
+hf jobs logs &lt;job_id&gt; | grep "LATENCY] JEPA"</code></pre>
+      <p>
+        A healthy run holds <code>emb_std</code> well clear of zero across all 60 epochs.
+        This report's conclusions are conditional on that check.
+      </p>
+    </div>
+
+    <ul class="prose">
+      <li>
+        <strong>Three seeds is thin for arm C.</strong> Its sd is 0.141 and seed 43 sits
+        0.24 below the other two. The <em>ordering</em> is unanimous across seeds, so the
+        qualitative finding is safe; the effect size is not. Five seeds for C and Cp before
+        a number is quoted.
+      </li>
+      <li>
+        <strong>The retrained arm A is below the published number.</strong> Seed 42 gives
+        0.3962 here against the published 0.418653, and the three-seed mean is 0.4027 ±
+        0.0134. The published value sits about 1.2 sd above that mean — inside the
+        distribution, but at its favourable end. The released checkpoint came from the
+        pre-restructure trainer on different hardware, and <code>docs/EVALUATION.md</code>
+        already records that training is not bit-reproducible above one thread.
+      </li>
+      <li>
+        <strong>Entity-identity priors are doing more work than the metric admits.</strong>
+        Arm D quantifies this at 0.6293 of achievable MRR. That is a property of the
+        leave-one-out protocol with same-type candidates, and it applies to every number in
+        the v16–v19 series, not only to v19's.
+      </li>
+      <li>
+        <strong>Nothing here tests the note localisation.</strong> Every arm runs
+        <code>USE_NOTE=1 GROUND_BY=prov</code>. The note's contribution is a v16/v18
+        question and is unaffected by this ablation.
+      </li>
+      <li>
+        <strong>Only pretraining and encoder trainability varied.</strong> The pretext task
+        itself (<code>MASK_STRATEGY=random</code>, <code>NODE_MASK=0.4</code>, 60 epochs, the
+        EMA schedule) was not swept. A different phase 1 configuration might behave
+        differently; this measures the one the paper ships.
+      </li>
+    </ul>
+
+    <p class="prose">
+      <strong>Recommendation.</strong> Pull the <code>emb_std</code> traces. If phase 1 is
+      healthy, report this ablation in full — it is the honest answer to the reviewer, and
+      an unfrozen from-scratch baseline that beats the published pipeline by 0.31 MRR is
+      itself a stronger result than the one the paper currently claims. If phase 1 collapsed,
+      fix it and rerun the 14 jobs before anything is rewritten.
+    </p>
+  </section>
+
+  <!-- ============================================================ LINEAGE INDEX -->
+  <section>
+    <h2><span class="sec">§7</span>The lineage — v16 through v19</h2>
+    <p class="prose">
+      The four versions ask progressively more fundamental questions of the same model, and
+      v19 is the first to question the premise rather than a setting. The three tables below
+      are the traceability record; §8–§10 then work backwards through each version in full,
+      so this document stands alone without the earlier reports.
+    </p>
+
+    <div class="table-scroll">
+      <table>
+        <caption>What each version changed, and what it measured.</caption>
+        <thead>
+          <tr><th>Version</th><th>Kind</th><th>What it changed</th><th>Headline measurement</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>v16</strong><br><span class="mono">stamp 260615</span></td>
+            <td>Experiment</td>
+            <td>The entity-localised note — the Clinical-ModernBERT vector moved onto the entity nodes the note grounds, retiring v15's single NOTE node.</td>
+            <td>LOO MRR <strong>0.418653</strong>, n=8,283, seeded test split. The published number.</td>
+          </tr>
+          <tr>
+            <td><strong>v17</strong></td>
+            <td>Engineering</td>
+            <td>One 719-line <code>trainer.py</code> split six ways; import-time env globals became a dataclass.</td>
+            <td>Equality with v16 to <code>1e-6</code>. <em>No numerics moved, by design.</em></td>
+          </tr>
+          <tr>
+            <td><strong>v18</strong></td>
+            <td>Experiment</td>
+            <td>BFS-balanced whole-patch masking as an opt-in pretext task.</td>
+            <td>No-note <strong>+0.0237</strong> MRR, with-note <strong>−0.0107</strong>. One seed per cell.</td>
+          </tr>
+          <tr class="ref">
+            <td><strong>v19</strong></td>
+            <td>Ablation</td>
+            <td>Nothing in the model. One model-selection fix; six arms over the existing env surface.</td>
+            <td>Phase 1 ≈ random init (<strong>−0.008</strong>); from-scratch training <strong>+0.311</strong> MRR.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="table-scroll">
+      <table>
+        <caption>Code and test traceability — what each version touched.</caption>
+        <thead>
+          <tr><th>Version</th><th class="mono">Source touched</th><th>Tests added</th><th>Config surface</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>v16</strong></td>
+            <td class="mono">paper_v16/trainer.py (719 lines), paper_v16/evaluate.py</td>
+            <td>None — one file, untestable by construction.</td>
+            <td>~30 <code>os.environ</code> reads at import.</td>
+          </tr>
+          <tr>
+            <td><strong>v17</strong></td>
+            <td class="mono">src/fawkes/{config,data,model,steps,train,evaluate}.py</td>
+            <td>The Phase-5 gates, all equality checks against <code>baseline/*.json</code>.</td>
+            <td>Same variable names, same defaults — now <code>Config.from_env()</code>.</td>
+          </tr>
+          <tr>
+            <td><strong>v18</strong></td>
+            <td class="mono">src/fawkes/patches.py <span class="chip new">new</span>, steps.py, config.py</td>
+            <td>4 — config validation, partition coverage/balance, mask coherence, end-to-end <code>jepa_step</code>.</td>
+            <td>+2 fields: <code>MASK_STRATEGY</code>, <code>JEPA_PATCHES</code>.</td>
+          </tr>
+          <tr class="ref">
+            <td><strong>v19</strong></td>
+            <td class="mono">src/fawkes/train.py (<code>train_readout</code> only)</td>
+            <td>1 — <code>test_readout_selection_rolls_back_the_encoder_too</code>.</td>
+            <td><strong>None.</strong> Six arms from knobs that already existed.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="table-scroll">
+      <table>
+        <caption>Artifact provenance — what each version produced and how it is verified.</caption>
+        <thead>
+          <tr><th>Version</th><th>Artifact</th><th>Verified by</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>v16</strong></td>
+            <td class="mono">models/fawkes-entity-note/fawkes_trainer_jepa_entity_note_v16_260615.pt</td>
+            <td><code>baseline/paper_loo_testsplit.json</code> — reproduces the checkpoint's embedded metrics to Δ = 0.00e+00.</td>
+          </tr>
+          <tr>
+            <td><strong>v17</strong></td>
+            <td>No new checkpoint — it re-evaluates v16's.</td>
+            <td>Three gates: LOO equality to <code>1e-6</code>, <code>state_dict</code> key sets, AST-verified absence of module-scope env reads.</td>
+          </tr>
+          <tr>
+            <td><strong>v18</strong></td>
+            <td class="mono">tmp/fawkes-v18-{note,nonote}.log</td>
+            <td><code>quiz_sig=304815655090</code> and <code>n=8283</code> identical across all four runs — same questions asked of every model.</td>
+          </tr>
+          <tr class="ref">
+            <td><strong>v19</strong></td>
+            <td class="mono">&lt;user&gt;/fawkes-ablation-{arm}-s{seed}, 14 repos</td>
+            <td><code>n</code> equal across arms within each seed; metrics read from each checkpoint's <code>recovery_test_loo</code>, not from logs.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="gate flagged">
+      <span class="gate-label">One artifact rule this series learned the hard way</span>
+      <p>
+        v16's checkpoint carries a <code>config</code> block written by
+        <code>Config.checkpoint_dict</code> — a hand-picked subset of fields. It records
+        <code>hid</code>, <code>use_note</code>, <code>node_mask</code> and sixteen others, but
+        <strong>not</strong> <code>jepa_epochs</code>, <code>readout_epochs</code> or
+        <code>freeze_encoder</code>. Every v19 arm therefore serialises to an indistinguishable
+        <code>config</code>, which is why arms C and Cp produce byte-identical files at two
+        seeds (§4). For v19 and after, the job name and output repository are the provenance
+        record; the checkpoint alone cannot identify its own experiment.
+      </p>
+    </div>
+  </section>
+
+  <!-- ============================================================ V18 -->
+  <section>
+    <h2><span class="sec">§8</span>v18 — BFS-balanced patch masking</h2>
+    <div class="rail">
+      <div>
+        <div class="rail-tag">v18 · pretext task</div>
+        <div class="rail-body">
+          One new module, one branch in <code>jepa_step</code>, two config fields. The default
+          stayed the v17 behaviour, so v18 is opt-in and every earlier gate still runs.
+        </div>
+      </div>
+    </div>
+
+    <p class="prose">
+      Through v17 the phase-1 mask was <strong>i.i.d. Bernoulli</strong>: each node masked
+      independently with probability <code>node_mask=0.4</code>, retried until every graph kept
+      at least one target and one context node. The weakness is structural — masking nodes
+      independently leaves a masked node's neighbours almost always visible, so the pretext
+      task can be solved by <em>local interpolation</em>: read the surviving neighbours,
+      average, done. A task solvable one hop out never forces the encoder to learn anything
+      longer-range.
+    </p>
+    <p class="prose">
+      v18 partitions each graph into <code>jepa_patches</code> balanced, connected-ish patches
+      by multi-source BFS and masks whole patches until the <code>node_mask</code> fraction is
+      reached. Targets become coherent regions, so a masked node's neighbours are usually
+      masked too and the shortcut disappears. Keeping the last-drawn patch as context makes the
+      ≥1-target / ≥1-context guarantee hold <strong>by construction</strong> rather than by
+      retrying. The partition was copied near-verbatim from
+      <code>clinical_jepa/graph/patches.py</code> rather than imported, because
+      <code>tests/test_import_boundaries.py</code> forbids the two lineages from importing each
+      other.
+    </p>
+
+    <div class="table-scroll">
+      <table>
+        <caption>v18 vs v17 — leave-one-out, 8,283 edges, one run per cell at seed 42.</caption>
+        <thead>
+          <tr>
+            <th>Variant</th><th>Metric</th>
+            <th class="num">v17</th><th class="num">v18</th><th class="num">Δ</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td rowspan="4">No-note</td><td>MRR</td><td class="num">0.2743</td><td class="num">0.2980</td><td class="num up">+0.0237</td></tr>
+          <tr><td>Hits@1</td><td class="num">0.1079</td><td class="num">0.1300</td><td class="num up">+0.0221</td></tr>
+          <tr><td>Hits@3</td><td class="num">0.2901</td><td class="num">0.3250</td><td class="num up">+0.0349</td></tr>
+          <tr><td>Hits@10</td><td class="num">0.7104</td><td class="num">0.7240</td><td class="num up">+0.0136</td></tr>
+          <tr><td rowspan="4">With-note</td><td>MRR</td><td class="num">0.4187</td><td class="num">0.4080</td><td class="num down">−0.0107</td></tr>
+          <tr><td>Hits@1</td><td class="num">0.2475</td><td class="num">0.2220</td><td class="num down">−0.0255</td></tr>
+          <tr><td>Hits@3</td><td class="num">0.4737</td><td class="num">0.4710</td><td class="num down">−0.0027</td></tr>
+          <tr><td>Hits@10</td><td class="num">0.8636</td><td class="num">0.8820</td><td class="num up">+0.0184</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p class="prose">
+      v18's reading was that patch masking <em>recovers part of what the note was
+      providing</em>: the no-note model has nothing but structure, so a harder pretext task
+      teaches it the long-range regularities edge recovery needs, while the with-note model
+      already receives that semantic content through another channel. The note's advantage
+      narrowed from <strong>+0.144</strong> to <strong>+0.110</strong> LOO MRR.
+    </p>
+
+    <div class="gate flagged">
+      <span class="gate-label">What v19 changes about this reading</span>
+      <p>
+        Both v18 arms froze the encoder, so the comparison is between two <em>frozen</em>
+        representations. That is internally valid and v19 does not contradict it — but v19
+        shows the frozen regime itself costs ~0.31 MRR, which is more than an order of
+        magnitude larger than v18's ±0.02 effects. v18 answers "which pretext task yields the
+        better frozen representation"; v19 asks whether the representation should be frozen at
+        all. If phase 1 survives the collapse check in §6, v18's sweep is worth repeating with
+        the encoder unfrozen, where the ranking may not hold.
+      </p>
+      <p>
+        v18 also ran <strong>one seed per cell</strong> and said so. v19's three-seed data puts
+        arm A at 0.4027 ± 0.0134, which is the same order as v18's with-note regression of
+        −0.0107 — so that regression remains, as v18 already cautioned, not distinguishable
+        from a single unlucky run.
+      </p>
+    </div>
+  </section>
+
+  <!-- ============================================================ V17 -->
+  <section>
+    <h2><span class="sec">§9</span>v17 — the refactor, and how it compares to v16</h2>
+    <div class="rail">
+      <div>
+        <div class="rail-tag">v17 · engineering only</div>
+        <div class="rail-body">
+          Same model, same numbers to within 1e-6, same environment interface — split into
+          modules, made importable and testable.
+        </div>
+      </div>
+    </div>
+
+    <p class="prose">
+      <span class="chip unchanged">no numerics changed</span> v17 deliberately produced
+      <em>no</em> metric movement. It compares to v16 by equality, not by improvement. It is
+      also the release that made both later versions cheap: v18 became a two-field change, and
+      v19 needed no new configuration at all.
+    </p>
+
+    <h3>What v16 was, and the four problems v17 fixed</h3>
+    <ul class="prose">
+      <li>
+        <strong>It configured itself from the environment at import time.</strong> Roughly
+        thirty <code>os.environ</code> reads ran when Python imported the module, and
+        <code>NUMERIC_DIM</code> — a tensor shape — was computed at import. Two configurations
+        could not coexist in one process, and the trainer was effectively untestable.
+      </li>
+      <li>
+        <strong>Everything shared one namespace.</strong> Data loading, the model, both
+        training phases, four evaluators and reporting were interleaved; the standalone
+        <code>evaluate.py</code> reached into <code>trainer.USE_NOTE</code> to validate
+        checkpoints.
+      </li>
+      <li>
+        <strong><code>--help</code> trained the model.</strong> <code>main()</code> took no
+        arguments and ran unconditionally, so <code>fawkes-train --help</code> completed a full
+        training run and — with <code>PUSH=1</code>, the default — uploaded the result.
+      </li>
+      <li>
+        <strong>The tensor code was hard to read</strong> (<code>b</code>, <code>nt</code>,
+        <code>ei</code>, <code>tot_llm</code>), and the checkpoint filename was a hardcoded
+        date stamp.
+      </li>
+    </ul>
+
+    <h3>The split</h3>
+    <p class="prose">
+      <code>trainer.py</code> was cut at its own existing comment banners — lines 256 ("shared
+      encoder"), 327 ("downstream readout"), 423 ("EIR scoring") — rather than at invented
+      boundaries, and <code>paper_v16/evaluate.py</code> was folded in as the checkpoint CLI.
+    </p>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th class="mono">module</th><th>contents</th><th>touched by</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">config.py</td><td><code>Config</code> — every knob; <code>from_env()</code>, <code>from_checkpoint()</code>, <code>checkpoint_dict()</code>, <code>checkpoint_name</code></td><td>v18</td></tr>
+          <tr><td class="mono">data.py</td><td>vocabularies, <code>score_vec</code>, <code>load_full_dataset</code>, <code>to_data</code></td><td>—</td></tr>
+          <tr><td class="mono">model.py</td><td><code>Encoder</code>, <code>JEPA</code>, <code>DistMult</code>, <code>Scorer</code></td><td>—</td></tr>
+          <tr><td class="mono">steps.py</td><td>per-batch tensor work: <code>jepa_step</code>, <code>readout_step</code>, negative sampling</td><td>v18</td></tr>
+          <tr><td class="mono">train.py</td><td>the run: <code>set_seed</code>, data prep/split, both phases, reporting, <code>main</code></td><td><strong>v19</strong></td></tr>
+          <tr><td class="mono">evaluate.py</td><td>the four evaluators, shared ranking helpers, checkpoint CLI</td><td>—</td></tr>
+          <tr><td class="mono">patches.py</td><td>BFS patch partition and <code>patch_mask</code></td><td>v18 <span class="chip new">new</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Env globals became a dataclass</h3>
+    <div class="pair">
+      <figure>
+        <figcaption>v16 — set env before import</figcaption>
+<pre><code># trainer.py, at module import:
+USE_NOTE = env_flag("USE_NOTE", "1")
+EMBED_DIM = int(env("EMBED_DIM", 768))
+NUMERIC_DIM = 6 + (EMBED_DIM
+    if USE_NOTE else 0)</code></pre>
+      </figure>
+      <figure>
+        <figcaption>v17 — two configs coexist</figcaption>
+<pre><code>from fawkes.config import Config
+
+with_note = Config()
+no_note = Config(use_note=False)
+
+no_note.numeric_dim    # 6
+with_note.numeric_dim  # 774</code></pre>
+      </figure>
+    </div>
+    <p class="prose">
+      That is also what let v19 run six configurations from one environment surface without
+      adding a field, and what let its regression test construct
+      <code>Config(jepa_epochs=0, freeze_encoder=False)</code> in-process.
+    </p>
+
+    <div class="gate">
+      <span class="gate-label">v17 vs v16 — equality, gated three ways</span>
+      <ul>
+        <li>Loading the released checkpoint and running <code>loo_evaluate</code> reproduces <code>baseline/paper_loo.json</code> to within <code>1e-6</code> on every metric.</li>
+        <li><code>Encoder().state_dict()</code> and <code>DistMult().state_dict()</code> key sets equal <code>baseline/paper_keys.json</code> — these are attribute paths, so a renamed submodule shows up here and nowhere else.</li>
+        <li>Importing <code>fawkes</code> with no environment set raises no error and reads no <code>os.environ</code> at module scope (AST-verified).</li>
+      </ul>
+    </div>
+
+    <p class="prose">
+      The plan carried an explicit stop rule: if either numeric gate failed, the refactor would
+      be abandoned and <code>trainer.py</code> kept verbatim — "an unverifiable refactor of the
+      paper artifact is not worth the readability gain." The gates passed. Three deliberate
+      behaviour changes shipped, and only three: variant-derived checkpoint names
+      (<code>fawkes_entity_note.pt</code> / <code>fawkes_no_note.pt</code>),
+      <code>CUBLAS_WORKSPACE_CONFIG</code> moved from import into <code>set_seed</code>, and the
+      argument-parse guard that stops <code>--help</code> from training and publishing.
+    </p>
+  </section>
+
+  <!-- ============================================================ V16 -->
+  <section>
+    <h2><span class="sec">§10</span>v16 — the experiment underneath all of this</h2>
+    <div class="rail">
+      <div>
+        <div class="rail-tag">v16 · the paper artifact</div>
+        <div class="rail-body">
+          The entity-grounded-note Graph-JEPA, run 260615. The released checkpoint and every
+          published number come from here.
+        </div>
+      </div>
+    </div>
+
+    <p class="prose">
+      One hazard to state, because it inverts what the repository name suggests:
+      <strong><code>fawkes</code> is the implementation behind the paper</strong>
+      (<code>paper/clinical_jepa.pdf</code>), and <code>clinical_jepa</code> is not — it is the
+      separate modular revision pipeline that v18 borrowed the patch algorithm from. This is
+      documented in <code>docs/LINEAGE.md</code>, stated in both package docstrings, and
+      enforced by <code>tests/test_import_boundaries.py</code>. The "16" is an experiment number
+      from a separate line of work, not the successor to the <code>v5</code>/<code>v6</code>
+      architecture names in <code>clinical_jepa</code>.
+    </p>
+
+    <h3>The experiment</h3>
+    <p class="prose">
+      A JEPA world model over per-admission clinical knowledge graphs, trained in two phases on
+      4,000 admission graphs (3,018 subjects, 85,290 LLM edges):
+    </p>
+    <ul class="prose">
+      <li>
+        <strong>Phase 1 — the world model.</strong> Masked-node latent prediction, BYOL-style,
+        with an EMA target encoder on one shared encoder. This is the phase v18 changed and the
+        phase <strong>v19 ablates away entirely</strong>.
+      </li>
+      <li>
+        <strong>Phase 2 — the readout.</strong> Frozen-encoder edge recovery with InfoNCE over
+        same-type negatives, the four inferred relations upweighted
+        (<code>target_weight=3.0</code>), and the scorer rolled back to its best validation-AUC
+        epoch. <strong>v19 corrected that rollback</strong> to carry the encoder as well
+        whenever the encoder trains — see §2. The frozen v16 path is unaffected.
+      </li>
+    </ul>
+    <p class="prose">
+      v16's own contribution — the thing the "entity-note" name refers to — was
+      <strong>localising the Clinical-ModernBERT note vector onto the entity nodes the note
+      actually grounds</strong> (28.6% of nodes under <code>ground_by=prov</code>), replacing
+      v15's single per-admission NOTE node. <code>NOTE</code> and <code>HAS_NOTE</code> remain
+      in the vocabulary, unused, as evidence of that retirement. No v19 arm varies this, so
+      nothing in this report speaks for or against it.
+    </p>
+
+    <h3>Architecture and defaults, unchanged through v19</h3>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Component</th><th>Setting</th></tr></thead>
+        <tbody>
+          <tr><td>Encoder</td><td>2-layer <code>TransformerConv</code>, hidden 128, 4 heads, edge embedding 32</td></tr>
+          <tr><td>Node input</td><td>6 demographic features + 768 note dims when <code>use_note</code> (774 total)</td></tr>
+          <tr><td>Decoder</td><td>DistMult</td></tr>
+          <tr><td>Parameters</td><td>2,637,954 (with note) / 2,441,346 (no note) / <strong>2,356,354 at v19's <code>LAYERS=0</code></strong></td></tr>
+          <tr><td>Schedule</td><td>60 JEPA epochs, 40 readout epochs, batch 16, lr 1e-3, seed 42</td></tr>
+          <tr><td>Masking</td><td><code>node_mask=0.4</code>, <code>edge_mask=0.3</code>, sampled held-edge ratio [0.1, 0.6]</td></tr>
+          <tr><td>Split</td><td>3,200 train / 400 val / 400 test, seeded, test drawn first</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>The four evaluators</h3>
+    <p class="prose">
+      They answer different questions and are not interchangeable. v19 quotes only the first,
+      and disables the third and fourth on every arm to save GPU time:
+    </p>
+    <ul class="prose">
+      <li><strong><code>loo_evaluate</code></strong> — mask exactly one edge, keep the whole rest of the graph. No randomness, exactly reproducible. The honest per-relation measure, what the paper reports, and every number in §3.</li>
+      <li><strong><code>evaluate</code></strong> — batch-mask: 30% of edges held out together. Harder and noisier. Used inside v19's training loop for validation-AUC model selection.</li>
+      <li><strong><code>cascade_evaluate</code></strong> — recover the inferred relations in order, adding each one's gold edges to context before the next. Disabled in v19 (<code>RUN_CASCADE=0</code>).</li>
+      <li><strong><code>eir_uplift_eval</code></strong> — refiner precision/recall against v8-gold triples. Off by default; full-gold F1 is hub-dominated.</li>
+    </ul>
+
+    <div class="gate flagged">
+      <span class="gate-label">Where the published number actually comes from</span>
+      <p>
+        <code>baseline/paper_loo_testsplit.json</code> — <strong>MRR 0.418653 over n=8,283</strong>,
+        the seeded test split. It reproduces the metrics stored inside the released checkpoint
+        to Δ = 0.00e+00. <code>baseline/paper_loo.json</code> (MRR 0.440249, n=40,000) is
+        <em>not</em> the published number: it is the whole 4,000-record file under the shipped
+        evaluator's <code>&gt;= 2</code> edge filter with no split, and exists only to gate the
+        evaluator refactor. v19's arm A is measured on the first population, so it is
+        comparable to 0.418653 and not to 0.440249.
+      </p>
+    </div>
+  </section>
+
+  <!-- ============================================================ PROVENANCE -->
+  <section>
+    <h2><span class="sec">§11</span>Provenance — where every number came from</h2>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Number</th><th>Source</th><th>Verification</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>All 14 LOO rows</td>
+            <td class="mono">&lt;user&gt;/fawkes-ablation-{A,B,C,Cp,D,E}-s{42,43,44}</td>
+            <td>Read from <code>recovery_test_loo</code> inside each pushed checkpoint, not parsed from logs.</td>
+          </tr>
+          <tr>
+            <td>Eval population</td>
+            <td class="mono">n per seed</td>
+            <td><code>n=8283</code> (s42), <code>7733</code> (s43), <code>8126</code> (s44), equal across arms within each seed.</td>
+          </tr>
+          <tr>
+            <td>Published v16 number</td>
+            <td class="mono">baseline/paper_loo_testsplit.json</td>
+            <td>MRR 0.418653, n=8,283; reproduces the released checkpoint's embedded metrics to Δ = 0.00e+00.</td>
+          </tr>
+          <tr>
+            <td>Selection-bug measurement</td>
+            <td class="mono">tests/test_fawkes.py</td>
+            <td><code>test_readout_selection_rolls_back_the_encoder_too</code> — fails at 0.705473 before the fix, passes at 0.707434 after.</td>
+          </tr>
+          <tr>
+            <td>Parameter counts</td>
+            <td class="mono">[MODEL] log line</td>
+            <td>2,637,954 with two <code>TransformerConv</code> layers; 2,356,354 at <code>LAYERS=0</code>.</td>
+          </tr>
+          <tr>
+            <td>C ≡ Cp at seeds 42/43</td>
+            <td class="mono">Hub content-addressed cache</td>
+            <td>Four metrics equal to 4 dp and no bytes transferred; confirm with a sha256 over both cached files.</td>
+          </tr>
+          <tr class="sub">
+            <td>v18 rows in §8</td>
+            <td class="mono">tmp/fawkes-v18-{note,nonote}.log</td>
+            <td>Carried forward from Report No. 2 unchanged; <code>quiz_sig</code> identical across its four runs.</td>
+          </tr>
+          <tr class="sub">
+            <td>v17 gates in §9</td>
+            <td class="mono">baseline/paper_loo.json, paper_keys.json</td>
+            <td>Carried forward from Report No. 2; the gates still run in <code>tests/test_fawkes.py</code> and passed under v19.</td>
+          </tr>
+          <tr class="sub">
+            <td>v16 defaults in §10</td>
+            <td class="mono">src/fawkes/config.py, docs/LINEAGE.md</td>
+            <td>Dataclass defaults are the released configuration — <code>Config()</code> and an unset environment describe the same experiment, itself a test.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h4>Reproducing one arm</h4>
+<pre><code>hf jobs uv run --detach --flavor t4-small --timeout 8h --secrets HF_TOKEN \
+  --name fawkes-abl-C-s42 -v ./src:/workspace/src \
+  -e MASK_STRATEGY=random -e USE_NOTE=1 -e GROUND_BY=prov -e EMBED_DIM=768 \
+  -e USE_SCORES=0 -e PRUNE_NO_EVIDENCE=1 -e RUN_CASCADE=0 -e RUN_EIR=0 \
+  -e PUSH=1 -e SEED=42 -e JEPA_EPOCHS=0 -e FREEZE_ENCODER=0 \
+  -e OUTPUT_REPO=&lt;user&gt;/fawkes-ablation-C-s42 \
+  scripts/fawkes_patch_masking_hf_job.py</code></pre>
+    <p class="prose">
+      The job script is v18's, reused unchanged: it applies its defaults with
+      <code>setdefault</code>, so every <code>-e</code> above wins over them. Its name is
+      cosmetic. Arm A drops the last two <code>-e</code> flags; B drops
+      <code>FREEZE_ENCODER=0</code>; Cp adds <code>READOUT_EPOCHS=100</code>; D adds
+      <code>LAYERS=0</code>; E drops <code>JEPA_EPOCHS=0</code>.
+    </p>
+
+    <p class="prose" style="margin-top:1.2rem">
+      <strong>On this report's charts.</strong> The diverging pair is v18's, re-validated
+      against this page's surfaces: worst-case CVD ΔE 21.6 light and 19.2 dark against a
+      threshold of 8, and every other check passes in both modes. The magnitude hue is
+      <em>new</em> — v18's dark step failed the lightness band at L 0.858, so the dark value
+      was re-stepped to <code>#4f97e4</code>, which passes lightness, chroma and contrast.
+      Figure 3 distinguishes individual seeds from their mean by shape rather than colour, so
+      it needs no second hue. Every chart carries its numbers in an adjacent table and every
+      delta is printed with its sign, so no value is reachable only by colour or only by
+      hovering.
+    </p>
+  </section>
+
+  <div class="gate flagged">
+    <span class="gate-label">If you do one thing next</span>
+    <p>
+      Pull <code>emb_std</code> from the three arm-A job logs. Everything in this report is
+      conditional on phase 1 having trained successfully, and that single grep decides
+      whether v19 is a finding about JEPA or a bug report about one training run.
+    </p>
+  </div>
+
+  <p class="footnote">
+    <strong>v19 sources:</strong> the fourteen pushed ablation checkpoints and their embedded
+    <code>recovery_test_loo</code> blocks; the working-tree diff
+    (<code>src/fawkes/train.py</code>, <code>tests/test_fawkes.py</code>); and
+    <code>docs/EVALUATION.md</code> on reproducibility.
+    <strong>Carried forward:</strong> §8 from Report No. 2 (v18 patch masking,
+    <code>tmp/fawkes-v18-{note,nonote}.log</code>); §9 from Reports No. 1 and 2 (the v16 → v17
+    refactor, <code>docs/RESTRUCTURE_PLAN.md</code>); §10 from
+    <code>baseline/paper_loo_testsplit.json</code>, <code>docs/LINEAGE.md</code>,
+    <code>docs/PAPER_CODE_MAP.md</code> and the <code>src/fawkes/</code> module docstrings.
+    This report is self-contained: §7–§10 reproduce the lineage so it can be read without the
+    two earlier reports, which remain the primary record for their own results.
+    Generated 2026-08-05.
+  </p>
+</div>
+
+<div id="tip" role="status" aria-live="polite"></div>
+<script>
+  (function () {
+    var tip = document.getElementById('tip');
+    function show(el, x, y) {
+      var text = el.getAttribute('data-tip');
+      if (!text) return;
+      tip.textContent = text;
+      tip.classList.add('on');
+      var r = tip.getBoundingClientRect();
+      var left = Math.min(Math.max(8, x + 14), window.innerWidth - r.width - 8);
+      var top = y - r.height - 12;
+      if (top < 8) top = y + 18;
+      tip.style.left = left + 'px';
+      tip.style.top = top + 'px';
+    }
+    function hide() { tip.classList.remove('on'); }
+    document.querySelectorAll('[data-tip]').forEach(function (el) {
+      el.addEventListener('mousemove', function (e) { show(el, e.clientX, e.clientY); });
+      el.addEventListener('mouseleave', hide);
+      el.addEventListener('focus', function () {
+        var r = el.getBoundingClientRect();
+        show(el, r.left + r.width / 2, r.top);
+      });
+      el.addEventListener('blur', hide);
+    });
+    window.addEventListener('scroll', hide, { passive: true });
+  })();
+</script>

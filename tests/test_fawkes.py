@@ -36,7 +36,7 @@ from fawkes.evaluate import (_load_graphs, cascade_evaluate, eir_uplift_eval, ev
                              loo_evaluate)
 from fawkes.model import JEPA, DistMult, Encoder
 from fawkes.patches import balanced_bfs_partition, patch_mask
-from fawkes.train import jepa_step, readout_step
+from fawkes.train import jepa_step, readout_step, train_readout
 
 PIN = "old_fawkes.json"
 PAPER_CKPT = ROOT / "models/fawkes-entity-note/fawkes_trainer_jepa_entity_note_v16_260615.pt"
@@ -417,3 +417,45 @@ def test_jepa_step_runs_with_patch_masking():
     model = JEPA(cfg)
     loss, emb_std = jepa_step(model, batch, torch.device("cpu"), cfg)
     assert torch.isfinite(loss) and float(emb_std) > 0
+
+
+# ---- best-VAL selection when the encoder is not frozen ----
+
+@requires_data
+def test_readout_selection_rolls_back_the_encoder_too(monkeypatch):
+    """train_readout must return the pair that actually scored best on VAL.
+
+    Under `freeze_encoder` the encoder never moves, so snapshotting the scorer
+    alone captures the whole model — which is why the paper runs are unaffected.
+    Without it the encoder keeps training past the selected epoch, and returning
+    the best-VAL scorer beside the final-epoch encoder is a combination that
+    existed at no epoch. That under-reports exactly the ablation arms that train
+    the encoder from scratch, so the baselines the JEPA claim is measured against
+    would be the ones handicapped.
+    """
+    from torch_geometric.loader import DataLoader
+    import fawkes.train as train_module
+
+    cfg = Config(jepa_epochs=0, readout_epochs=20, freeze_encoder=False, push=False)
+    graphs = [d for d, _ in _sample_graphs(cfg, 64)]
+    train_graphs, val_graphs = graphs[:48], graphs[48:56]
+    device = torch.device("cpu")
+
+    val_aucs = []
+    inner_evaluate = train_module.evaluate
+
+    def recording_evaluate(*args, **kwargs):
+        metrics = inner_evaluate(*args, **kwargs)
+        val_aucs.append(metrics["auc"])
+        return metrics
+
+    monkeypatch.setattr(train_module, "evaluate", recording_evaluate)
+
+    torch.manual_seed(0)
+    encoder, scorer = train_readout(JEPA(cfg), train_graphs, val_graphs, device, cfg)
+
+    assert max(val_aucs) > val_aucs[-1], (
+        "VAL AUC peaked at the final epoch, so this run cannot tell a rolled-back "
+        "encoder from a final-epoch one — re-pin the seed or the epoch count")
+    selected = evaluate(encoder, scorer, DataLoader(val_graphs, batch_size=1, shuffle=False), device, cfg)
+    assert selected["auc"] == pytest.approx(max(val_aucs), abs=1e-9)

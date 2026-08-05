@@ -157,10 +157,16 @@ def pretrain_jepa(train_graphs, device, cfg):
 # ---- PHASE 2: edge-recovery readout on the (frozen) world-model encoder ----
 
 def train_readout(model, train_graphs, val_graphs, device, cfg):
-    """Train the readout scorer on the world-model encoder; keep the best-VAL-auc scorer.
+    """Train the readout scorer on the world-model encoder; keep the best-VAL-auc pair.
 
     Returns ``(encoder, scorer)`` with the encoder frozen when
-    ``cfg.freeze_encoder`` and the scorer rolled back to its best VAL epoch.
+    ``cfg.freeze_encoder``, both rolled back to their best VAL epoch.
+
+    The encoder is snapshotted alongside the scorer only when it trains: under
+    ``freeze_encoder`` it never moves, so the scorer alone is the whole model,
+    but without it the encoder would otherwise keep training past the selected
+    epoch and be returned beside a scorer from a different one — a pair that
+    existed at no epoch. That matters for the from-scratch ablation arms.
     """
     encoder = model.ctx
     if cfg.freeze_encoder:
@@ -174,7 +180,8 @@ def train_readout(model, train_graphs, val_graphs, device, cfg):
     loader = DataLoader(train_graphs, batch_size=cfg.batch, shuffle=True)
     val_loader = DataLoader(val_graphs, batch_size=eval_batch, shuffle=False)
     best_auc = 0.0
-    best_state = None
+    best_scorer_state = None
+    best_encoder_state = None
     for epoch in range(1, cfg.readout_epochs + 1):
         scorer.train()
         if not cfg.freeze_encoder:
@@ -198,9 +205,13 @@ def train_readout(model, train_graphs, val_graphs, device, cfg):
                         f"| VAL auc={val_metrics['auc']:.3f} nonobv={val_metrics['auc_nonobvious']:.3f} MRR={val_metrics['mrr']:.3f} H@1={val_metrics['hits1']:.3f} H@10={val_metrics['hits10']:.3f}")
             if val_metrics["auc"] > best_auc:
                 best_auc = val_metrics["auc"]
-                best_state = copy.deepcopy(scorer.state_dict())
-    if best_state is not None:
-        scorer.load_state_dict(best_state)
+                best_scorer_state = copy.deepcopy(scorer.state_dict())
+                if not cfg.freeze_encoder:
+                    best_encoder_state = copy.deepcopy(encoder.state_dict())
+    if best_scorer_state is not None:
+        scorer.load_state_dict(best_scorer_state)
+    if best_encoder_state is not None:
+        encoder.load_state_dict(best_encoder_state)
     return encoder, scorer
 
 
