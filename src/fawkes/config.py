@@ -63,6 +63,7 @@ class Config:
     batch: int = 16
     lr: float = 1e-3
     seed: int = 42
+    data_split_seed: int = 42             # (v20) train/val/test split seed, held apart from `seed` so a fixed cohort can be paired against varying training randomness. 42 is the published split.
     deterministic: bool = True
 
     # ---- encoder ----
@@ -150,6 +151,7 @@ class Config:
             batch=int(os.environ.get("BATCH", 16)),
             lr=float(os.environ.get("LR", 1e-3)),
             seed=int(os.environ.get("SEED", 42)),
+            data_split_seed=int(os.environ.get("DATA_SPLIT_SEED", 42)),
             deterministic=_flag("DETERMINISTIC", "1"),
             hid=int(os.environ.get("HID", 128)),
             layers=int(os.environ.get("LAYERS", 2)),

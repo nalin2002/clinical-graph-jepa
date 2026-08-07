@@ -99,15 +99,21 @@ def _convert_graphs(raw, demographics, cfg):
 
 def _split_items(items, cfg):
     """Seeded shuffle -> (train, val, test) pairs; test comes first so its membership
-    is independent of the val fraction."""
-    rng = np.random.RandomState(cfg.seed)
+    is independent of the val fraction.
+
+    (v20) The permutation draws on ``data_split_seed``, not ``seed``. They default
+    to the same 42, so the published split is unchanged, but holding one while
+    varying the other is what separates "a different sample of patients" from "a
+    different initialisation" in the Table 1 variance study.
+    """
+    rng = np.random.RandomState(cfg.data_split_seed)
     shuffled = rng.permutation(len(items))
     num_test = int(cfg.test_frac * len(items))
     num_val = int(cfg.val_frac * len(items))
     test_pairs = [items[i] for i in shuffled[:num_test]]
     val_pairs = [items[i] for i in shuffled[num_test:num_test + num_val]]
     train_pairs = [items[i] for i in shuffled[num_test + num_val:]]
-    logger.info(f"[DATA] graphs={len(items)} -> TRAIN={len(train_pairs)} VAL={len(val_pairs)} TEST={len(test_pairs)} (seeded split)")
+    logger.info(f"[DATA] graphs={len(items)} -> TRAIN={len(train_pairs)} VAL={len(val_pairs)} TEST={len(test_pairs)} (split seed={cfg.data_split_seed})")
     return train_pairs, val_pairs, test_pairs
 
 
@@ -350,7 +356,7 @@ def main(argv=None):
     logging.basicConfig(level=logging.INFO, format='%(asctime)s | %(levelname)s | %(name)s | %(message)s')
     cfg = Config.from_env()
     logger.info(f"[ENTRY] ENTITY-NOTE v18 | data={cfg.data_repo} use_note={cfg.use_note} ground_by={cfg.ground_by} embed_dim={cfg.embed_dim} numeric_dim={cfg.numeric_dim} use_scores={cfg.use_scores} prune_no_evidence={cfg.prune_no_evidence} mask_schedule={cfg.mask_schedule}[{cfg.mask_lo},{cfg.mask_hi}] target_weight={cfg.target_weight} cascade={cfg.run_cascade} order={cfg.cascade_order} jepa_ep={cfg.jepa_epochs} readout_ep={cfg.readout_epochs} loo_cap={cfg.loo_cap} run_eir={cfg.run_eir} "
-                f"hid={cfg.hid} mask_strategy={cfg.mask_strategy} jepa_patches={cfg.jepa_patches} node_mask={cfg.node_mask} edge_mask={cfg.edge_mask} entity_emb={cfg.use_entity_emb} decoder={cfg.decoder} loss={cfg.loss} neg_k={cfg.neg_k} freeze_eval={cfg.freeze_eval} deterministic={cfg.deterministic} val={cfg.val_frac} test={cfg.test_frac} seed={cfg.seed}")
+                f"hid={cfg.hid} mask_strategy={cfg.mask_strategy} jepa_patches={cfg.jepa_patches} node_mask={cfg.node_mask} edge_mask={cfg.edge_mask} entity_emb={cfg.use_entity_emb} decoder={cfg.decoder} loss={cfg.loss} neg_k={cfg.neg_k} freeze_eval={cfg.freeze_eval} deterministic={cfg.deterministic} val={cfg.val_frac} test={cfg.test_frac} seed={cfg.seed} data_split_seed={cfg.data_split_seed}")
     set_seed(cfg)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     logger.info(f"[GPU] {device}" + (f" {torch.cuda.get_device_name(0)}" if device.type == 'cuda' else ""))
