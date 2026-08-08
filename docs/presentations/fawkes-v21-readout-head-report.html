@@ -1,0 +1,1268 @@
+<title>fawkes v21 — The Readout Head: MLP vs DistMult</title>
+<style>
+  /* ============================================================
+     TOKENS — chrome carried over unchanged from the v20 report, so
+     the five reports read as one series. The data layer is carried
+     too and re-validated rather than assumed: the diverging pair and
+     the magnitude hue were re-run through the palette validator in
+     both modes (§12). The diverging pair now encodes which readout
+     head is ahead. Teal never encodes data; blue/red never appear in
+     text chrome.
+     ============================================================ */
+  :root {
+    /* chrome */
+    --paper: #FAFBFA;
+    --raised: #F3F6F5;
+    --ink: #1A2426;
+    --muted: #5C6B6A;
+    --accent: #0F6B5C;
+    --accent-soft: #E7F0EE;
+    --flag: #B3591A;
+    --flag-soft: #F7EDE4;
+    --line: #DCE3E1;
+    --hairline: #E8EDEC;
+    --code-bg: #F0F4F3;
+    /* data layer — carried from v20, re-validated (see §12) */
+    --up: #2a78d6;          /* MLP head ahead     */
+    --down: #e34948;        /* DistMult ahead     */
+    --zero: #C3C2BB;        /* diverging midpoint               */
+    --data: #1c5cab;        /* single magnitude hue             */
+    --grid: #E4E8E7;
+    --axis: #C6CFCD;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #101716; --raised: #17201E; --ink: #E4EAE8; --muted: #93A5A2;
+      --accent: #4FBFA8; --accent-soft: #16302B; --flag: #E09A5A; --flag-soft: #33241A;
+      --line: #263230; --hairline: #1E2927; --code-bg: #18211F;
+      --up: #3987e5; --down: #e66767; --zero: #4A5654; --data: #4f97e4;
+      --grid: #202B29; --axis: #33403D;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #101716; --raised: #17201E; --ink: #E4EAE8; --muted: #93A5A2;
+    --accent: #4FBFA8; --accent-soft: #16302B; --flag: #E09A5A; --flag-soft: #33241A;
+    --line: #263230; --hairline: #1E2927; --code-bg: #18211F;
+    --up: #3987e5; --down: #e66767; --zero: #4A5654; --data: #4f97e4;
+    --grid: #202B29; --axis: #33403D;
+  }
+  :root[data-theme="light"] {
+    --paper: #FAFBFA; --raised: #F3F6F5; --ink: #1A2426; --muted: #5C6B6A;
+    --accent: #0F6B5C; --accent-soft: #E7F0EE; --flag: #B3591A; --flag-soft: #F7EDE4;
+    --line: #DCE3E1; --hairline: #E8EDEC; --code-bg: #F0F4F3;
+    --up: #2a78d6; --down: #e34948; --zero: #C3C2BB; --data: #1c5cab;
+    --grid: #E4E8E7; --axis: #C6CFCD;
+  }
+
+  /* ============================================================ TYPE */
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: Charter, Georgia, 'Times New Roman', serif;
+    font-size: 1.05rem;
+    line-height: 1.62;
+    margin: 0;
+  }
+  h1, h2, h3, h4, .eyebrow, .chip, .gate-label, thead th,
+  .fig, .fig *, .kpi, .kpi *, .rail, .rail * {
+    font-family: 'Avenir Next', Avenir, Seravek, 'Segoe UI', system-ui, sans-serif;
+  }
+  code, pre, .mono { font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; font-size: 0.88em; }
+
+  .wrap { max-width: 52rem; margin: 0 auto; padding: 3.5rem 1.5rem 6rem; }
+  .prose { max-width: 40rem; }
+
+  .eyebrow {
+    text-transform: uppercase; letter-spacing: 0.14em; font-size: 0.72rem;
+    font-weight: 600; color: var(--accent); margin: 0 0 0.75rem;
+  }
+  h1 {
+    font-size: 2.15rem; font-weight: 700; line-height: 1.14;
+    margin: 0 0 0.6rem; text-wrap: balance; letter-spacing: -0.015em;
+  }
+  .subtitle { color: var(--muted); font-size: 1.05rem; margin: 0 0 1.4rem; max-width: 38rem; }
+  .meta {
+    display: flex; flex-wrap: wrap; gap: 0.4rem 1.4rem;
+    font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 0.76rem;
+    color: var(--muted); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+    padding: 0.6rem 0; margin-bottom: 2.4rem;
+  }
+  .meta strong { color: var(--ink); font-weight: 600; }
+
+  section { margin-top: 3.4rem; }
+  h2 {
+    font-size: 1.34rem; font-weight: 700; letter-spacing: -0.01em;
+    margin: 0 0 1rem; text-wrap: balance; display: flex; align-items: baseline; gap: 0.65rem;
+  }
+  h2 .sec {
+    color: var(--accent); font-size: 0.82rem; font-weight: 600;
+    font-family: ui-monospace, 'SF Mono', Menlo, monospace; white-space: nowrap;
+  }
+  h3 { font-size: 1.04rem; font-weight: 600; margin: 1.9rem 0 0.5rem; }
+  h4 { font-size: 0.85rem; font-weight: 600; margin: 1.3rem 0 0.4rem; letter-spacing: 0.01em; }
+  p { margin: 0 0 1rem; }
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  a:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 2px; }
+  ul { padding-left: 1.2rem; margin: 0 0 1rem; }
+  li { margin-bottom: 0.45rem; }
+  code { background: var(--code-bg); padding: 0.1em 0.35em; border-radius: 3px; }
+  pre {
+    background: var(--code-bg); border: 1px solid var(--line); border-radius: 6px;
+    padding: 0.9rem 1.1rem; overflow-x: auto; line-height: 1.55; margin: 0 0 1rem;
+  }
+  pre code { background: none; padding: 0; }
+
+  /* ============================================================ VERSION RAIL */
+  .rail {
+    display: flex; align-items: stretch; gap: 0.9rem;
+    border-left: 3px solid var(--accent); padding-left: 1rem; margin: 0 0 1.6rem;
+  }
+  .rail-tag {
+    font-size: 0.7rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--accent);
+  }
+  .rail-body { font-family: Charter, Georgia, serif; color: var(--muted); font-size: 0.95rem; }
+
+  /* ============================================================ CHIPS */
+  .chip {
+    display: inline-block; font-size: 0.68rem; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.08em; padding: 0.14rem 0.55rem; border-radius: 999px;
+    vertical-align: 0.12em; margin-right: 0.3rem;
+  }
+  .chip.new { background: var(--accent-soft); color: var(--accent); }
+  .chip.changed { background: var(--flag-soft); color: var(--flag); }
+  .chip.unchanged { background: var(--accent-soft); color: var(--accent); }
+
+  /* ============================================================ CALLOUTS */
+  .gate {
+    border: 1px solid var(--line); border-left: 3px solid var(--accent);
+    background: var(--accent-soft); border-radius: 0 6px 6px 0;
+    padding: 0.9rem 1.1rem; margin: 1.3rem 0;
+  }
+  .gate-label {
+    font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em;
+    color: var(--accent); display: block; margin-bottom: 0.35rem;
+  }
+  .gate p:last-child, .gate ul:last-child { margin-bottom: 0; }
+  .gate.flagged { border-left-color: var(--flag); background: var(--flag-soft); }
+  .gate.flagged .gate-label { color: var(--flag); }
+
+  /* ============================================================ KPI TILES */
+  .kpi-row {
+    display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin: 1.6rem 0 1.2rem;
+  }
+  @media (max-width: 640px) { .kpi-row { grid-template-columns: 1fr; } }
+  .kpi {
+    background: var(--raised); border: 1px solid var(--hairline);
+    border-radius: 8px; padding: 1.05rem 1.15rem;
+  }
+  .kpi-label {
+    font-size: 0.71rem; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--muted); margin-bottom: 0.5rem;
+  }
+  .kpi-value {
+    font-size: 2.5rem; font-weight: 600; line-height: 1; letter-spacing: -0.02em;
+    display: flex; align-items: baseline; gap: 0.5rem; flex-wrap: wrap;
+  }
+  .kpi-from { font-size: 0.82rem; color: var(--muted); font-weight: 400; letter-spacing: 0; }
+  .kpi-delta { font-size: 0.88rem; font-weight: 600; margin-top: 0.5rem; }
+  .kpi-delta.up { color: var(--up); }
+  .kpi-delta.down { color: var(--down); }
+  .kpi-delta.flat { color: var(--muted); }
+  .kpi-note { font-size: 0.78rem; color: var(--muted); margin-top: 0.35rem; line-height: 1.45; }
+
+  /* ============================================================ FIGURES */
+  .fig {
+    margin: 1.8rem 0 1.2rem; border: 1px solid var(--hairline);
+    border-radius: 8px; padding: 1.15rem 1.2rem 1rem; background: var(--raised);
+  }
+  .fig-title { font-size: 0.92rem; font-weight: 600; margin: 0 0 0.2rem; }
+  .fig-sub { font-size: 0.78rem; color: var(--muted); margin: 0 0 1rem; line-height: 1.45; }
+  .legend {
+    display: flex; flex-wrap: wrap; gap: 0.35rem 1.1rem; margin: 0 0 1rem;
+    font-size: 0.74rem; color: var(--muted);
+  }
+  .legend span { display: inline-flex; align-items: center; gap: 0.38rem; }
+  .swatch { width: 11px; height: 11px; border-radius: 2px; display: inline-block; flex: none; }
+  .swatch.dot { border-radius: 50%; width: 9px; height: 9px; }
+  .swatch.tick { width: 2px; height: 12px; border-radius: 1px; background: var(--data); }
+  .swatch.rule { width: 0; height: 13px; border-left: 2px dashed var(--ink); border-radius: 0; }
+  .swatch.band { width: 16px; height: 9px; border-radius: 2px; background: var(--data); opacity: 0.17; }
+
+  .panel-label {
+    font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em;
+    color: var(--ink); margin: 0.9rem 0 0.55rem;
+  }
+  .panel-label:first-of-type { margin-top: 0; }
+
+  /* --- ladder: magnitude bars from a zero baseline --- */
+  .lad-rows { display: grid; gap: 0.32rem; }
+  .lad {
+    display: grid; grid-template-columns: 9.4rem 1fr 3.4rem; align-items: center;
+    gap: 0.6rem; font-size: 0.76rem;
+  }
+  .lad-name { color: var(--ink); text-align: right; line-height: 1.25; font-weight: 600; font-size: 0.74rem; }
+  .lad-name i { display: block; font-style: normal; font-weight: 400; font-size: 0.66rem; color: var(--muted); }
+  .lad-track { position: relative; height: 19px; }
+  .lad-track::after {
+    content: ""; position: absolute; left: var(--ref, 50%); top: -3px; bottom: -3px;
+    width: 1px; background: var(--axis);
+  }
+  .lad-fill {
+    position: absolute; left: 0; top: 4px; height: 11px;
+    background: var(--data); border-radius: 0 4px 4px 0;
+  }
+  .lad-val { font-variant-numeric: tabular-nums; font-weight: 600; font-size: 0.75rem; color: var(--ink); }
+  .lad-axis {
+    display: grid; grid-template-columns: 9.4rem 1fr 3.4rem; gap: 0.6rem;
+    font-size: 0.68rem; color: var(--muted); margin-top: 0.45rem;
+  }
+  .lad-axis-inner { display: flex; justify-content: space-between; font-variant-numeric: tabular-nums; }
+
+  /* --- diverging delta bars --- */
+  .dbar-rows { display: grid; gap: 0.3rem; }
+  .dbar {
+    display: grid; grid-template-columns: 6.6rem 1fr 4.2rem; align-items: center;
+    gap: 0.6rem; font-size: 0.76rem;
+  }
+  .dbar-name { color: var(--muted); text-align: right; }
+  .dbar-track {
+    position: relative; height: 17px; background: transparent;
+    border-left: 0; overflow: visible;
+  }
+  .dbar-track::before {
+    content: ""; position: absolute; left: 50%; top: -2px; bottom: -2px;
+    width: 1px; background: var(--zero);
+  }
+  .dbar-fill {
+    position: absolute; top: 3px; height: 11px; border-radius: 3px;
+  }
+  .dbar-fill.pos { left: 50%; background: var(--up); border-radius: 0 3px 3px 0; }
+  .dbar-fill.neg { right: 50%; background: var(--down); border-radius: 3px 0 0 3px; }
+  .dbar-val { font-variant-numeric: tabular-nums; font-weight: 600; font-size: 0.75rem; }
+  .dbar-val.pos { color: var(--up); }
+  .dbar-val.neg { color: var(--down); }
+  .dbar-axis {
+    display: grid; grid-template-columns: 6.6rem 1fr 4.2rem; gap: 0.6rem;
+    font-size: 0.68rem; color: var(--muted); margin-top: 0.4rem;
+  }
+  .dbar-axis-inner { display: flex; justify-content: space-between; font-variant-numeric: tabular-nums; }
+
+  /* --- seed strip: per-seed dots with a range line, mean tick and reference rule --- */
+  .strip-rows { display: grid; gap: 0.5rem; }
+  .strip {
+    display: grid; grid-template-columns: 9.4rem 1fr 5.4rem; align-items: center;
+    gap: 0.6rem; font-size: 0.75rem;
+  }
+  .strip-name { color: var(--ink); text-align: right; line-height: 1.25; font-weight: 600; font-size: 0.74rem; }
+  .strip-name i { display: block; font-style: normal; font-weight: 400; font-size: 0.66rem; color: var(--muted); }
+  .strip-track { position: relative; height: 38px; }
+  .strip-track::before {
+    content: ""; position: absolute; left: 0; right: 0; top: 50%;
+    height: 1px; background: var(--grid);
+  }
+  /* Taller than a dot plus its 2px surface ring, so the interval still reads as one
+     continuous span where the seed dots sit on top of it. */
+  .strip-ci {
+    position: absolute; top: 50%; height: 26px; transform: translateY(-50%);
+    background: var(--data); opacity: 0.17; border-radius: 3px;
+  }
+  .strip-range {
+    position: absolute; top: 50%; height: 2px; transform: translateY(-50%); background: var(--axis);
+  }
+  .strip-dot {
+    position: absolute; top: 50%; width: 10px; height: 10px; border-radius: 50%;
+    background: var(--data); transform: translate(-50%, -50%);
+    box-shadow: 0 0 0 2px var(--raised);
+  }
+  .strip-mean {
+    position: absolute; top: 50%; width: 3px; height: 20px; border-radius: 1.5px;
+    background: var(--data); transform: translate(-50%, -50%);
+    box-shadow: 0 0 0 2px var(--raised);
+  }
+  /* The published rule sits 1.6% of the axis from the mean tick — that near-coincidence
+     is the finding, so the two must stay separable. It is taller than the track and
+     dashed, so shape distinguishes it rather than position or colour. */
+  .strip-ref {
+    position: absolute; top: 50%; height: 34px; width: 0;
+    border-left: 2px dashed var(--ink); transform: translate(-50%, -50%);
+  }
+  .strip-ref::after {
+    content: "published"; position: absolute; left: 4px; top: -2px;
+    font-size: 0.6rem; letter-spacing: 0.03em; color: var(--muted); white-space: nowrap;
+  }
+  .strip-val { font-variant-numeric: tabular-nums; font-weight: 600; font-size: 0.73rem; color: var(--ink); }
+  .strip-val i { font-style: normal; font-weight: 400; color: var(--muted); font-size: 0.68rem; }
+  .strip-axis {
+    display: grid; grid-template-columns: 9.4rem 1fr 5.4rem; gap: 0.6rem;
+    font-size: 0.68rem; color: var(--muted); margin-top: 0.5rem;
+  }
+  .strip-axis-inner { display: flex; justify-content: space-between; font-variant-numeric: tabular-nums; }
+
+  /* ============================================================ TABLES */
+  .table-scroll { overflow-x: auto; margin: 1.2rem 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.86rem; }
+  thead th {
+    text-align: left; font-size: 0.7rem; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.09em; color: var(--muted); border-bottom: 2px solid var(--line);
+    padding: 0.42rem 0.85rem 0.42rem 0; white-space: nowrap;
+  }
+  tbody td {
+    border-bottom: 1px solid var(--hairline); padding: 0.5rem 0.85rem 0.5rem 0;
+    vertical-align: top;
+  }
+  tbody tr:last-child td { border-bottom: 1px solid var(--line); }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  td.mono, th.mono { white-space: nowrap; font-family: ui-monospace, Menlo, monospace; font-size: 0.8rem; }
+  td.up { color: var(--up); font-weight: 600; }
+  td.down { color: var(--down); font-weight: 600; }
+  tbody tr.sub td { color: var(--muted); font-size: 0.8rem; }
+  tbody tr.ref td { background: var(--accent-soft); }
+  caption {
+    caption-side: top; text-align: left; font-size: 0.78rem; color: var(--muted);
+    padding-bottom: 0.5rem; line-height: 1.45;
+    font-family: 'Avenir Next', Avenir, system-ui, sans-serif;
+  }
+
+  /* ============================================================ PAIR */
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 1.2rem 0; }
+  @media (max-width: 640px) { .pair { grid-template-columns: 1fr; } }
+  .pair figure { margin: 0; min-width: 0; }
+  .pair figcaption {
+    font-family: 'Avenir Next', Avenir, system-ui, sans-serif; font-size: 0.72rem;
+    font-weight: 600; text-transform: uppercase; letter-spacing: 0.09em;
+    color: var(--muted); margin-bottom: 0.4rem;
+  }
+  .pair pre { margin: 0; height: calc(100% - 1.4rem); box-sizing: border-box; }
+
+  /* ============================================================ TOOLTIP */
+  #tip {
+    position: fixed; z-index: 50; pointer-events: none; opacity: 0;
+    transition: opacity 0.12s ease; background: var(--ink); color: var(--paper);
+    font-family: 'Avenir Next', Avenir, system-ui, sans-serif; font-size: 0.73rem;
+    line-height: 1.45; padding: 0.4rem 0.6rem; border-radius: 5px; max-width: 17rem;
+    box-shadow: 0 3px 12px rgba(0,0,0,0.18);
+  }
+  #tip.on { opacity: 1; }
+  [data-tip] { cursor: default; }
+  @media (prefers-reduced-motion: reduce) {
+    #tip { transition: none; }
+    * { animation: none !important; }
+  }
+
+  .footnote {
+    margin-top: 3.5rem; padding-top: 1.2rem; border-top: 1px solid var(--line);
+    color: var(--muted); font-size: 0.86rem;
+  }
+</style>
+<div class="wrap">
+  <header>
+    <p class="eyebrow">Clinical Graph-JEPA · Engineering Report No. 5</p>
+    <h1>v21: the readout head was the wrong one</h1>
+    <p class="subtitle">
+      Swapping DistMult for the MLP edge head — a switch that has existed in the paper
+      implementation since v16 and had never been flipped — raises leave-one-out MRR from
+      0.417 to 0.471. It wins at every seed, on every metric that is correctly constructed,
+      and on all four of the paper's inferred relations. The one metric that appeared to
+      regress turned out to be measuring the wrong thing. §8–§11 work backwards through v20,
+      v19, v18 and v16/v17 so the lineage stays traceable from one document.
+    </p>
+    <div class="meta">
+      <span>repo <strong>clinical-graph-jepa</strong></span>
+      <span>runs <strong>10 new</strong> (+10 reused from v20)</span>
+      <span>eval <strong>LOO 8,283 · batch-mask 3,000</strong></span>
+      <span>seeds <strong>42–51, paired</strong></span>
+      <span>split <strong>42, fixed</strong></span>
+      <span>lineage <strong>v16 → v21</strong></span>
+      <span>date <strong>2026-08-07</strong></span>
+    </div>
+  </header>
+
+  <!-- ============================================================ VERDICT -->
+  <section>
+    <h2><span class="sec">§1</span>The verdict, first</h2>
+    <p class="prose">
+      <strong>The MLP readout beats DistMult at every one of the ten seeds, and the two
+      distributions do not overlap.</strong> DistMult's best run scores 0.4438 LOO MRR; the
+      MLP's worst scores 0.4493. There is no seed you could have drawn that would reverse the
+      ordering — which is a stronger statement than the paired test, and it comes from an
+      experiment that required no source changes at all.
+    </p>
+
+    <div class="kpi-row">
+      <div class="kpi">
+        <div class="kpi-label">LOO MRR · the paper's metric</div>
+        <div class="kpi-value">0.4705 <span class="kpi-from">from 0.4174</span></div>
+        <div class="kpi-delta up">▲ +0.0530 &nbsp;(+12.7%)</div>
+        <p class="kpi-note">
+          Paired across seeds: +0.0530 ± 0.0181, 95% CI [+0.0401, +0.0660]. That is 2.2× the
+          0.0238 minimum detectable difference v20 established.
+        </p>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Consistency</div>
+        <div class="kpi-value">10/10 <span class="kpi-from">seeds, all four LOO metrics</span></div>
+        <div class="kpi-delta up">▲ zero distribution overlap</div>
+        <p class="kpi-note">
+          Hits@1 +0.0582, Hits@3 +0.0597, Hits@10 +0.0292 — every one significant, every one
+          ahead at all ten seeds.
+        </p>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">All four inferred relations</div>
+        <div class="kpi-value">+0.03 → +0.12 <span class="kpi-from">LOO MRR, per relation</span></div>
+        <div class="kpi-delta up">▲ 10/10 seeds on each</div>
+        <p class="kpi-note">
+          MANAGED_FOR, INDICATES, COMPLICATED_BY and CONFIRMS — the relations the paper is
+          about — all improve. The gain is not concentrated in the easy backbone.
+        </p>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Source changes required</div>
+        <div class="kpi-value">0 <span class="kpi-from">one env var: DECODER=mlp</span></div>
+        <div class="kpi-delta flat">the switch has existed since v16</div>
+        <p class="kpi-note">
+          <code>build_scorer</code> has returned this head for any non-DistMult
+          <code>DECODER</code> since the original trainer. Nobody had run it.
+        </p>
+      </div>
+    </div>
+
+    <div class="gate flagged">
+      <span class="gate-label">The one apparent regression was a broken metric</span>
+      <p>
+        Batch-mask <code>auc_nonobvious</code> showed the MLP losing by 0.0713 at 10/10 seeds
+        — the only negative result anywhere in this experiment. It is an artefact:
+        <code>_classification_metrics</code> filters the <em>positives</em> to non-patient-anchored
+        edges but compares them against the <strong>unfiltered</strong> negative pool, which is
+        68% patient-anchored. Drawing negatives from the same population flips the sign to
+        <strong>+0.041</strong>. §4 has the reproduction. This is a pre-existing bug that also
+        inflates the published <code>auc_nonobvious</code> of 0.800.
+      </p>
+    </div>
+  </section>
+
+  <!-- ============================================================ WHAT CHANGED -->
+  <section>
+    <h2><span class="sec">§2</span>v21 — what changed and why</h2>
+    <div class="rail">
+      <div>
+        <div class="rail-tag">v21 · readout head</div>
+        <div class="rail-body">
+          No source changes. One environment variable, one arm, ten jobs. The baseline arm is
+          v20, reused rather than re-run.
+        </div>
+      </div>
+    </div>
+
+    <h3>The head was already there</h3>
+    <p class="prose">
+      <span class="chip unchanged">zero code added</span> <code>build_scorer</code> returns
+      <code>DistMult</code> when <code>DECODER=distmult</code> and an MLP <code>Scorer</code>
+      otherwise, and it has done so since the original trainer — its docstring still cites
+      <code>trainer.py:630</code>. The config pin confirms it: <code>decoder</code> maps to the
+      real trainer global <code>DECODER</code>, not to <code>null</code> as genuinely new
+      fields like <code>mask_strategy</code> and <code>data_split_seed</code> do.
+    </p>
+
+    <div class="pair">
+      <figure>
+        <figcaption>DistMult — the released checkpoint's head</figcaption>
+<pre><code>(hidden[head]
+   * self.rel(relation)
+   * hidden[tail]).sum(-1)
+# bilinear, no parameters beyond
+# the relation embedding</code></pre>
+      </figure>
+      <figure>
+        <figcaption>Scorer — the v21 arm</figcaption>
+<pre><code>self.mlp(torch.cat([
+    hidden[head], hidden[tail],
+    self.rel(relation)], -1))
+# Linear(3d->d) -> ReLU -> Linear(d->1)
+# ~49k more parameters</code></pre>
+      </figure>
+    </div>
+
+    <p class="prose">
+      This is the same architecture <code>clinical_jepa</code> scores edges with
+      (<code>EdgePlausibilityHead</code>: a relation embedding plus an MLP over
+      <code>[src ; tgt ; rel]</code>), differing only in ReLU against GELU. Porting the GELU
+      variant was rejected: an activation change is far below the ±0.019 noise floor v20
+      measured, and resolving it would cost another ten jobs to conclude nothing.
+    </p>
+
+    <div class="gate flagged">
+      <span class="gate-label">The path had never been executed or tested</span>
+      <p>
+        No prior version ran <code>DECODER=mlp</code>, and
+        <code>grep "Scorer\|decoder" tests/test_fawkes.py</code> returns nothing — the config
+        <em>parsing</em> is pinned (the pin's non-default environment sets
+        <code>DECODER=MLP</code>) but no test ever instantiated the model. A local smoke run
+        at 2+2 epochs was the first end-to-end execution of this code path in the tree; it
+        completed, trained and evaluated cleanly before the fleet was submitted.
+      </p>
+      <p>
+        <code>decoder</code> is <strong>not</strong> in <code>checkpoint_dict()</code>, so a
+        v21 checkpoint is indistinguishable from a v20 one by its config block — the same
+        blind spot that made v19's arms C and Cp serialise identically. The output repository
+        name is the provenance record, and re-evaluating a v21 checkpoint requires
+        <code>DECODER=mlp</code> or the strict <code>state_dict</code> load fails on the
+        <code>mlp.0.*</code> keys DistMult does not carry.
+      </p>
+    </div>
+
+    <h3>Why only ten jobs</h3>
+    <p class="prose">
+      The v20 runs <em>are</em> the DistMult arm: same split, same seeds, same configuration,
+      <code>DECODER</code> at its default. So v21 submitted one arm and compared against
+      stored checkpoints. Better still, the scorer is only built in phase 2, after
+      <code>pretrain_jepa</code> returns, and <code>FREEZE_ENCODER=1</code> means the encoder
+      never moves afterwards — <strong>both arms run the identical, identically seeded phase
+      1</strong>. This isolates the readout head against the same encoder. The pairing is
+      tight but not exact: the hardware nondeterminism of §9 still sits inside each pair.
+    </p>
+  </section>
+
+  <!-- ============================================================ RESULTS -->
+  <section>
+    <h2><span class="sec">§3</span>Results</h2>
+
+    <!-- FIGURE 1 -->
+    <div class="fig">
+      <p class="fig-title">Figure 1 · LOO MRR, the two arms across ten seeds</p>
+      <p class="fig-sub">
+        Each dot is one seed. The line spans that arm's range, the tall tick is its mean, and
+        the dashed rule is the published v16 value. The ranges do not touch: DistMult's best
+        run falls below the MLP's worst.
+      </p>
+      <div class="legend">
+        <span><i class="swatch dot" style="background:var(--data)"></i>one seed</span>
+        <span><i class="swatch tick"></i>arm mean</span>
+        <span><i class="swatch rule"></i>published v16 · 0.418653</span>
+      </div>
+      <div class="strip-rows">
+        <div class="strip" tabindex="0" data-tip="DistMult (v20): mean 0.4174, sd 0.0190, range 0.3828-0.4438. This is the arm that produced the published checkpoint.">
+          <span class="strip-name">DistMult<i>v20, published head</i></span>
+          <span class="strip-track">
+            <i class="strip-range" style="left:14.25%;width:38.12%"></i>
+            <i class="strip-dot" style="left:14.25%"></i>
+            <i class="strip-dot" style="left:22.62%"></i>
+            <i class="strip-dot" style="left:26.88%"></i>
+            <i class="strip-dot" style="left:31.56%"></i>
+            <i class="strip-dot" style="left:37.44%"></i>
+            <i class="strip-dot" style="left:40.06%"></i>
+            <i class="strip-dot" style="left:43.12%"></i>
+            <i class="strip-dot" style="left:43.31%"></i>
+            <i class="strip-dot" style="left:47.19%"></i>
+            <i class="strip-dot" style="left:52.37%"></i>
+            <i class="strip-mean" style="left:35.88%"></i>
+            <i class="strip-ref" style="left:36.66%"></i>
+          </span>
+          <span class="strip-val">0.4174 <i>±0.019</i></span>
+        </div>
+        <div class="strip" tabindex="0" data-tip="MLP (v21): mean 0.4705, sd 0.0167, range 0.4493-0.5000. Tighter as well as higher.">
+          <span class="strip-name">MLP<i>v21, this experiment</i></span>
+          <span class="strip-track">
+            <i class="strip-range" style="left:55.79%;width:31.71%"></i>
+            <i class="strip-dot" style="left:55.79%"></i>
+            <i class="strip-dot" style="left:57.45%"></i>
+            <i class="strip-dot" style="left:59.66%"></i>
+            <i class="strip-dot" style="left:62.59%"></i>
+            <i class="strip-dot" style="left:68.16%"></i>
+            <i class="strip-dot" style="left:68.72%"></i>
+            <i class="strip-dot" style="left:73.62%"></i>
+            <i class="strip-dot" style="left:77.86%"></i>
+            <i class="strip-dot" style="left:79.00%"></i>
+            <i class="strip-dot" style="left:87.50%"></i>
+            <i class="strip-mean" style="left:69.04%"></i>
+          </span>
+          <span class="strip-val">0.4705 <i>±0.017</i></span>
+        </div>
+      </div>
+      <div class="strip-axis">
+        <span></span>
+        <span class="strip-axis-inner"><span>0.36</span><span>0.40</span><span>0.44</span><span>0.48</span><span>0.52</span></span>
+        <span></span>
+      </div>
+    </div>
+
+    <p class="prose">
+      The separation is the headline. With ten runs per arm and no overlap at all, the
+      probability of that ordering arising by chance under exchangeable arms is
+      1 / C(20,10) ≈ 5.4 × 10⁻⁶. The MLP is also <em>tighter</em> — sd 0.0167 against 0.0190
+      — so the improvement does not come at the cost of stability.
+    </p>
+
+    <h3>Every run, both arms</h3>
+    <div class="table-scroll">
+      <table>
+        <caption>
+          Leave-one-out, read from <code>recovery_test_loo</code> in each checkpoint.
+          <code>n=8283</code> for all twenty runs — the pinned split guarantees it, and makes
+          the per-seed difference a paired measurement.
+        </caption>
+        <thead>
+          <tr>
+            <th>Seed</th>
+            <th class="num">DistMult MRR</th><th class="num">MLP MRR</th><th class="num">Δ MRR</th>
+            <th class="num">Δ H@1</th><th class="num">Δ H@3</th><th class="num">Δ H@10</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td class="mono">42</td><td class="num">0.3962</td><td class="num">0.4519</td><td class="num up">+0.0557</td><td class="num up">+0.0529</td><td class="num up">+0.0822</td><td class="num up">+0.0311</td></tr>
+          <tr><td class="mono">43</td><td class="num">0.4199</td><td class="num">0.4691</td><td class="num up">+0.0492</td><td class="num up">+0.0569</td><td class="num up">+0.0458</td><td class="num up">+0.0273</td></tr>
+          <tr><td class="mono">44</td><td class="num">0.4290</td><td class="num">0.4846</td><td class="num up">+0.0555</td><td class="num up">+0.0636</td><td class="num up">+0.0549</td><td class="num up">+0.0324</td></tr>
+          <tr><td class="mono">45</td><td class="num">0.4293</td><td class="num">0.5000</td><td class="num up">+0.0707</td><td class="num up">+0.0854</td><td class="num up">+0.0659</td><td class="num up">+0.0365</td></tr>
+          <tr><td class="mono">46</td><td class="num">0.3828</td><td class="num">0.4493</td><td class="num up">+0.0665</td><td class="num up">+0.0742</td><td class="num up">+0.0796</td><td class="num up">+0.0327</td></tr>
+          <tr><td class="mono">47</td><td class="num">0.4241</td><td class="num">0.4700</td><td class="num up">+0.0458</td><td class="num up">+0.0551</td><td class="num up">+0.0430</td><td class="num up">+0.0220</td></tr>
+          <tr><td class="mono">48</td><td class="num">0.4030</td><td class="num">0.4864</td><td class="num up">+0.0834</td><td class="num up">+0.0808</td><td class="num up">+0.1046</td><td class="num up">+0.0456</td></tr>
+          <tr><td class="mono">49</td><td class="num">0.4355</td><td class="num">0.4555</td><td class="num up">+0.0200</td><td class="num up">+0.0152</td><td class="num up">+0.0303</td><td class="num up">+0.0212</td></tr>
+          <tr><td class="mono">50</td><td class="num">0.4438</td><td class="num">0.4778</td><td class="num up">+0.0340</td><td class="num up">+0.0307</td><td class="num up">+0.0503</td><td class="num up">+0.0298</td></tr>
+          <tr><td class="mono">51</td><td class="num">0.4105</td><td class="num">0.4601</td><td class="num up">+0.0497</td><td class="num up">+0.0674</td><td class="num up">+0.0408</td><td class="num up">+0.0135</td></tr>
+          <tr class="ref">
+            <td><strong>mean ± sd</strong></td>
+            <td class="num"><strong>0.4174</strong><br>±0.0190</td>
+            <td class="num"><strong>0.4705</strong><br>±0.0167</td>
+            <td class="num"><strong>+0.0530</strong><br>±0.0181</td>
+            <td class="num"><strong>+0.0582</strong><br>±0.0218</td>
+            <td class="num"><strong>+0.0597</strong><br>±0.0230</td>
+            <td class="num"><strong>+0.0292</strong><br>±0.0089</td>
+          </tr>
+          <tr class="sub">
+            <td>95% CI of the paired mean</td><td class="num">—</td><td class="num">—</td>
+            <td class="num">+0.0401<br>+0.0660</td><td class="num">+0.0426<br>+0.0738</td>
+            <td class="num">+0.0433<br>+0.0762</td><td class="num">+0.0228<br>+0.0356</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- FIGURE 2 -->
+    <div class="fig">
+      <p class="fig-title">Figure 2 · Per-seed paired difference in LOO MRR</p>
+      <p class="fig-sub">
+        MLP minus DistMult at each seed, both arms sharing the same test set. The reference
+        line marks 0.0238 — the minimum difference v20 established as detectable.
+      </p>
+      <div class="legend">
+        <span><i class="swatch" style="background:var(--data)"></i>MLP ahead</span>
+        <span><i class="swatch rule" style="border-left-color:var(--axis);border-left-style:solid"></i>0.0238 detection floor</span>
+      </div>
+      <div class="lad-rows">
+        <div class="lad" tabindex="0" data-tip="Seed 48: the largest gain, +0.0834."><span class="lad-name">seed 48</span><span class="lad-track" style="--ref:23.8%"><i class="lad-fill" style="width:83.40%"></i></span><span class="lad-val">+.0834</span></div>
+        <div class="lad" tabindex="0" data-tip="Seed 45: +0.0707."><span class="lad-name">seed 45</span><span class="lad-track" style="--ref:23.8%"><i class="lad-fill" style="width:70.70%"></i></span><span class="lad-val">+.0707</span></div>
+        <div class="lad" tabindex="0" data-tip="Seed 46: +0.0665. This is the seed where DistMult scored lowest.">
+          <span class="lad-name">seed 46</span><span class="lad-track" style="--ref:23.8%"><i class="lad-fill" style="width:66.50%"></i></span><span class="lad-val">+.0665</span></div>
+        <div class="lad" tabindex="0" data-tip="Seed 42: +0.0557. The published seed."><span class="lad-name">seed 42</span><span class="lad-track" style="--ref:23.8%"><i class="lad-fill" style="width:55.70%"></i></span><span class="lad-val">+.0557</span></div>
+        <div class="lad" tabindex="0" data-tip="Seed 44: +0.0555."><span class="lad-name">seed 44</span><span class="lad-track" style="--ref:23.8%"><i class="lad-fill" style="width:55.50%"></i></span><span class="lad-val">+.0555</span></div>
+        <div class="lad" tabindex="0" data-tip="Seed 51: +0.0497."><span class="lad-name">seed 51</span><span class="lad-track" style="--ref:23.8%"><i class="lad-fill" style="width:49.70%"></i></span><span class="lad-val">+.0497</span></div>
+        <div class="lad" tabindex="0" data-tip="Seed 43: +0.0492."><span class="lad-name">seed 43</span><span class="lad-track" style="--ref:23.8%"><i class="lad-fill" style="width:49.20%"></i></span><span class="lad-val">+.0492</span></div>
+        <div class="lad" tabindex="0" data-tip="Seed 47: +0.0458."><span class="lad-name">seed 47</span><span class="lad-track" style="--ref:23.8%"><i class="lad-fill" style="width:45.80%"></i></span><span class="lad-val">+.0458</span></div>
+        <div class="lad" tabindex="0" data-tip="Seed 50: +0.0340."><span class="lad-name">seed 50</span><span class="lad-track" style="--ref:23.8%"><i class="lad-fill" style="width:34.00%"></i></span><span class="lad-val">+.0340</span></div>
+        <div class="lad" tabindex="0" data-tip="Seed 49: +0.0200 — the only seed whose individual gain sits below the 0.0238 single-comparison floor. Still positive.">
+          <span class="lad-name">seed 49</span><span class="lad-track" style="--ref:23.8%"><i class="lad-fill" style="width:20.00%"></i></span><span class="lad-val">+.0200</span></div>
+      </div>
+      <div class="lad-axis">
+        <span></span>
+        <span class="lad-axis-inner"><span>0</span><span>0.025</span><span>0.050</span><span>0.075</span><span>0.100</span></span>
+        <span></span>
+      </div>
+    </div>
+
+    <p class="prose">
+      Nine of the ten individual gains clear the detection floor on their own. Seed 49 at
+      +0.0200 does not — worth stating plainly rather than rounding past, because it is the
+      honest picture of a real effect measured against real noise. The paired test aggregates
+      those ten observations, which is why the interval [+0.0401, +0.0660] sits comfortably
+      clear of zero even though one seed individually does not.
+    </p>
+
+    <h3>The batch-mask protocol</h3>
+    <div class="table-scroll">
+      <table>
+        <caption>
+          Batch-mask evaluation, <code>n_mrr=3000</code>. Not comparable with the LOO table:
+          different masking, different population. <code>auc_nonobvious</code> is shown as
+          reported and is <strong>not trustworthy</strong> — see §4.
+        </caption>
+        <thead>
+          <tr><th>Metric</th><th class="num">DistMult</th><th class="num">MLP</th><th class="num">paired Δ</th><th class="num">95% CI</th><th>Seeds ahead</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>AUC</td><td class="num">0.7145 ±0.0186</td><td class="num">0.7988 ±0.0155</td><td class="num up">+0.0843</td><td class="num">+0.0700, +0.0986</td><td>10/10</td></tr>
+          <tr><td>AP</td><td class="num">0.6299 ±0.0148</td><td class="num">0.7105 ±0.0278</td><td class="num up">+0.0806</td><td class="num">+0.0620, +0.0992</td><td>10/10</td></tr>
+          <tr><td>MRR</td><td class="num">0.3627 ±0.0043</td><td class="num">0.3741 ±0.0031</td><td class="num up">+0.0114</td><td class="num">+0.0087, +0.0141</td><td>10/10</td></tr>
+          <tr class="sub"><td>AUC non-obvious <em>(as shipped — see §4)</em></td><td class="num">0.8129 ±0.0209</td><td class="num">0.7416 ±0.0399</td><td class="num down">−0.0713</td><td class="num">−0.0955, −0.0472</td><td>0/10</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ============================================================ THE METRIC BUG -->
+  <section>
+    <h2><span class="sec">§4</span>The non-obvious AUC regression is a measurement artefact</h2>
+    <p class="prose">
+      One result in this experiment pointed the other way, and it pointed hard: the MLP lost
+      <code>auc_nonobvious</code> by 0.0713 at every seed. A single consistent negative amid
+      seven consistent positives is exactly the kind of thing that deserves investigating
+      rather than reporting, because it either qualifies the conclusion or reveals a defect.
+      It was a defect.
+    </p>
+
+    <h3>What the metric does</h3>
+    <p class="prose">
+      "Non-obvious" means the held edge's source is not the PATIENT node — entity-to-entity
+      relations rather than the trivially predictable patient backbone. The intent is a
+      harder subset. The implementation filters the positives to that subset and then scores
+      them against <strong>every</strong> negative, including the ones drawn for
+      patient-anchored positives:
+    </p>
+    <div class="pair">
+      <figure>
+        <figcaption>As shipped — evaluate.py</figcaption>
+<pre><code>nonobvious_pos = positives[nonpat_mask]
+nonobvious_scores = np.concatenate(
+    [nonobvious_pos, negatives])
+#                    ^^^^^^^^^ unfiltered</code></pre>
+      </figure>
+      <figure>
+        <figcaption>Matched populations</figcaption>
+<pre><code>nonobvious_scores = np.concatenate(
+    [positives[nonpat_mask],
+     negatives[nonpat_mask]])
+# negatives is per-positive, so the
+# mask applies to it unchanged</code></pre>
+      </figure>
+    </div>
+    <p class="prose">
+      <code>negatives</code> is <code>neg_scores[:, 0]</code> — one negative per positive, same
+      length, same order — so <code>nonpat_mask</code> indexes it correctly. The as-shipped
+      version compares 2,509 non-patient positives against all 7,766 negatives, of which
+      <strong>68% belong to patient-anchored edges</strong>. Those are easy to beat, so the
+      metric is inflated for both arms, and it is inflated <em>unequally</em>.
+    </p>
+
+    <h3>Reproduction</h3>
+    <p class="prose">
+      Both arms re-evaluated locally on the same test split, computing the metric both ways.
+      The as-shipped column reproduces the fleet's stored result — mean −0.070 here against
+      the −0.0713 the ten pushed checkpoints report — which is what establishes the
+      reproduction is faithful before drawing any conclusion from the corrected column.
+    </p>
+    <div class="table-scroll">
+      <table>
+        <caption>
+          Non-obvious AUC, computed both ways on identical runs. CPU evaluation draws
+          different negatives than the CUDA fleet, so absolute values shift slightly; the
+          comparison within each row is unaffected.
+        </caption>
+        <thead>
+          <tr><th>Seed</th><th class="num">DistMult<br>as shipped</th><th class="num">MLP<br>as shipped</th><th class="num">Δ</th><th class="num">DistMult<br>matched</th><th class="num">MLP<br>matched</th><th class="num">Δ</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="mono">42</td><td class="num">0.8180</td><td class="num">0.7187</td><td class="num down">−0.0993</td><td class="num">0.6036</td><td class="num">0.6566</td><td class="num up">+0.0530</td></tr>
+          <tr><td class="mono">43</td><td class="num">0.8053</td><td class="num">0.7592</td><td class="num down">−0.0461</td><td class="num">0.6310</td><td class="num">0.6577</td><td class="num up">+0.0267</td></tr>
+          <tr><td class="mono">44</td><td class="num">0.8154</td><td class="num">0.7507</td><td class="num down">−0.0647</td><td class="num">0.6105</td><td class="num">0.6527</td><td class="num up">+0.0422</td></tr>
+          <tr class="ref"><td><strong>mean</strong></td><td class="num">0.8129</td><td class="num">0.7429</td><td class="num down"><strong>−0.0700</strong></td><td class="num">0.6150</td><td class="num">0.6557</td><td class="num up"><strong>+0.0406</strong></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- FIGURE 3 -->
+    <div class="fig">
+      <p class="fig-title">Figure 3 · The same comparison, before and after matching the negatives</p>
+      <p class="fig-sub">
+        MLP minus DistMult on non-obvious AUC. The as-shipped metric reverses the sign of a
+        result that every other measurement in this report agrees on.
+      </p>
+      <div class="legend">
+        <span><i class="swatch" style="background:var(--up)"></i>MLP ahead</span>
+        <span><i class="swatch" style="background:var(--down)"></i>DistMult ahead</span>
+      </div>
+      <p class="panel-label">As shipped — positives filtered, negatives not</p>
+      <div class="dbar-rows">
+        <div class="dbar" tabindex="0" data-tip="Seed 42, as shipped: -0.0993."><span class="dbar-name">seed 42</span><span class="dbar-track"><i class="dbar-fill neg" style="width:41.38%"></i></span><span class="dbar-val neg">−0.0993</span></div>
+        <div class="dbar" tabindex="0" data-tip="Seed 43, as shipped: -0.0461."><span class="dbar-name">seed 43</span><span class="dbar-track"><i class="dbar-fill neg" style="width:19.21%"></i></span><span class="dbar-val neg">−0.0461</span></div>
+        <div class="dbar" tabindex="0" data-tip="Seed 44, as shipped: -0.0647."><span class="dbar-name">seed 44</span><span class="dbar-track"><i class="dbar-fill neg" style="width:26.96%"></i></span><span class="dbar-val neg">−0.0647</span></div>
+      </div>
+      <p class="panel-label">Negatives drawn from the same population</p>
+      <div class="dbar-rows">
+        <div class="dbar" tabindex="0" data-tip="Seed 42, matched: +0.0530."><span class="dbar-name">seed 42</span><span class="dbar-track"><i class="dbar-fill pos" style="width:22.08%"></i></span><span class="dbar-val pos">+0.0530</span></div>
+        <div class="dbar" tabindex="0" data-tip="Seed 43, matched: +0.0267."><span class="dbar-name">seed 43</span><span class="dbar-track"><i class="dbar-fill pos" style="width:11.13%"></i></span><span class="dbar-val pos">+0.0267</span></div>
+        <div class="dbar" tabindex="0" data-tip="Seed 44, matched: +0.0422."><span class="dbar-name">seed 44</span><span class="dbar-track"><i class="dbar-fill pos" style="width:17.58%"></i></span><span class="dbar-val pos">+0.0422</span></div>
+      </div>
+      <div class="dbar-axis">
+        <span></span>
+        <span class="dbar-axis-inner"><span>−0.12</span><span>0</span><span>+0.12</span></span>
+        <span></span>
+      </div>
+    </div>
+
+    <div class="gate flagged">
+      <span class="gate-label">This also affects the published number</span>
+      <p>
+        The bug predates v21 — it is in the evaluation path inherited from the original
+        trainer, so the released checkpoint's <code>auc_nonobvious</code> of
+        <strong>0.800028</strong> is inflated by the same mechanism. Only that one metric is
+        affected: <code>auc</code> and <code>ap</code> compare all positives against all
+        negatives, which is matched by construction, and MRR/Hits/LOO never touch this code.
+        <strong>If Table 1 or the text quotes a non-obvious AUC, it needs recomputing before
+        the revision goes out.</strong>
+      </p>
+    </div>
+  </section>
+
+  <!-- ============================================================ PER RELATION -->
+  <section>
+    <h2><span class="sec">§5</span>Where the gain lands</h2>
+    <p class="prose">
+      An aggregate MRR can improve because a model got better at the easy majority. That
+      would be a much weaker result for this paper, whose subject is the four LLM-inferred
+      relations. It did not happen: leave-one-out evaluates almost exclusively those
+      relations, and the MLP wins every one of them at all ten seeds.
+    </p>
+
+    <!-- FIGURE 4 -->
+    <div class="fig">
+      <p class="fig-title">Figure 4 · Per-relation LOO MRR, MLP minus DistMult</p>
+      <p class="fig-sub">
+        Averaged over the ten paired seeds. The four inferred relations are the paper's
+        subject; TARGETS_ORGANISM is shown for completeness at n=25.
+      </p>
+      <div class="legend">
+        <span><i class="swatch" style="background:var(--up)"></i>MLP ahead</span>
+        <span><i class="swatch" style="background:var(--down)"></i>DistMult ahead</span>
+      </div>
+      <div class="dbar-rows">
+        <div class="dbar" tabindex="0" data-tip="CONFIRMS, n=125: 0.3823 -> 0.5038, +0.1215, ahead at 10/10 seeds. The largest relative gain."><span class="dbar-name">CONFIRMS</span><span class="dbar-track"><i class="dbar-fill pos" style="width:40.50%"></i></span><span class="dbar-val pos">+0.1215</span></div>
+        <div class="dbar" tabindex="0" data-tip="INDICATES, n=1459: 0.5235 -> 0.6323, +0.1087, ahead at 10/10 seeds."><span class="dbar-name">INDICATES</span><span class="dbar-track"><i class="dbar-fill pos" style="width:36.23%"></i></span><span class="dbar-val pos">+0.1087</span></div>
+        <div class="dbar" tabindex="0" data-tip="COMPLICATED_BY, n=1147: 0.4508 -> 0.5380, +0.0872, ahead at 10/10 seeds."><span class="dbar-name">COMPLICATED_BY</span><span class="dbar-track"><i class="dbar-fill pos" style="width:29.07%"></i></span><span class="dbar-val pos">+0.0872</span></div>
+        <div class="dbar" tabindex="0" data-tip="MANAGED_FOR, n=5527: 0.3822 -> 0.4123, +0.0302, ahead at 10/10 seeds. Two thirds of all LOO queries."><span class="dbar-name">MANAGED_FOR</span><span class="dbar-track"><i class="dbar-fill pos" style="width:10.07%"></i></span><span class="dbar-val pos">+0.0302</span></div>
+        <div class="dbar" tabindex="0" data-tip="TARGETS_ORGANISM, n=25: 0.6675 -> 0.6178, -0.0498, ahead at only 3/10 seeds. n=25 is far too small to read."><span class="dbar-name">TARGETS_ORG.</span><span class="dbar-track"><i class="dbar-fill neg" style="width:16.60%"></i></span><span class="dbar-val neg">−0.0498</span></div>
+      </div>
+      <div class="dbar-axis">
+        <span></span>
+        <span class="dbar-axis-inner"><span>−0.15</span><span>0</span><span>+0.15</span></span>
+        <span></span>
+      </div>
+    </div>
+
+    <div class="table-scroll">
+      <table>
+        <caption>
+          Per-relation LOO MRR, mean over ten paired seeds. These five relations account for
+          all 8,283 queries — the filtered ranking protocol excludes patient-anchored backbone
+          edges, because after removing the other true tails of <code>(patient, relation)</code>
+          fewer than two candidates usually remain.
+        </caption>
+        <thead>
+          <tr><th>Relation</th><th class="num">n</th><th class="num">DistMult</th><th class="num">MLP</th><th class="num">Δ</th><th>Seeds ahead</th><th>Paper target?</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="mono">MANAGED_FOR</td><td class="num">5527</td><td class="num">0.3822</td><td class="num">0.4123</td><td class="num up">+0.0302</td><td>10/10</td><td>yes</td></tr>
+          <tr><td class="mono">INDICATES</td><td class="num">1459</td><td class="num">0.5235</td><td class="num">0.6323</td><td class="num up">+0.1087</td><td>10/10</td><td>yes</td></tr>
+          <tr><td class="mono">COMPLICATED_BY</td><td class="num">1147</td><td class="num">0.4508</td><td class="num">0.5380</td><td class="num up">+0.0872</td><td>10/10</td><td>yes</td></tr>
+          <tr><td class="mono">CONFIRMS</td><td class="num">125</td><td class="num">0.3823</td><td class="num">0.5038</td><td class="num up">+0.1215</td><td>10/10</td><td>yes</td></tr>
+          <tr class="sub"><td class="mono">TARGETS_ORGANISM</td><td class="num">25</td><td class="num">0.6675</td><td class="num">0.6178</td><td class="num down">−0.0498</td><td>3/10</td><td>no</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p class="prose">
+      Two things are worth noticing. <strong>MANAGED_FOR gains least</strong> (+0.0302) and
+      carries two thirds of the queries, so the aggregate +0.0530 is <em>dragged down</em> by
+      the largest relation rather than propped up by it — the smaller, harder relations gain
+      two to four times as much. And <strong>TARGETS_ORGANISM is the only loss anywhere</strong>,
+      at n=25 across a 400-graph test set and ahead at only 3 of 10 seeds. That is a
+      handful of queries and should not be read as a finding in either direction.
+    </p>
+  </section>
+
+  <!-- ============================================================ WHAT IT MEANS -->
+  <section>
+    <h2><span class="sec">§6</span>What this means for the paper</h2>
+
+    <h3>The row to write</h3>
+    <p class="prose">
+      If the MLP head becomes the reported model, Table 1's leave-one-out row moves from
+      0.417 to 0.471 — a 12.7% relative improvement over the number currently under review:
+    </p>
+<pre><code>Leave-one-out (n = 8,283)
+  MRR      0.471 ± 0.017      Hits@1   0.301 ± 0.017
+  Hits@3   0.530 ± 0.024      Hits@10  0.898 ± 0.011
+
+Batch-mask (n = 3,000)
+  AUC      0.799 ± 0.016      AP       0.711 ± 0.028
+  MRR      0.374 ± 0.003
+
+(mean ± sd over 10 training seeds, 42-51, fixed test split, MLP readout)</code></pre>
+    <p class="prose">
+      Non-obvious AUC is deliberately absent from that block. It cannot be quoted until the
+      metric is fixed and both arms re-scored (§4).
+    </p>
+
+    <div class="gate flagged">
+      <span class="gate-label">This retires the released checkpoint as the paper artifact</span>
+      <p>
+        <code>models/fawkes-entity-note/…v16_260615.pt</code> is a DistMult model. Reporting
+        the MLP numbers means the released checkpoint no longer produces Table 1, and every
+        gate pinned to it — <code>test_loo_reproduces_published_test_split</code>,
+        <code>baseline/paper_loo_testsplit.json</code>, the <code>checkpoint_dict</code>
+        equality test — now pins a <em>historical</em> artifact rather than the current claim.
+        Those tests should stay (they are the regression net for the data path), but a v21
+        checkpoint has to be released alongside, and the paper must say which one it describes.
+      </p>
+    </div>
+
+    <h3>Where this sits among the known effects</h3>
+    <p class="prose">
+      v19 and v20 give the scale to read this against, and the ordering is worth stating
+      because it says where the remaining headroom is:
+    </p>
+    <div class="table-scroll">
+      <table>
+        <caption>Measured effects on LOO MRR, largest first. All on the same data and protocol.</caption>
+        <thead><tr><th>Change</th><th class="num">Effect</th><th>Evidence</th></tr></thead>
+        <tbody>
+          <tr><td>Unfreezing the encoder (train end-to-end)</td><td class="num up">+0.311</td><td>v19 arm C, 3 seeds</td></tr>
+          <tr class="ref"><td><strong>DistMult → MLP readout</strong></td><td class="num up"><strong>+0.053</strong></td><td><strong>v21, 10 paired seeds</strong></td></tr>
+          <tr><td>Seed alone (noise floor)</td><td class="num">±0.019</td><td>v20, 10 seeds</td></tr>
+          <tr><td>Patch masking vs random (with note)</td><td class="num down">−0.011</td><td>v18, 1 seed — inside noise</td></tr>
+          <tr><td>JEPA pretraining vs random init</td><td class="num">−0.008</td><td>v19 arms A/B — inside noise</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="prose">
+      The readout head is the second-largest effect measured in this project, an order of
+      magnitude above the pretext-task changes v18 and v19 spent their budget on, and the
+      largest one that <em>keeps the paper's frozen-encoder protocol intact</em>. v19's +0.311
+      remains bigger, but claiming it means abandoning the frozen readout that the method is
+      built around; v21 is a change the paper can absorb without rewriting its premise.
+    </p>
+  </section>
+
+  <!-- ============================================================ LIMITS -->
+  <section>
+    <h2><span class="sec">§7</span>What this does not establish</h2>
+    <ul class="prose">
+      <li>
+        <strong>Still one split.</strong> All twenty runs hold out the same 400 admissions,
+        and the review's question about the patient sample remains open. v20 §6 has the
+        four-job fix; it applies to both arms now, which doubles it to eight.
+      </li>
+      <li>
+        <strong>The MLP is not "the clinical_jepa head".</strong> It is the same architecture
+        with ReLU where <code>clinical_jepa</code> uses GELU. Nothing here tests that
+        difference, and nothing here validates the rest of panel C — the schema guard,
+        candidate generation and KEEP/REVIEW/PRUNE remain unimplemented in <code>fawkes</code>.
+      </li>
+      <li>
+        <strong>Parameters are not controlled.</strong> The MLP head adds ~49k parameters over
+        DistMult's relation embedding. This experiment shows the head is better; it does not
+        separate "better architecture" from "more capacity". A width-matched DistMult, or an
+        MLP shrunk to parameter parity, would.
+      </li>
+      <li>
+        <strong>Cascade and EIR are still empty.</strong> Both arms ran
+        <code>RUN_CASCADE=0</code> and <code>RUN_EIR=0</code>.
+      </li>
+      <li>
+        <strong>The corrected non-obvious AUC is measured on three seeds, not ten</strong>,
+        and on CPU. It establishes the sign flip and the mechanism; the fleet-scale number
+        needs the metric fixed and both arms re-scored.
+      </li>
+      <li>
+        <strong>No test covers the MLP path.</strong> The arm ran clean across ten jobs, but
+        the regression gate that would catch a future break still does not exist.
+      </li>
+    </ul>
+  </section>
+
+  <!-- ============================================================ LINEAGE -->
+  <section>
+    <h2><span class="sec">§8</span>The lineage — v16 through v21</h2>
+    <p class="prose">
+      Six versions of one model. v18 questioned a setting, v19 questioned the method, v20
+      questioned whether any of it was resolvable, and v21 answers the question v20 made
+      askable — because a +0.053 effect is only reportable once you know the noise floor is
+      ±0.019. §9–§11 work backwards through each version in full, so this document stands
+      alone.
+    </p>
+    <div class="table-scroll">
+      <table>
+        <caption>What each version changed, and what it measured.</caption>
+        <thead><tr><th>Version</th><th>Kind</th><th>What it changed</th><th>Headline measurement</th></tr></thead>
+        <tbody>
+          <tr><td><strong>v16</strong><br><span class="mono">stamp 260615</span></td><td>Experiment</td><td>The entity-localised note — the Clinical-ModernBERT vector moved onto the entity nodes the note grounds.</td><td>LOO MRR <strong>0.418653</strong>, n=8,283. The published number.</td></tr>
+          <tr><td><strong>v17</strong></td><td>Engineering</td><td>One 719-line <code>trainer.py</code> split six ways; import-time env globals became a dataclass.</td><td>Equality with v16 to <code>1e-6</code>. <em>No numerics moved, by design.</em></td></tr>
+          <tr><td><strong>v18</strong></td><td>Experiment</td><td>BFS-balanced whole-patch masking as an opt-in pretext task.</td><td>No-note <strong>+0.0237</strong>, with-note <strong>−0.0107</strong>. One seed per cell.</td></tr>
+          <tr><td><strong>v19</strong></td><td>Ablation</td><td>Nothing in the model. One model-selection fix; six arms over the existing env surface.</td><td>Phase 1 ≈ random init (−0.008); from-scratch <strong>+0.311</strong>.</td></tr>
+          <tr><td><strong>v20</strong></td><td>Variance</td><td>Split seed separated from training seed. One field, one line, one test.</td><td>MRR <strong>0.4174 ± 0.0190</strong> over ten seeds; published value inside the 95% CI.</td></tr>
+          <tr class="ref"><td><strong>v21</strong></td><td>Experiment</td><td><strong>Nothing.</strong> <code>DECODER=mlp</code> — a switch present since v16, never run.</td><td>LOO MRR <strong>+0.0530</strong> paired, 10/10 seeds, distributions disjoint.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <caption>Code and test traceability.</caption>
+        <thead><tr><th>Version</th><th class="mono">Source touched</th><th>Tests added</th><th>Config surface</th></tr></thead>
+        <tbody>
+          <tr><td><strong>v17</strong></td><td class="mono">src/fawkes/{config,data,model,steps,train,evaluate}.py</td><td>The Phase-5 gates.</td><td>Same names, same defaults — now <code>Config.from_env()</code>.</td></tr>
+          <tr><td><strong>v18</strong></td><td class="mono">src/fawkes/patches.py <span class="chip new">new</span>, steps.py, config.py</td><td>4</td><td>+2 fields: <code>MASK_STRATEGY</code>, <code>JEPA_PATCHES</code>.</td></tr>
+          <tr><td><strong>v19</strong></td><td class="mono">src/fawkes/train.py (<code>train_readout</code>)</td><td>1</td><td><strong>None.</strong></td></tr>
+          <tr><td><strong>v20</strong></td><td class="mono">src/fawkes/config.py, train.py, baseline/old_fawkes.json</td><td>1</td><td>+1 field: <code>DATA_SPLIT_SEED</code>.</td></tr>
+          <tr class="ref"><td><strong>v21</strong></td><td class="mono"><strong>None.</strong></td><td><strong>0</strong> — and the MLP path still has no gate (§7).</td><td><strong>None.</strong> <code>DECODER</code> has existed since v16.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="gate flagged">
+      <span class="gate-label">The artifact rule this series keeps re-learning</span>
+      <p>
+        <code>Config.checkpoint_dict</code> writes a hand-picked subset of fields. It omits
+        <code>jepa_epochs</code>, <code>readout_epochs</code> and <code>freeze_encoder</code>
+        — which is why v19's arms C and Cp serialise identically — and it omits
+        <code>data_split_seed</code> and <code>decoder</code> too. A v21 checkpoint therefore
+        cannot be distinguished from a v20 one by its config block, and loading one without
+        <code>DECODER=mlp</code> fails a strict <code>state_dict</code> load. <strong>From v19
+        on, the job name and output repository are the provenance record.</strong>
+      </p>
+    </div>
+  </section>
+
+  <!-- ============================================================ V20 -->
+  <section>
+    <h2><span class="sec">§9</span>v20 — the seed variance study</h2>
+    <div class="rail"><div>
+      <div class="rail-tag">v20 · split/seed separation</div>
+      <div class="rail-body">One config field, one line in the splitter, one regression test. No change to any published number.</div>
+    </div></div>
+    <p class="prose">
+      A reviewer asked for mean ± std across seeds and splits, on the grounds that the paper
+      reports one particular random sample of patients. Before v20, <code>_split_items</code>
+      keyed its permutation on <code>cfg.seed</code> — the same value seeding the model — so
+      changing <code>SEED</code> resampled the patients <em>and</em> reinitialised the model at
+      once. <code>data_split_seed</code> separated them, defaulting to 42 so the published
+      split is unchanged.
+    </p>
+    <p class="prose">
+      Ten retrains of the paper configuration gave LOO MRR <strong>0.4174 ± 0.0190</strong>,
+      with all four published metrics inside the 95% CI and AUC agreeing to 0.0002. The
+      published number was not a lucky draw. But the spread is large — Hits@1 varies by 9.4%
+      of its mean — and it established the <strong>0.0238 minimum detectable difference</strong>
+      that makes v21 readable. v20 also found that no retrain in the lineage had ever
+      reproduced the published number as a point: every apparent reproduction re-evaluates
+      the released checkpoint.
+    </p>
+    <div class="gate flagged">
+      <span class="gate-label">v20's open item, still open</span>
+      <p>
+        Every run in v20 and v21 uses <code>DATA_SPLIT_SEED=42</code>. The split axis is
+        unmeasured, so the reviewer's actual question — is it a lucky sample of
+        <em>patients</em> — remains unanswered. v20 §6 also recorded that the split is by
+        admission, not by patient: 139 subjects appear in both train and test, and 36.8% of
+        test admissions belong to a patient the model trained on.
+      </p>
+    </div>
+  </section>
+
+  <!-- ============================================================ V19 -->
+  <section>
+    <h2><span class="sec">§10</span>v19 — the JEPA pretraining ablation</h2>
+    <div class="rail"><div>
+      <div class="rail-tag">v19 · ablation harness</div>
+      <div class="rail-body">No new configuration. One model-selection bug fixed, six arms over the existing env surface.</div>
+    </div></div>
+    <p class="prose">
+      Asked how much of the result comes from JEPA pretraining rather than from having any
+      graph encoder, six arms across three seeds answered: <strong>a frozen randomly
+      initialised encoder scores the same as the JEPA-pretrained one</strong> (−0.008, sign
+      flipping across seeds), while the same architecture trained end-to-end without phase 1
+      beats both by <strong>+0.311 MRR</strong>. An encoder with message passing removed
+      entirely still beat the paper model by +0.23.
+    </p>
+    <div class="table-scroll">
+      <table>
+        <caption>The six arms, LOO MRR. Everything unlisted is the v16 entity-note default.</caption>
+        <thead><tr><th>Arm</th><th>Phase 1</th><th>Phase 2 encoder</th><th class="num">LOO MRR</th><th>Seeds</th></tr></thead>
+        <tbody>
+          <tr class="ref"><td><strong>A</strong> paper</td><td>JEPA, 60 ep</td><td>frozen</td><td class="num">0.4027 ±0.013</td><td>42, 43, 44</td></tr>
+          <tr><td><strong>B</strong> random frozen</td><td>none</td><td>frozen (random init)</td><td class="num">0.3952 ±0.031</td><td>42, 43, 44</td></tr>
+          <tr><td><strong>C</strong> from scratch</td><td>none</td><td>trained jointly</td><td class="num">0.7135 ±0.141</td><td>42, 43, 44</td></tr>
+          <tr><td><strong>Cp</strong> compute-matched</td><td>none</td><td>trained jointly, 100 ep</td><td class="num">0.7147 ±0.142</td><td>42, 43, 44</td></tr>
+          <tr><td><strong>D</strong> no graph</td><td>none</td><td>no message passing</td><td class="num">0.6293</td><td>42</td></tr>
+          <tr><td><strong>E</strong> pretrain + finetune</td><td>JEPA, 60 ep</td><td>fine-tuned</td><td class="num">0.5442</td><td>42</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="prose">
+      v19's proposed mechanism: under <code>FREEZE_ENCODER=1</code> the 8,192 × 128 entity
+      embedding table is only ever shaped by the pretext task, and in arm B never trained at
+      all. Its one code change fixed <code>train_readout</code> snapshotting only the scorer at
+      the best-VAL epoch, which had been pairing a selected scorer with a final-epoch encoder
+      — a bug that degraded exactly the arms the JEPA claim was measured against.
+    </p>
+    <p class="prose">
+      <strong>v21 sharpens v19's negative result.</strong> The −0.008 that v19 could not
+      distinguish from zero is now known to sit less than half a seed-sd from it, while v21's
+      +0.053 on the same protocol is 2.2× the detection floor. The readout head matters; the
+      pretext task, on this evidence, does not. v19's outstanding diagnostic — pulling
+      <code>emb_std</code> from arm A's logs to rule out target-encoder collapse — is still
+      outstanding, and v21 does not bear on it.
+    </p>
+  </section>
+
+  <!-- ============================================================ V18/V17/V16 -->
+  <section>
+    <h2><span class="sec">§11</span>v18, v17 and v16 — the earlier lineage</h2>
+
+    <h3>v18 — BFS-balanced patch masking</h3>
+    <p class="prose">
+      v16's pretext task masks nodes i.i.d. Bernoulli at 0.4, which lets the model solve
+      masking by local interpolation from surviving neighbours. v18 added
+      <code>MASK_STRATEGY=patch</code>: partition each graph into 8 BFS-balanced patches and
+      mask whole patches, so a masked node's neighbours are usually masked too. Results were
+      no-note <strong>+0.0237</strong> and with-note <strong>−0.0107</strong>, one seed per cell.
+      Both sit inside the ±0.019 v20 later measured, so neither is resolvable — and the
+      with-note comparison set a freshly trained patch model against the <em>released
+      checkpoint</em>, making it unpaired as well as underpowered.
+    </p>
+
+    <h3>v17 — the refactor that had to move nothing</h3>
+    <p class="prose">
+      <code>paper_v16/trainer.py</code> read ~30 <code>os.environ</code> values at import and
+      computed a tensor shape from them, so environment variables had to be set before import,
+      two configurations could not coexist in one process, and the trainer was untestable. v17
+      split it into <code>fawkes/{config,data,model,steps,train,evaluate}.py</code> with every
+      global becoming a <code>Config</code> field. The success criterion was equality: LOO to
+      <code>1e-6</code>, identical <code>state_dict</code> keys, and an AST gate proving no
+      module-scope environment reads remain. All three still pass under v21. <strong>It is
+      that verbatim-preservation requirement that carried <code>DECODER</code> forward</strong>,
+      which is why v21 needed no code.
+    </p>
+
+    <h3>v16 — the experiment that produced the published number</h3>
+    <p class="prose">
+      v15 attached the Clinical-ModernBERT note embedding to a single per-admission
+      <code>NOTE</code> node. v16 retired it and localised the same 768-dimensional vector onto
+      the entity nodes the note actually grounds — by default the endpoints of any edge
+      carrying <code>prov_in_note</code>, which is 28.6% of nodes on the shipped dataset.
+      Ungrounded entities receive a zero vector.
+    </p>
+    <div class="table-scroll">
+      <table>
+        <caption>The v16 configuration — <code>Config()</code> defaults are the released experiment.</caption>
+        <thead><tr><th>Setting</th><th class="mono">Value</th><th>Note</th></tr></thead>
+        <tbody>
+          <tr><td>Encoder</td><td class="mono">hid=128, layers=2, heads=4</td><td>Two <code>TransformerConv</code> layers; 2,637,954 parameters.</td></tr>
+          <tr><td>Node input</td><td class="mono">numeric_dim=774</td><td>6 demographic slots + 768 note dims — <em>not</em> 778 or 1550.</td></tr>
+          <tr><td>Phase 1</td><td class="mono">jepa_epochs=60, node_mask=0.4</td><td>Masked-node latent prediction, EMA target.</td></tr>
+          <tr><td>Phase 2</td><td class="mono">readout_epochs=40, freeze_encoder=1</td><td>Frozen encoder; v19's finding and v21's arm both live here.</td></tr>
+          <tr><td>Readout head</td><td class="mono">decoder=distmult</td><td><strong>The v21 switch.</strong> The MLP alternative shipped alongside it.</td></tr>
+          <tr><td>Evaluation</td><td class="mono">loo_cap=40000</td><td>Mask one edge, keep the graph as context, filtered ranking.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ============================================================ PROVENANCE -->
+  <section>
+    <h2><span class="sec">§12</span>Provenance — where every number came from</h2>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Number</th><th>Source</th><th>Verification</th></tr></thead>
+        <tbody>
+          <tr><td>All 10 MLP rows</td><td class="mono">&lt;user&gt;/fawkes-v21-mlp-sp42-s{42…51}</td><td>Read from <code>recovery_test_loo</code> and <code>recovery_test_batchmask</code> in each pushed checkpoint.</td></tr>
+          <tr><td>All 10 DistMult rows</td><td class="mono">&lt;user&gt;/fawkes-v20-variance-sp42-s{42…51}</td><td>Reused from v20 unchanged — same split, same seeds, <code>DECODER</code> at its default.</td></tr>
+          <tr><td>Paired differences and CIs</td><td class="mono">print_v21_decoder_table.py</td><td>Per-seed difference, sample sd, interval from t(9)=2.262. A paired CI excluding zero is the two-sided paired t-test at .05; no scipy needed.</td></tr>
+          <tr><td>Eval population</td><td class="mono">n per run</td><td><code>n=8283</code> (LOO) and <code>n_mrr=3000</code> (batch-mask) across all twenty runs — the pinned split's signature.</td></tr>
+          <tr><td>Per-relation table</td><td class="mono">recovery_test_loo["per_rel"]</td><td>Mean over the ten paired seeds; the five relations sum to 8,283, the full LOO population.</td></tr>
+          <tr><td>Non-obvious AUC artefact</td><td class="mono">local re-evaluation, 3 seeds</td><td>As-shipped column reproduces the fleet's −0.0713 to within 0.002 before the corrected column is read.</td></tr>
+          <tr><td>The metric defect itself</td><td class="mono">src/fawkes/evaluate.py::_classification_metrics</td><td>Read from source: positives masked by <code>nonpat_mask</code>, negatives concatenated unmasked.</td></tr>
+          <tr><td><code>DECODER</code> predates v21</td><td class="mono">baseline/old_fawkes.json</td><td><code>field_to_global["decoder"] == "DECODER"</code> — a real trainer.py global, not <code>null</code> as new fields are.</td></tr>
+          <tr class="sub"><td>v20 / v19 / v18 rows</td><td class="mono">Reports No. 4, 3 and 2</td><td>Carried forward unchanged.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h4>Reproducing one run</h4>
+<pre><code>hf jobs uv run --detach --flavor t4-small --timeout 4h --secrets HF_TOKEN \
+  --name fawkes-v21-mlp-sp42-s42 -v ./src:/workspace/src \
+  -e MASK_STRATEGY=random -e USE_NOTE=1 -e GROUND_BY=prov -e EMBED_DIM=768 \
+  -e USE_SCORES=0 -e PRUNE_NO_EVIDENCE=1 -e RUN_CASCADE=0 -e RUN_EIR=0 \
+  -e DECODER=mlp -e PUSH=1 -e DATA_SPLIT_SEED=42 -e SEED=42 \
+  -e OUTPUT_REPO=&lt;user&gt;/fawkes-v21-mlp-sp42-s42 \
+  scripts/fawkes_patch_masking_hf_job.py</code></pre>
+    <p class="prose">
+      <code>submit-v21-mlp-decoder.sh</code> loops this over seeds 42–51. The only difference
+      from v20's submission is <code>-e DECODER=mlp</code>.
+    </p>
+
+    <p class="prose" style="margin-top:1.2rem">
+      <strong>On this report's charts.</strong> The data palette is carried from v20 and re-run
+      through the palette validator rather than assumed: the diverging pair passes all six
+      checks in both modes (worst-case CVD ΔE 21.6 light, 19.2 dark against a threshold of 8;
+      normal-vision ΔE 32.3 and 29.0), and the single magnitude hue passes lightness, chroma
+      and contrast in both. No new hue was introduced; the diverging pair's <em>meaning</em>
+      changed — it now encodes which readout head is ahead — and that is stated in every
+      legend that uses it. Figures 1 and 2 distinguish their marks by shape rather than
+      colour. Every chart's numbers appear in an adjacent table, and every delta is printed
+      with its sign, so no value is reachable only by colour or only by hovering.
+    </p>
+  </section>
+
+  <div class="gate flagged">
+    <span class="gate-label">If you do one thing next</span>
+    <p>
+      Fix <code>_classification_metrics</code> and re-score both arms. It is a one-line change
+      — <code>negatives[nonpat_mask]</code> — and until it lands, one column of Table 1 is
+      measuring non-patient positives against a mostly-patient negative pool, in the released
+      checkpoint as well as in v21.
+    </p>
+  </div>
+
+  <p class="footnote">
+    <strong>v21 sources:</strong> the ten pushed MLP checkpoints and their embedded
+    <code>recovery_test_loo</code> and <code>recovery_test_batchmask</code> blocks; the ten v20
+    checkpoints as the paired baseline; a local re-evaluation of three seeds per arm against
+    <code>data/fawkes-training-graph-embedded-260615/</code> for §4; and
+    <code>src/fawkes/{model,steps,evaluate}.py</code> read directly for the scorer definitions
+    and the metric defect.
+    <strong>Carried forward:</strong> §9 from Report No. 4 (v20 seed variance), §10 from Report
+    No. 3 (v19 ablation), §11 from Reports No. 2 and 1 together with
+    <code>docs/LINEAGE.md</code> and <code>docs/PAPER_CODE_MAP.md</code>.
+    This report is self-contained: §8–§11 reproduce the lineage so it can be read without the
+    four earlier reports, which remain the primary record for their own results.
+    Generated 2026-08-07.
+  </p>
+</div>
+
+<div id="tip" role="status" aria-live="polite"></div>
+<script>
+  (function () {
+    var tip = document.getElementById('tip');
+    function show(el, x, y) {
+      var text = el.getAttribute('data-tip');
+      if (!text) return;
+      tip.textContent = text;
+      tip.classList.add('on');
+      var r = tip.getBoundingClientRect();
+      var left = Math.min(Math.max(8, x + 14), window.innerWidth - r.width - 8);
+      var top = y - r.height - 12;
+      if (top < 8) top = y + 18;
+      tip.style.left = left + 'px';
+      tip.style.top = top + 'px';
+    }
+    function hide() { tip.classList.remove('on'); }
+    document.querySelectorAll('[data-tip]').forEach(function (el) {
+      el.addEventListener('mousemove', function (e) { show(el, e.clientX, e.clientY); });
+      el.addEventListener('mouseleave', hide);
+      el.addEventListener('focus', function () {
+        var r = el.getBoundingClientRect();
+        show(el, r.left + r.width / 2, r.top);
+      });
+      el.addEventListener('blur', hide);
+    });
+    window.addEventListener('scroll', hide, { passive: true });
+  })();
+</script>

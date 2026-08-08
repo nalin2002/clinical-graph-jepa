@@ -36,7 +36,7 @@ from fawkes.evaluate import (_load_graphs, cascade_evaluate, eir_uplift_eval, ev
                              loo_evaluate)
 from fawkes.model import JEPA, DistMult, Encoder
 from fawkes.patches import balanced_bfs_partition, patch_mask
-from fawkes.train import jepa_step, readout_step, train_readout
+from fawkes.train import _split_items, jepa_step, readout_step, train_readout
 
 PIN = "old_fawkes.json"
 PAPER_CKPT = ROOT / "models/fawkes-entity-note/fawkes_trainer_jepa_entity_note_v16_260615.pt"
@@ -107,7 +107,7 @@ def test_loo_reproduces_published_test_split():
     raw, demographics = _load_graphs(DATA, None)
     items = [d for g in raw
              if (d := to_data(g, demographics, cfg)).num_nodes >= 3 and d.edge_index.size(1) >= 4]
-    idx = np.random.RandomState(cfg.seed).permutation(len(items))
+    idx = np.random.RandomState(cfg.data_split_seed).permutation(len(items))
     test = [items[i] for i in idx[:int(cfg.test_frac * len(items))]]
     metrics = loo_evaluate(encoder, scorer, test, torch.device("cpu"), cfg)
 
@@ -117,6 +117,23 @@ def test_loo_reproduces_published_test_split():
     assert metrics["n"] == embedded["n"]
     for key in ("mrr", "hits1", "hits3", "hits10"):
         assert abs(metrics[key] - embedded[key]) <= TOL
+
+
+def test_split_follows_data_split_seed_not_seed():
+    """(v20) The split must move with ``data_split_seed`` and hold under ``seed``.
+
+    The Table 1 variance study varies the two independently. If ``_split_items``
+    still read ``cfg.seed``, every "same patients, new initialisation" run would
+    silently resample the test set, which would make the per-split comparison a
+    comparison of nothing and would put unpaired runs in a paired column.
+    """
+    items = list(range(500))
+    _, _, test = _split_items(items, Config())
+
+    assert _split_items(items, Config(seed=7))[2] == test, "changing seed moved the split"
+    assert _split_items(items, Config(data_split_seed=43))[2] != test, "data_split_seed did not move the split"
+    # The defaults still describe the published split, whichever field carries it.
+    assert _split_items(items, Config(data_split_seed=42))[2] == test
 
 
 # ---- Gate 2: attribute paths did not move ----

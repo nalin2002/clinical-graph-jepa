@@ -1,0 +1,1628 @@
+<title>fawkes v20 — Seed Variance: Defending Table 1</title>
+<style>
+  /* ============================================================
+     TOKENS — chrome carried over unchanged from the v19 report, so
+     the four reports read as one series. The data layer is carried
+     too, and re-validated for v20 rather than assumed: the diverging
+     pair and the magnitude hue were re-run through the palette
+     validator in both modes (§11). Teal never encodes data;
+     blue/red never appear in text chrome.
+     ============================================================ */
+  :root {
+    /* chrome */
+    --paper: #FAFBFA;
+    --raised: #F3F6F5;
+    --ink: #1A2426;
+    --muted: #5C6B6A;
+    --accent: #0F6B5C;
+    --accent-soft: #E7F0EE;
+    --flag: #B3591A;
+    --flag-soft: #F7EDE4;
+    --line: #DCE3E1;
+    --hairline: #E8EDEC;
+    --code-bg: #F0F4F3;
+    /* data layer — re-validated for v20 (see §11) */
+    --up: #2a78d6;          /* published above the retrain mean */
+    --down: #e34948;        /* published below the retrain mean */
+    --zero: #C3C2BB;        /* diverging midpoint               */
+    --data: #1c5cab;        /* single magnitude hue             */
+    --grid: #E4E8E7;
+    --axis: #C6CFCD;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #101716; --raised: #17201E; --ink: #E4EAE8; --muted: #93A5A2;
+      --accent: #4FBFA8; --accent-soft: #16302B; --flag: #E09A5A; --flag-soft: #33241A;
+      --line: #263230; --hairline: #1E2927; --code-bg: #18211F;
+      --up: #3987e5; --down: #e66767; --zero: #4A5654; --data: #4f97e4;
+      --grid: #202B29; --axis: #33403D;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #101716; --raised: #17201E; --ink: #E4EAE8; --muted: #93A5A2;
+    --accent: #4FBFA8; --accent-soft: #16302B; --flag: #E09A5A; --flag-soft: #33241A;
+    --line: #263230; --hairline: #1E2927; --code-bg: #18211F;
+    --up: #3987e5; --down: #e66767; --zero: #4A5654; --data: #4f97e4;
+    --grid: #202B29; --axis: #33403D;
+  }
+  :root[data-theme="light"] {
+    --paper: #FAFBFA; --raised: #F3F6F5; --ink: #1A2426; --muted: #5C6B6A;
+    --accent: #0F6B5C; --accent-soft: #E7F0EE; --flag: #B3591A; --flag-soft: #F7EDE4;
+    --line: #DCE3E1; --hairline: #E8EDEC; --code-bg: #F0F4F3;
+    --up: #2a78d6; --down: #e34948; --zero: #C3C2BB; --data: #1c5cab;
+    --grid: #E4E8E7; --axis: #C6CFCD;
+  }
+
+  /* ============================================================ TYPE */
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: Charter, Georgia, 'Times New Roman', serif;
+    font-size: 1.05rem;
+    line-height: 1.62;
+    margin: 0;
+  }
+  h1, h2, h3, h4, .eyebrow, .chip, .gate-label, thead th,
+  .fig, .fig *, .kpi, .kpi *, .rail, .rail * {
+    font-family: 'Avenir Next', Avenir, Seravek, 'Segoe UI', system-ui, sans-serif;
+  }
+  code, pre, .mono { font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; font-size: 0.88em; }
+
+  .wrap { max-width: 52rem; margin: 0 auto; padding: 3.5rem 1.5rem 6rem; }
+  .prose { max-width: 40rem; }
+
+  .eyebrow {
+    text-transform: uppercase; letter-spacing: 0.14em; font-size: 0.72rem;
+    font-weight: 600; color: var(--accent); margin: 0 0 0.75rem;
+  }
+  h1 {
+    font-size: 2.15rem; font-weight: 700; line-height: 1.14;
+    margin: 0 0 0.6rem; text-wrap: balance; letter-spacing: -0.015em;
+  }
+  .subtitle { color: var(--muted); font-size: 1.05rem; margin: 0 0 1.4rem; max-width: 38rem; }
+  .meta {
+    display: flex; flex-wrap: wrap; gap: 0.4rem 1.4rem;
+    font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 0.76rem;
+    color: var(--muted); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+    padding: 0.6rem 0; margin-bottom: 2.4rem;
+  }
+  .meta strong { color: var(--ink); font-weight: 600; }
+
+  section { margin-top: 3.4rem; }
+  h2 {
+    font-size: 1.34rem; font-weight: 700; letter-spacing: -0.01em;
+    margin: 0 0 1rem; text-wrap: balance; display: flex; align-items: baseline; gap: 0.65rem;
+  }
+  h2 .sec {
+    color: var(--accent); font-size: 0.82rem; font-weight: 600;
+    font-family: ui-monospace, 'SF Mono', Menlo, monospace; white-space: nowrap;
+  }
+  h3 { font-size: 1.04rem; font-weight: 600; margin: 1.9rem 0 0.5rem; }
+  h4 { font-size: 0.85rem; font-weight: 600; margin: 1.3rem 0 0.4rem; letter-spacing: 0.01em; }
+  p { margin: 0 0 1rem; }
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  a:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 2px; }
+  ul { padding-left: 1.2rem; margin: 0 0 1rem; }
+  li { margin-bottom: 0.45rem; }
+  code { background: var(--code-bg); padding: 0.1em 0.35em; border-radius: 3px; }
+  pre {
+    background: var(--code-bg); border: 1px solid var(--line); border-radius: 6px;
+    padding: 0.9rem 1.1rem; overflow-x: auto; line-height: 1.55; margin: 0 0 1rem;
+  }
+  pre code { background: none; padding: 0; }
+
+  /* ============================================================ VERSION RAIL */
+  .rail {
+    display: flex; align-items: stretch; gap: 0.9rem;
+    border-left: 3px solid var(--accent); padding-left: 1rem; margin: 0 0 1.6rem;
+  }
+  .rail-tag {
+    font-size: 0.7rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--accent);
+  }
+  .rail-body { font-family: Charter, Georgia, serif; color: var(--muted); font-size: 0.95rem; }
+
+  /* ============================================================ CHIPS */
+  .chip {
+    display: inline-block; font-size: 0.68rem; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.08em; padding: 0.14rem 0.55rem; border-radius: 999px;
+    vertical-align: 0.12em; margin-right: 0.3rem;
+  }
+  .chip.new { background: var(--accent-soft); color: var(--accent); }
+  .chip.changed { background: var(--flag-soft); color: var(--flag); }
+  .chip.unchanged { background: var(--accent-soft); color: var(--accent); }
+
+  /* ============================================================ CALLOUTS */
+  .gate {
+    border: 1px solid var(--line); border-left: 3px solid var(--accent);
+    background: var(--accent-soft); border-radius: 0 6px 6px 0;
+    padding: 0.9rem 1.1rem; margin: 1.3rem 0;
+  }
+  .gate-label {
+    font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em;
+    color: var(--accent); display: block; margin-bottom: 0.35rem;
+  }
+  .gate p:last-child, .gate ul:last-child { margin-bottom: 0; }
+  .gate.flagged { border-left-color: var(--flag); background: var(--flag-soft); }
+  .gate.flagged .gate-label { color: var(--flag); }
+
+  /* ============================================================ KPI TILES */
+  .kpi-row {
+    display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin: 1.6rem 0 1.2rem;
+  }
+  @media (max-width: 640px) { .kpi-row { grid-template-columns: 1fr; } }
+  .kpi {
+    background: var(--raised); border: 1px solid var(--hairline);
+    border-radius: 8px; padding: 1.05rem 1.15rem;
+  }
+  .kpi-label {
+    font-size: 0.71rem; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--muted); margin-bottom: 0.5rem;
+  }
+  .kpi-value {
+    font-size: 2.5rem; font-weight: 600; line-height: 1; letter-spacing: -0.02em;
+    display: flex; align-items: baseline; gap: 0.5rem; flex-wrap: wrap;
+  }
+  .kpi-from { font-size: 0.82rem; color: var(--muted); font-weight: 400; letter-spacing: 0; }
+  .kpi-delta { font-size: 0.88rem; font-weight: 600; margin-top: 0.5rem; }
+  .kpi-delta.up { color: var(--up); }
+  .kpi-delta.down { color: var(--down); }
+  .kpi-delta.flat { color: var(--muted); }
+  .kpi-note { font-size: 0.78rem; color: var(--muted); margin-top: 0.35rem; line-height: 1.45; }
+
+  /* ============================================================ FIGURES */
+  .fig {
+    margin: 1.8rem 0 1.2rem; border: 1px solid var(--hairline);
+    border-radius: 8px; padding: 1.15rem 1.2rem 1rem; background: var(--raised);
+  }
+  .fig-title { font-size: 0.92rem; font-weight: 600; margin: 0 0 0.2rem; }
+  .fig-sub { font-size: 0.78rem; color: var(--muted); margin: 0 0 1rem; line-height: 1.45; }
+  .legend {
+    display: flex; flex-wrap: wrap; gap: 0.35rem 1.1rem; margin: 0 0 1rem;
+    font-size: 0.74rem; color: var(--muted);
+  }
+  .legend span { display: inline-flex; align-items: center; gap: 0.38rem; }
+  .swatch { width: 11px; height: 11px; border-radius: 2px; display: inline-block; flex: none; }
+  .swatch.dot { border-radius: 50%; width: 9px; height: 9px; }
+  .swatch.tick { width: 2px; height: 12px; border-radius: 1px; background: var(--data); }
+  .swatch.rule { width: 0; height: 13px; border-left: 2px dashed var(--ink); border-radius: 0; }
+  .swatch.band { width: 16px; height: 9px; border-radius: 2px; background: var(--data); opacity: 0.17; }
+
+  .panel-label {
+    font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em;
+    color: var(--ink); margin: 0.9rem 0 0.55rem;
+  }
+  .panel-label:first-of-type { margin-top: 0; }
+
+  /* --- ladder: magnitude bars from a zero baseline --- */
+  .lad-rows { display: grid; gap: 0.32rem; }
+  .lad {
+    display: grid; grid-template-columns: 9.4rem 1fr 3.4rem; align-items: center;
+    gap: 0.6rem; font-size: 0.76rem;
+  }
+  .lad-name { color: var(--ink); text-align: right; line-height: 1.25; font-weight: 600; font-size: 0.74rem; }
+  .lad-name i { display: block; font-style: normal; font-weight: 400; font-size: 0.66rem; color: var(--muted); }
+  .lad-track { position: relative; height: 19px; }
+  .lad-track::after {
+    content: ""; position: absolute; left: var(--ref, 50%); top: -3px; bottom: -3px;
+    width: 1px; background: var(--axis);
+  }
+  .lad-fill {
+    position: absolute; left: 0; top: 4px; height: 11px;
+    background: var(--data); border-radius: 0 4px 4px 0;
+  }
+  .lad-val { font-variant-numeric: tabular-nums; font-weight: 600; font-size: 0.75rem; color: var(--ink); }
+  .lad-axis {
+    display: grid; grid-template-columns: 9.4rem 1fr 3.4rem; gap: 0.6rem;
+    font-size: 0.68rem; color: var(--muted); margin-top: 0.45rem;
+  }
+  .lad-axis-inner { display: flex; justify-content: space-between; font-variant-numeric: tabular-nums; }
+
+  /* --- diverging delta bars --- */
+  .dbar-rows { display: grid; gap: 0.3rem; }
+  .dbar {
+    display: grid; grid-template-columns: 6.6rem 1fr 4.2rem; align-items: center;
+    gap: 0.6rem; font-size: 0.76rem;
+  }
+  .dbar-name { color: var(--muted); text-align: right; }
+  .dbar-track {
+    position: relative; height: 17px; background: transparent;
+    border-left: 0; overflow: visible;
+  }
+  .dbar-track::before {
+    content: ""; position: absolute; left: 50%; top: -2px; bottom: -2px;
+    width: 1px; background: var(--zero);
+  }
+  .dbar-fill {
+    position: absolute; top: 3px; height: 11px; border-radius: 3px;
+  }
+  .dbar-fill.pos { left: 50%; background: var(--up); border-radius: 0 3px 3px 0; }
+  .dbar-fill.neg { right: 50%; background: var(--down); border-radius: 3px 0 0 3px; }
+  .dbar-val { font-variant-numeric: tabular-nums; font-weight: 600; font-size: 0.75rem; }
+  .dbar-val.pos { color: var(--up); }
+  .dbar-val.neg { color: var(--down); }
+  .dbar-axis {
+    display: grid; grid-template-columns: 6.6rem 1fr 4.2rem; gap: 0.6rem;
+    font-size: 0.68rem; color: var(--muted); margin-top: 0.4rem;
+  }
+  .dbar-axis-inner { display: flex; justify-content: space-between; font-variant-numeric: tabular-nums; }
+
+  /* --- seed strip: per-seed dots with a range line, mean tick and reference rule --- */
+  .strip-rows { display: grid; gap: 0.5rem; }
+  .strip {
+    display: grid; grid-template-columns: 9.4rem 1fr 5.4rem; align-items: center;
+    gap: 0.6rem; font-size: 0.75rem;
+  }
+  .strip-name { color: var(--ink); text-align: right; line-height: 1.25; font-weight: 600; font-size: 0.74rem; }
+  .strip-name i { display: block; font-style: normal; font-weight: 400; font-size: 0.66rem; color: var(--muted); }
+  .strip-track { position: relative; height: 38px; }
+  .strip-track::before {
+    content: ""; position: absolute; left: 0; right: 0; top: 50%;
+    height: 1px; background: var(--grid);
+  }
+  /* Taller than a dot plus its 2px surface ring, so the interval still reads as one
+     continuous span where the seed dots sit on top of it. */
+  .strip-ci {
+    position: absolute; top: 50%; height: 26px; transform: translateY(-50%);
+    background: var(--data); opacity: 0.17; border-radius: 3px;
+  }
+  .strip-range {
+    position: absolute; top: 50%; height: 2px; transform: translateY(-50%); background: var(--axis);
+  }
+  .strip-dot {
+    position: absolute; top: 50%; width: 10px; height: 10px; border-radius: 50%;
+    background: var(--data); transform: translate(-50%, -50%);
+    box-shadow: 0 0 0 2px var(--raised);
+  }
+  .strip-mean {
+    position: absolute; top: 50%; width: 3px; height: 20px; border-radius: 1.5px;
+    background: var(--data); transform: translate(-50%, -50%);
+    box-shadow: 0 0 0 2px var(--raised);
+  }
+  /* The published rule sits 1.6% of the axis from the mean tick — that near-coincidence
+     is the finding, so the two must stay separable. It is taller than the track and
+     dashed, so shape distinguishes it rather than position or colour. */
+  .strip-ref {
+    position: absolute; top: 50%; height: 34px; width: 0;
+    border-left: 2px dashed var(--ink); transform: translate(-50%, -50%);
+  }
+  .strip-ref::after {
+    content: "published"; position: absolute; left: 4px; top: -2px;
+    font-size: 0.6rem; letter-spacing: 0.03em; color: var(--muted); white-space: nowrap;
+  }
+  .strip-val { font-variant-numeric: tabular-nums; font-weight: 600; font-size: 0.73rem; color: var(--ink); }
+  .strip-val i { font-style: normal; font-weight: 400; color: var(--muted); font-size: 0.68rem; }
+  .strip-axis {
+    display: grid; grid-template-columns: 9.4rem 1fr 5.4rem; gap: 0.6rem;
+    font-size: 0.68rem; color: var(--muted); margin-top: 0.5rem;
+  }
+  .strip-axis-inner { display: flex; justify-content: space-between; font-variant-numeric: tabular-nums; }
+
+  /* ============================================================ TABLES */
+  .table-scroll { overflow-x: auto; margin: 1.2rem 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.86rem; }
+  thead th {
+    text-align: left; font-size: 0.7rem; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.09em; color: var(--muted); border-bottom: 2px solid var(--line);
+    padding: 0.42rem 0.85rem 0.42rem 0; white-space: nowrap;
+  }
+  tbody td {
+    border-bottom: 1px solid var(--hairline); padding: 0.5rem 0.85rem 0.5rem 0;
+    vertical-align: top;
+  }
+  tbody tr:last-child td { border-bottom: 1px solid var(--line); }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  td.mono, th.mono { white-space: nowrap; font-family: ui-monospace, Menlo, monospace; font-size: 0.8rem; }
+  td.up { color: var(--up); font-weight: 600; }
+  td.down { color: var(--down); font-weight: 600; }
+  tbody tr.sub td { color: var(--muted); font-size: 0.8rem; }
+  tbody tr.ref td { background: var(--accent-soft); }
+  caption {
+    caption-side: top; text-align: left; font-size: 0.78rem; color: var(--muted);
+    padding-bottom: 0.5rem; line-height: 1.45;
+    font-family: 'Avenir Next', Avenir, system-ui, sans-serif;
+  }
+
+  /* ============================================================ PAIR */
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 1.2rem 0; }
+  @media (max-width: 640px) { .pair { grid-template-columns: 1fr; } }
+  .pair figure { margin: 0; min-width: 0; }
+  .pair figcaption {
+    font-family: 'Avenir Next', Avenir, system-ui, sans-serif; font-size: 0.72rem;
+    font-weight: 600; text-transform: uppercase; letter-spacing: 0.09em;
+    color: var(--muted); margin-bottom: 0.4rem;
+  }
+  .pair pre { margin: 0; height: calc(100% - 1.4rem); box-sizing: border-box; }
+
+  /* ============================================================ TOOLTIP */
+  #tip {
+    position: fixed; z-index: 50; pointer-events: none; opacity: 0;
+    transition: opacity 0.12s ease; background: var(--ink); color: var(--paper);
+    font-family: 'Avenir Next', Avenir, system-ui, sans-serif; font-size: 0.73rem;
+    line-height: 1.45; padding: 0.4rem 0.6rem; border-radius: 5px; max-width: 17rem;
+    box-shadow: 0 3px 12px rgba(0,0,0,0.18);
+  }
+  #tip.on { opacity: 1; }
+  [data-tip] { cursor: default; }
+  @media (prefers-reduced-motion: reduce) {
+    #tip { transition: none; }
+    * { animation: none !important; }
+  }
+
+  .footnote {
+    margin-top: 3.5rem; padding-top: 1.2rem; border-top: 1px solid var(--line);
+    color: var(--muted); font-size: 0.86rem;
+  }
+</style>
+
+<div class="wrap">
+  <header>
+    <p class="eyebrow">Clinical Graph-JEPA · Engineering Report No. 4</p>
+    <h1>v20: how much of Table 1 is the seed?</h1>
+    <p class="subtitle">
+      A reviewer asked for mean ± std across seeds and splits, on the grounds that the paper
+      reports one particular random sample of patients. v20 answers the seed half: ten
+      retrains of the paper configuration on the published split. The published number
+      survives — but the error bar it needs is wider than the effects the paper compares.
+      §7–§10 then work backwards through v19, v18, v17 and v16 so the lineage stays traceable
+      from one document.
+    </p>
+    <div class="meta">
+      <span>repo <strong>clinical-graph-jepa</strong></span>
+      <span>runs <strong>10</strong> (1 arm × 10 seeds)</span>
+      <span>eval <strong>LOO 8,283 · batch-mask 3,000</strong></span>
+      <span>seeds <strong>42–51</strong></span>
+      <span>split <strong>42, fixed</strong></span>
+      <span>lineage <strong>v16 → v20</strong></span>
+      <span>date <strong>2026-08-06</strong></span>
+    </div>
+  </header>
+
+  <!-- ============================================================ VERDICT -->
+  <section>
+    <h2><span class="sec">§1</span>The verdict, first</h2>
+    <p class="prose">
+      <strong>The published number is not a lucky seed, and it is also not reproducible as a
+      point.</strong> Ten retrains of the exact paper configuration, differing only in
+      training seed, give LOO MRR <strong>0.4174 ± 0.0190</strong>. The published 0.418653
+      sits essentially on that mean — inside the 95% confidence interval for all four
+      metrics, at the 40th percentile of the ten draws. Nothing about Table 1's headline was
+      cherry-picked.
+    </p>
+    <p class="prose">
+      What the sweep does establish is that <strong>the error bar is large</strong>. Seed
+      alone moves MRR across a range of 0.061 and Hits@1 across 0.072 — a coefficient of
+      variation of 9.4% on Hits@1. Any comparison in Table 1 whose margin is smaller than
+      roughly 0.024 MRR is not distinguishable from seed noise at this sample size.
+    </p>
+
+    <div class="kpi-row">
+      <div class="kpi">
+        <div class="kpi-label">LOO MRR over 10 seeds</div>
+        <div class="kpi-value">0.4174 <span class="kpi-from">± 0.0190 sd</span></div>
+        <div class="kpi-delta flat">published 0.418653 &nbsp;(Δ −0.0012)</div>
+        <p class="kpi-note">
+          95% CI [0.4038, 0.4310] contains the published value comfortably. The paper's number
+          is within 0.07 sd of the retrain mean.
+        </p>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Spread across seeds</div>
+        <div class="kpi-value">0.0610 <span class="kpi-from">min 0.3828 → max 0.4438</span></div>
+        <div class="kpi-delta down">CV 4.6% on MRR, 9.4% on Hits@1</div>
+        <p class="kpi-note">
+          The same code, same data, same split, same hyperparameters. Only
+          <code>SEED</code> differs.
+        </p>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Seed 42, the published seed</div>
+        <div class="kpi-value">0.3962 <span class="kpi-from">vs 0.418653 published</span></div>
+        <div class="kpi-delta down">▼ −0.0225 &nbsp;(z = −1.12, rank 2/10)</div>
+        <p class="kpi-note">
+          Re-running the published seed does <em>not</em> return the published weights. §4
+          explains why this is expected and why the mean, not this cell, is the check.
+        </p>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Smallest defensible margin</div>
+        <div class="kpi-value">0.024 <span class="kpi-from">MRR, α = .05, power .80</span></div>
+        <div class="kpi-delta flat">5.7% of the mean</div>
+        <p class="kpi-note">
+          Against a comparably-seeded baseline at n = 10 per arm. Below this, a Table 1 gap
+          cannot be claimed as real.
+        </p>
+      </div>
+    </div>
+
+    <p class="prose">
+      The same holds on the <em>other</em> evaluation protocol. Each checkpoint carries a
+      second metric block — the batch-mask evaluation, the only one that computes AUC — and
+      every one of its metrics also lands inside the ten-seed 95% CI. AUC comes out at
+      <strong>0.7145 ± 0.0186</strong> against a published 0.714351: a difference of
+      <strong>0.0002</strong>, or 0.01 sd. Eight metrics across two protocols, and none of
+      them contradicts the paper.
+    </p>
+
+    <div class="gate">
+      <span class="gate-label">The evaluation population is byte-identical to the paper's</span>
+      <p>
+        Every run reports <code>quiz_sig = 304815655090</code> — and so does the released v16
+        checkpoint. That signature hashes the evaluation questions themselves, so the ten
+        retrains were asked <em>exactly</em> the same questions as the published model, on
+        exactly the same 8,283 LOO edges and 3,000 ranked batch-mask queries. Whatever moves
+        between these runs, the measuring instrument does not.
+      </p>
+    </div>
+
+    <div class="gate flagged">
+      <span class="gate-label">The reviewer's question is only half answered</span>
+      <p>
+        The review asked for variance across <strong>seeds and splits</strong>, and named the
+        patient sample specifically. All ten runs here share <code>DATA_SPLIT_SEED=42</code>,
+        so every one of them holds out the same 400 admissions. This report measures
+        initialisation variance and says nothing about sensitivity to <em>which patients</em>
+        were sampled. §6 states what is still missing and what it costs.
+      </p>
+    </div>
+  </section>
+
+  <!-- ============================================================ WHAT CHANGED -->
+  <section>
+    <h2><span class="sec">§2</span>v20 — what changed and why</h2>
+    <div class="rail">
+      <div>
+        <div class="rail-tag">v20 · split/seed separation</div>
+        <div class="rail-body">
+          One config field, one line in the splitter, one regression test. No model code, no
+          change to any published number — the defaults describe the same experiment they
+          always did.
+        </div>
+      </div>
+    </div>
+
+    <h3>One knob was doing two jobs</h3>
+    <p class="prose">
+      Before v20, <code>_split_items</code> keyed its permutation on <code>cfg.seed</code> —
+      the same value <code>set_seed</code> hands to <code>torch.manual_seed</code> and
+      <code>np.random.seed</code>. Changing <code>SEED</code> therefore resampled the test set
+      <em>and</em> reinitialised the model at once, and the two effects could not be
+      separated. That is exactly the separation the review asks for.
+    </p>
+
+    <div class="pair">
+      <figure>
+        <figcaption>Before — one seed, two jobs</figcaption>
+<pre><code>def _split_items(items, cfg):
+    rng = np.random.RandomState(cfg.seed)
+    ...
+# SEED=43 -> different patients
+#         -> and different init</code></pre>
+      </figure>
+      <figure>
+        <figcaption>After — the split has its own seed</figcaption>
+<pre><code>def _split_items(items, cfg):
+    rng = np.random.RandomState(
+        cfg.data_split_seed)
+    ...
+# DATA_SPLIT_SEED pins the cohort;
+# SEED moves only the training</code></pre>
+      </figure>
+    </div>
+
+    <p class="prose">
+      <span class="chip new">+1 config field</span> <code>data_split_seed</code> defaults to
+      42, as does <code>seed</code>, so <code>Config()</code> and an unset environment
+      describe the same experiment they described in v16. It is read from
+      <code>DATA_SPLIT_SEED</code> by <code>Config.from_env</code> and printed on both the
+      <code>[ENTRY]</code> and <code>[DATA]</code> log lines, so a job log now records which
+      cohort it trained on.
+    </p>
+
+    <h3>Why it is not in the checkpoint</h3>
+    <p class="prose">
+      <span class="chip changed">deliberate omission</span> <code>checkpoint_dict()</code>
+      writes a hand-picked subset of fields that
+      <code>test_checkpoint_dict_matches_released_config</code> pins byte-for-byte against the
+      released v16 file. Adding a key breaks that gate. <code>data_split_seed</code> therefore
+      lives in the output-repository name and the job log — the same provenance convention
+      v19 was forced into for its arms (§8).
+    </p>
+
+    <h3>Verification</h3>
+    <p class="prose">
+      Counts cannot prove a split is pinned: <code>TRAIN=3200 VAL=400 TEST=400</code> is a
+      function of the fractions, identical for every seed. Membership was compared directly,
+      by <code>gid</code>, on the real 4,000-admission dataset.
+    </p>
+    <div class="table-scroll">
+      <table>
+        <caption>Test-set membership against the published split, real data, one load.</caption>
+        <thead>
+          <tr><th>Configuration</th><th>Test set</th><th>Expected</th><th>Result</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="mono">split=42 seed=99</td><td>identical</td><td>identical</td><td>PASS</td></tr>
+          <tr><td class="mono">split=42 seed=7</td><td>identical</td><td>identical</td><td>PASS</td></tr>
+          <tr><td class="mono">split=43 seed=42</td><td>different</td><td>different</td><td>PASS</td></tr>
+          <tr><td class="mono">split=44 seed=42</td><td>different</td><td>different</td><td>PASS</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="gate">
+      <span class="gate-label">The published split is provably unmoved</span>
+      <p>
+        All nineteen fawkes gates pass, including
+        <code>test_loo_reproduces_published_test_split</code>, which rebuilds the split, runs
+        LOO with the released checkpoint and reproduces
+        <code>baseline/paper_loo_testsplit.json</code> to <code>1e-6</code>. The new gate,
+        <code>test_split_follows_data_split_seed_not_seed</code>, asserts the split holds under
+        a changed <code>seed</code> and moves under a changed <code>data_split_seed</code>; it
+        fails against the old <code>cfg.seed</code> code path, so it is a real gate rather than
+        a vacuous one.
+      </p>
+      <p>
+        One consequence to know about: <code>SEED</code> alone no longer moves the split, so
+        re-running <code>submit-v19-ablations.sh</code> unchanged now produces three runs that
+        share split 42 and differ only in initialisation — <em>not</em> the semantics that
+        produced the recorded v19 numbers. That script was deliberately left untouched.
+      </p>
+    </div>
+  </section>
+
+  <!-- ============================================================ RESULTS -->
+  <section>
+    <h2><span class="sec">§3</span>Results — ten retrains</h2>
+    <p class="prose">
+      All ten runs on the 4,000-graph embedded dataset via Hugging Face Jobs,
+      <code>--flavor t4-small</code>, the v16 entity-note configuration throughout. Every run
+      evaluates the same 8,283 leave-one-out queries, because the split is pinned — so unlike
+      a multi-split study these ten are genuinely paired and directly comparable.
+    </p>
+
+    <!-- FIGURE 1 — the ten seeds -->
+    <div class="fig">
+      <p class="fig-title">Figure 1 · LOO MRR across ten training seeds, published split</p>
+      <p class="fig-sub">
+        Each dot is one seed. The line spans the observed range, the tall tick is the mean of
+        ten, the band is the 95% confidence interval of that mean, and the dashed rule is the
+        published v16 value. The published value falls inside the interval.
+      </p>
+      <div class="legend">
+        <span><i class="swatch dot" style="background:var(--data)"></i>one seed</span>
+        <span><i class="swatch tick"></i>mean of ten</span>
+        <span><i class="swatch band"></i>95% CI of the mean</span>
+        <span><i class="swatch rule"></i>published v16 · 0.418653</span>
+      </div>
+      <div class="strip-rows">
+        <div class="strip" tabindex="0" data-tip="Ten seeds 42-51: min 0.3828 (s46), max 0.4438 (s50), mean 0.4174, sd 0.0190. Published 0.418653 sits at the 40th percentile.">
+          <span class="strip-name">LOO MRR<i>seeds 42–51</i></span>
+          <span class="strip-track">
+            <i class="strip-ci" style="left:42.25%;width:34.00%"></i>
+            <i class="strip-range" style="left:16.00%;width:76.25%"></i>
+            <i class="strip-dot" style="left:16.00%"></i>
+            <i class="strip-dot" style="left:32.75%"></i>
+            <i class="strip-dot" style="left:41.25%"></i>
+            <i class="strip-dot" style="left:50.62%"></i>
+            <i class="strip-dot" style="left:62.37%"></i>
+            <i class="strip-dot" style="left:67.62%"></i>
+            <i class="strip-dot" style="left:73.75%"></i>
+            <i class="strip-dot" style="left:74.13%"></i>
+            <i class="strip-dot" style="left:81.87%"></i>
+            <i class="strip-dot" style="left:92.25%"></i>
+            <i class="strip-mean" style="left:59.26%"></i>
+            <i class="strip-ref" style="left:60.82%"></i>
+          </span>
+          <span class="strip-val">0.4174 <i>±0.019</i></span>
+        </div>
+      </div>
+      <div class="strip-axis">
+        <span></span>
+        <span class="strip-axis-inner"><span>0.37</span><span>0.39</span><span>0.41</span><span>0.43</span><span>0.45</span></span>
+        <span></span>
+      </div>
+    </div>
+
+    <p class="prose">
+      The mean tick and the published rule are 1.6% of the axis apart — visually almost the
+      same line. That near-coincidence is the strongest evidence in this report that nothing
+      has drifted in the pipeline between v16 and v20: a systematic regression would shift the
+      whole distribution, not centre it on the published value.
+    </p>
+
+    <h3>Every run, every metric</h3>
+    <div class="table-scroll">
+      <table>
+        <caption>
+          All ten runs, read from <code>recovery_test_loo</code> inside each pushed checkpoint.
+          <code>n=8283</code> for every row — the pinned split guarantees it.
+        </caption>
+        <thead>
+          <tr>
+            <th>Run</th><th class="num">MRR</th><th class="num">H@1</th>
+            <th class="num">H@3</th><th class="num">H@10</th><th class="num">n</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td class="mono">sp42-s42</td><td class="num">0.3962</td><td class="num">0.2195</td><td class="num">0.4343</td><td class="num">0.8682</td><td class="num">8283</td></tr>
+          <tr><td class="mono">sp42-s43</td><td class="num">0.4199</td><td class="num">0.2403</td><td class="num">0.4838</td><td class="num">0.8779</td><td class="num">8283</td></tr>
+          <tr><td class="mono">sp42-s44</td><td class="num">0.4290</td><td class="num">0.2528</td><td class="num">0.4888</td><td class="num">0.8785</td><td class="num">8283</td></tr>
+          <tr><td class="mono">sp42-s45</td><td class="num">0.4293</td><td class="num">0.2454</td><td class="num">0.5044</td><td class="num">0.8770</td><td class="num">8283</td></tr>
+          <tr><td class="mono">sp42-s46</td><td class="num">0.3828</td><td class="num">0.2080</td><td class="num">0.4236</td><td class="num">0.8540</td><td class="num">8283</td></tr>
+          <tr><td class="mono">sp42-s47</td><td class="num">0.4241</td><td class="num">0.2503</td><td class="num">0.4818</td><td class="num">0.8674</td><td class="num">8283</td></tr>
+          <tr><td class="mono">sp42-s48</td><td class="num">0.4030</td><td class="num">0.2289</td><td class="num">0.4556</td><td class="num">0.8561</td><td class="num">8283</td></tr>
+          <tr><td class="mono">sp42-s49</td><td class="num">0.4355</td><td class="num">0.2753</td><td class="num">0.4719</td><td class="num">0.8688</td><td class="num">8283</td></tr>
+          <tr><td class="mono">sp42-s50</td><td class="num">0.4438</td><td class="num">0.2801</td><td class="num">0.4896</td><td class="num">0.8742</td><td class="num">8283</td></tr>
+          <tr><td class="mono">sp42-s51</td><td class="num">0.4105</td><td class="num">0.2305</td><td class="num">0.4683</td><td class="num">0.8657</td><td class="num">8283</td></tr>
+          <tr class="ref">
+            <td><strong>mean ± sd</strong></td>
+            <td class="num"><strong>0.4174</strong><br>±0.0190</td>
+            <td class="num"><strong>0.2431</strong><br>±0.0229</td>
+            <td class="num"><strong>0.4702</strong><br>±0.0256</td>
+            <td class="num"><strong>0.8688</strong><br>±0.0086</td>
+            <td class="num">8283</td>
+          </tr>
+          <tr class="sub">
+            <td>95% CI of the mean</td>
+            <td class="num">0.4038–0.4310</td><td class="num">0.2267–0.2595</td>
+            <td class="num">0.4519–0.4885</td><td class="num">0.8626–0.8749</td><td class="num">—</td>
+          </tr>
+          <tr class="sub">
+            <td>published v16</td>
+            <td class="num">0.418653</td><td class="num">0.247495</td>
+            <td class="num">0.473741</td><td class="num">0.863576</td><td class="num">8283</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>The other protocol — where AUC lives</h3>
+    <p class="prose">
+      <code>loo_evaluate</code> returns MRR and Hits@K and nothing else; AUC, AP and
+      non-obvious AUC come from <code>evaluate</code> and are stored in a separate
+      <code>recovery_test_batchmask</code> block. That block masks roughly 30% of edges per
+      batch and caps ranking at <code>MRR_CAP=3000</code>, so it is a
+      <strong>different protocol on a different population</strong>.
+    </p>
+    <div class="gate flagged">
+      <span class="gate-label">The two MRR columns are not the same number</span>
+      <p>
+        Batch-mask MRR is <strong>0.3627</strong>; LOO MRR is <strong>0.4174</strong>. Same
+        metric name, different evaluation. A Table 1 row quoting AUC is describing the
+        batch-mask evaluation, so its MRR must come from that block too — mixing an AUC from
+        one protocol with an MRR from the other is the easiest error to make here, and the
+        hardest to spot in review.
+      </p>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <caption>
+          Batch-mask evaluation, all ten runs. <code>n_mrr=3000</code> and
+          <code>quiz_sig=304815655090</code> for every row, matching the released checkpoint.
+        </caption>
+        <thead>
+          <tr>
+            <th>Run</th><th class="num">AUC</th><th class="num">AP</th>
+            <th class="num">AUC non-obv.</th><th class="num">MRR</th><th class="num">n</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td class="mono">sp42-s42</td><td class="num">0.6970</td><td class="num">0.6154</td><td class="num">0.8187</td><td class="num">0.3596</td><td class="num">3000</td></tr>
+          <tr><td class="mono">sp42-s43</td><td class="num">0.7296</td><td class="num">0.6405</td><td class="num">0.8061</td><td class="num">0.3648</td><td class="num">3000</td></tr>
+          <tr><td class="mono">sp42-s44</td><td class="num">0.6913</td><td class="num">0.6105</td><td class="num">0.8167</td><td class="num">0.3604</td><td class="num">3000</td></tr>
+          <tr><td class="mono">sp42-s45</td><td class="num">0.7188</td><td class="num">0.6352</td><td class="num">0.8312</td><td class="num">0.3708</td><td class="num">3000</td></tr>
+          <tr><td class="mono">sp42-s46</td><td class="num">0.7213</td><td class="num">0.6333</td><td class="num">0.8108</td><td class="num">0.3599</td><td class="num">3000</td></tr>
+          <tr><td class="mono">sp42-s47</td><td class="num">0.7138</td><td class="num">0.6287</td><td class="num">0.8259</td><td class="num">0.3674</td><td class="num">3000</td></tr>
+          <tr><td class="mono">sp42-s48</td><td class="num">0.6851</td><td class="num">0.6092</td><td class="num">0.8330</td><td class="num">0.3558</td><td class="num">3000</td></tr>
+          <tr><td class="mono">sp42-s49</td><td class="num">0.7443</td><td class="num">0.6544</td><td class="num">0.7592</td><td class="num">0.3640</td><td class="num">3000</td></tr>
+          <tr><td class="mono">sp42-s50</td><td class="num">0.7292</td><td class="num">0.6441</td><td class="num">0.8176</td><td class="num">0.3621</td><td class="num">3000</td></tr>
+          <tr><td class="mono">sp42-s51</td><td class="num">0.7148</td><td class="num">0.6276</td><td class="num">0.8100</td><td class="num">0.3623</td><td class="num">3000</td></tr>
+          <tr class="ref">
+            <td><strong>mean ± sd</strong></td>
+            <td class="num"><strong>0.7145</strong><br>±0.0186</td>
+            <td class="num"><strong>0.6299</strong><br>±0.0148</td>
+            <td class="num"><strong>0.8129</strong><br>±0.0209</td>
+            <td class="num"><strong>0.3627</strong><br>±0.0043</td>
+            <td class="num">3000</td>
+          </tr>
+          <tr class="sub">
+            <td>95% CI of the mean</td>
+            <td class="num">0.7012–0.7278</td><td class="num">0.6193–0.6405</td>
+            <td class="num">0.7980–0.8278</td><td class="num">0.3596–0.3658</td><td class="num">—</td>
+          </tr>
+          <tr class="sub">
+            <td>published v16</td>
+            <td class="num">0.714351</td><td class="num">0.627698</td>
+            <td class="num">0.800028</td><td class="num">0.360833</td><td class="num">3000</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="prose">
+      All four published values fall inside their intervals. Non-obvious AUC is the least
+      central at the 10th percentile — the published 0.8000 against a retrain mean of 0.8129 —
+      but that is still only 0.62 sd, and it is the metric with the widest spread. AUC itself
+      is the closest agreement anywhere in this report: 0.7145 measured against 0.714351
+      published, 0.01 sd apart.
+    </p>
+
+    <h3>Which metrics are noisy</h3>
+
+    <!-- FIGURE 2 — CV by metric -->
+    <div class="fig">
+      <p class="fig-title">Figure 2 · Coefficient of variation across the ten seeds</p>
+      <p class="fig-sub">
+        Standard deviation as a percentage of that metric's mean. CV is unitless, so metrics
+        from both protocols share one axis — but they are grouped, because the metrics
+        themselves are not comparable across the divide. The reference line marks 5%.
+      </p>
+      <div class="legend">
+        <span><i class="swatch" style="background:var(--data)"></i>CV across seeds</span>
+        <span><i class="swatch rule" style="border-left-color:var(--axis);border-left-style:solid"></i>5% reference</span>
+      </div>
+      <p class="panel-label">Leave-one-out · n = 8,283</p>
+      <div class="lad-rows">
+        <div class="lad" tabindex="0" data-tip="Hits@1: sd 0.0229 on a mean of 0.2431. The noisiest metric in Table 1 — a top-1 metric moves whenever one ranking flips.">
+          <span class="lad-name">Hits@1<i>0.2431 ± 0.0229</i></span>
+          <span class="lad-track" style="--ref:50%"><i class="lad-fill" style="width:94.20%"></i></span>
+          <span class="lad-val">9.4%</span>
+        </div>
+        <div class="lad" tabindex="0" data-tip="Hits@3: sd 0.0256 on a mean of 0.4702.">
+          <span class="lad-name">Hits@3<i>0.4702 ± 0.0256</i></span>
+          <span class="lad-track" style="--ref:50%"><i class="lad-fill" style="width:54.44%"></i></span>
+          <span class="lad-val">5.4%</span>
+        </div>
+        <div class="lad" tabindex="0" data-tip="MRR: sd 0.0190 on a mean of 0.4174. The headline metric.">
+          <span class="lad-name">MRR<i>0.4174 ± 0.0190</i></span>
+          <span class="lad-track" style="--ref:50%"><i class="lad-fill" style="width:45.52%"></i></span>
+          <span class="lad-val">4.6%</span>
+        </div>
+        <div class="lad" tabindex="0" data-tip="Hits@10: sd 0.0086 on a mean of 0.8688. Nearly saturated, and by far the most stable LOO metric.">
+          <span class="lad-name">Hits@10<i>0.8688 ± 0.0086</i></span>
+          <span class="lad-track" style="--ref:50%"><i class="lad-fill" style="width:9.90%"></i></span>
+          <span class="lad-val">1.0%</span>
+        </div>
+      </div>
+      <p class="panel-label">Batch-mask · n = 3,000</p>
+      <div class="lad-rows">
+        <div class="lad" tabindex="0" data-tip="AUC: sd 0.0186 on a mean of 0.7145.">
+          <span class="lad-name">AUC<i>0.7145 ± 0.0186</i></span>
+          <span class="lad-track" style="--ref:50%"><i class="lad-fill" style="width:25.99%"></i></span>
+          <span class="lad-val">2.6%</span>
+        </div>
+        <div class="lad" tabindex="0" data-tip="Non-obvious AUC: sd 0.0209 on a mean of 0.8129 — the widest absolute spread of the batch-mask metrics.">
+          <span class="lad-name">AUC non-obv.<i>0.8129 ± 0.0209</i></span>
+          <span class="lad-track" style="--ref:50%"><i class="lad-fill" style="width:25.68%"></i></span>
+          <span class="lad-val">2.6%</span>
+        </div>
+        <div class="lad" tabindex="0" data-tip="Average precision: sd 0.0148 on a mean of 0.6299.">
+          <span class="lad-name">AP<i>0.6299 ± 0.0148</i></span>
+          <span class="lad-track" style="--ref:50%"><i class="lad-fill" style="width:23.51%"></i></span>
+          <span class="lad-val">2.4%</span>
+        </div>
+        <div class="lad" tabindex="0" data-tip="Batch-mask MRR: sd 0.0043 on a mean of 0.3627 — 4.4x tighter than the same metric under LOO.">
+          <span class="lad-name">MRR<i>0.3627 ± 0.0043</i></span>
+          <span class="lad-track" style="--ref:50%"><i class="lad-fill" style="width:11.82%"></i></span>
+          <span class="lad-val">1.2%</span>
+        </div>
+      </div>
+      <div class="lad-axis">
+        <span></span>
+        <span class="lad-axis-inner"><span>0%</span><span>2.5%</span><span>5%</span><span>7.5%</span><span>10%</span></span>
+        <span></span>
+      </div>
+    </div>
+
+    <p class="prose">
+      The ordering is not incidental. <strong>Hits@1 is the least stable metric in Table 1</strong>,
+      by roughly an order of magnitude over the steadiest. A top-1 metric changes whenever a
+      single ranking flips at the boundary, while Hits@10 is close enough to saturation
+      (0.87) that the same flips rarely cross it. If Table 1 leans on a Hits@1 comparison,
+      that is the number most exposed to this critique.
+    </p>
+    <p class="prose">
+      The second panel carries a finding worth its own sentence: <strong>the same MRR is 4.4×
+      more stable under batch-mask evaluation than under LOO</strong> — sd 0.0043 against
+      0.0190 — even though LOO scores 8,283 queries and batch-mask only 3,000. More queries
+      normally means a tighter estimate, so the difference is not sampling noise; it is the
+      protocol. A plausible reading is that LOO's full-context setting produces sharper, more
+      confident rankings, so a small change in weights reorders many near-ties at the top,
+      while batch-mask's degraded context flattens the rankings and damps that effect. That
+      is a hypothesis this data does not test, and it does not change which number the paper
+      reports — but if a tighter error bar is wanted for a secondary table, the batch-mask
+      block already provides one.
+    </p>
+
+    <h3>Where the published value sits</h3>
+
+    <!-- FIGURE 3 — published vs retrain mean -->
+    <div class="fig">
+      <p class="fig-title">Figure 3 · Published v16 minus the ten-seed mean, in standard deviations</p>
+      <p class="fig-sub">
+        Distance from the retrain mean, expressed in that metric's own sd so all eight are
+        comparable. Every metric across both protocols is within 0.7 sd of centre.
+      </p>
+      <div class="legend">
+        <span><i class="swatch" style="background:var(--up)"></i>published above the retrain mean</span>
+        <span><i class="swatch" style="background:var(--down)"></i>published below</span>
+      </div>
+      <p class="panel-label">Leave-one-out</p>
+      <div class="dbar-rows">
+        <div class="dbar" tabindex="0" data-tip="MRR: published 0.418653 vs retrain mean 0.4174. +0.07 sd — indistinguishable from the centre.">
+          <span class="dbar-name">MRR</span>
+          <span class="dbar-track"><i class="dbar-fill pos" style="width:3.30%"></i></span>
+          <span class="dbar-val pos">+0.07</span>
+        </div>
+        <div class="dbar" tabindex="0" data-tip="Hits@1: published 0.247495 vs retrain mean 0.2431. +0.19 sd.">
+          <span class="dbar-name">Hits@1</span>
+          <span class="dbar-track"><i class="dbar-fill pos" style="width:9.60%"></i></span>
+          <span class="dbar-val pos">+0.19</span>
+        </div>
+        <div class="dbar" tabindex="0" data-tip="Hits@3: published 0.473741 vs retrain mean 0.4702. +0.14 sd.">
+          <span class="dbar-name">Hits@3</span>
+          <span class="dbar-track"><i class="dbar-fill pos" style="width:6.92%"></i></span>
+          <span class="dbar-val pos">+0.14</span>
+        </div>
+        <div class="dbar" tabindex="0" data-tip="Hits@10: published 0.863576 vs retrain mean 0.8688. -0.61 sd — the published run was slightly below the retrain average here.">
+          <span class="dbar-name">Hits@10</span>
+          <span class="dbar-track"><i class="dbar-fill neg" style="width:30.37%"></i></span>
+          <span class="dbar-val neg">−0.61</span>
+        </div>
+      </div>
+      <p class="panel-label">Batch-mask</p>
+      <div class="dbar-rows">
+        <div class="dbar" tabindex="0" data-tip="AUC: published 0.714351 vs retrain mean 0.7145. -0.01 sd — the closest agreement in this report.">
+          <span class="dbar-name">AUC</span>
+          <span class="dbar-track"><i class="dbar-fill neg" style="width:0.43%"></i></span>
+          <span class="dbar-val neg">−0.01</span>
+        </div>
+        <div class="dbar" tabindex="0" data-tip="AP: published 0.627698 vs retrain mean 0.6299. -0.15 sd.">
+          <span class="dbar-name">AP</span>
+          <span class="dbar-track"><i class="dbar-fill neg" style="width:7.38%"></i></span>
+          <span class="dbar-val neg">−0.15</span>
+        </div>
+        <div class="dbar" tabindex="0" data-tip="Non-obvious AUC: published 0.800028 vs retrain mean 0.8129. -0.62 sd, the 10th percentile of ten draws — still inside the 95% CI.">
+          <span class="dbar-name">AUC non-obv.</span>
+          <span class="dbar-track"><i class="dbar-fill neg" style="width:30.82%"></i></span>
+          <span class="dbar-val neg">−0.62</span>
+        </div>
+        <div class="dbar" tabindex="0" data-tip="Batch-mask MRR: published 0.360833 vs retrain mean 0.3627. -0.44 sd — but only 0.0019 in absolute terms, because this metric's sd is tiny.">
+          <span class="dbar-name">MRR</span>
+          <span class="dbar-track"><i class="dbar-fill neg" style="width:21.76%"></i></span>
+          <span class="dbar-val neg">−0.44</span>
+        </div>
+      </div>
+      <div class="dbar-axis">
+        <span></span>
+        <span class="dbar-axis-inner"><span>−1 sd</span><span>0</span><span>+1 sd</span></span>
+        <span></span>
+      </div>
+    </div>
+
+    <p class="prose">
+      Three of the four are within a fifth of a standard deviation of the centre. Hits@10 is
+      the one metric where the published run came in below the retrain average, and it is
+      also the metric with the smallest sd, so −0.61 sd is only −0.005 in absolute terms.
+      There is no direction here worth a story: the published run behaves like an ordinary
+      draw from this distribution.
+    </p>
+  </section>
+
+  <!-- ============================================================ THE SEED-42 DELTA -->
+  <section>
+    <h2><span class="sec">§4</span>Why seed 42 does not reproduce the published number</h2>
+    <p class="prose">
+      The collection script checks the <code>sp42-s42</code> cell against the published
+      0.418653, on the reasoning that it is the same configuration at the same seed on the
+      same split. It came back <strong>0.3962, Δ −0.0225</strong>. That check was too strict,
+      and the reason matters more than the miss.
+    </p>
+    <p class="prose">
+      <strong>0.418653 is the released checkpoint's own metric, not a retraining target.</strong>
+      <code>baseline/paper_loo_testsplit.json</code> is produced by loading
+      <code>models/fawkes-entity-note/…v16_260615.pt</code> and evaluating it — a path that
+      reproduces to Δ = 0.00e+00 and still does, under
+      <code>test_loo_reproduces_published_test_split</code>. The v20 runs do something
+      different: they train a new model from scratch on a T4 with <code>torch==2.4.1</code>.
+      Seed equality gives an identical <em>split</em>, and §2 proves it does, but it does not
+      give identical <em>weights</em> across different hardware and library versions.
+    </p>
+    <div class="gate flagged">
+      <span class="gate-label">Determinism here is requested, not guaranteed</span>
+      <p>
+        <code>set_seed</code> calls
+        <code>torch.use_deterministic_algorithms(True, warn_only=True)</code>. The
+        <code>warn_only</code> flag means any operation without a deterministic implementation
+        <strong>falls back to the non-deterministic kernel and logs a warning instead of
+        raising</strong>. The scatter reductions underneath <code>TransformerConv</code> are
+        exactly such operations on CUDA. Run-to-run variation at a fixed seed is therefore
+        expected on GPU, and two runs of <code>sp42-s42</code> on the same T4 need not agree
+        either — a cheap follow-up that would bound this directly.
+      </p>
+    </div>
+    <p class="prose">
+      This is why the mean is the reproduction check and the single cell is not. If something
+      had genuinely drifted — a regression in the v18 patch-masking refactor, the v19
+      encoder-snapshot change, a data path — the whole distribution would move. Instead the
+      ten-seed mean lands 0.0012 from the published value. The seed-42 cell is simply the
+      second-lowest of ten draws, at z = −1.12, which at n = 10 is unremarkable.
+    </p>
+    <p class="prose">
+      The practical correction: <code>print_v20_seed_variance_table.py</code>'s published-run
+      line should be read as a distributional check, not an equality gate. A single cell
+      within about 2 sd of the published value is consistent; the mean landing far from it
+      would be the alarm.
+    </p>
+    <div class="gate">
+      <span class="gate-label">No retrain in this lineage has ever reproduced the published number</span>
+      <p>
+        Worth stating explicitly, because it is easy to believe otherwise. Every apparent
+        reproduction of 0.418653 in Reports No. 1–3 is a <em>re-evaluation of the released
+        checkpoint</em>: <code>baseline/paper_loo_testsplit.json</code>, the
+        <code>test_loo_reproduces_published_test_split</code> gate, and — as §9 shows — the
+        baseline column of v18's comparison table, which matches the published file on all four
+        metrics to four decimal places. Those paths reproduce to Δ = 0.00e+00 because they load
+        the same weights.
+      </p>
+      <p>
+        v20 is the first time the paper configuration has been <strong>retrained from
+        scratch</strong> at any scale. That it lands 0.0012 from the published value in the
+        mean is the reproduction result; that no individual seed lands on it is the expected
+        behaviour of the training pipeline, and was simply never visible before.
+      </p>
+    </div>
+  </section>
+
+  <!-- ============================================================ WHAT IT MEANS -->
+  <section>
+    <h2><span class="sec">§5</span>What this means for Table 1</h2>
+
+    <h3>The row to write</h3>
+    <p class="prose">
+      Reported as mean ± sample standard deviation over ten training seeds, with the split
+      held fixed:
+    </p>
+<pre><code>Leave-one-out (n = 8,283)
+  MRR      0.417 ± 0.019      Hits@1   0.243 ± 0.023
+  Hits@3   0.470 ± 0.026      Hits@10  0.869 ± 0.009
+
+Batch-mask (n = 3,000)
+  AUC      0.714 ± 0.019      AP       0.630 ± 0.015
+  AUC-nonobv 0.813 ± 0.021    MRR      0.363 ± 0.004
+
+(mean ± sd over 10 training seeds, 42-51, fixed test split)</code></pre>
+    <p class="prose">
+      Keep the two blocks visibly separate in the paper, as above. They are different
+      protocols and their MRR columns differ by 0.055 — a reader who sees one MRR beside an
+      AUC will assume they came from the same evaluation.
+    </p>
+    <p class="prose">
+      Report the standard deviation rather than the standard error, and state <em>n</em>
+      explicitly. With ten runs the sd is itself only known to about ±24%, so quoting it to
+      more than two significant figures overstates what was measured. Naming the seed range
+      in the text — "seeds 42–51" — costs a clause and forecloses the question of whether the
+      set was chosen after seeing results.
+    </p>
+
+    <h3>What can and cannot be claimed</h3>
+    <p class="prose">
+      Against a baseline run with the same ten-seed protocol, the smallest difference
+      detectable at α = .05 with 80% power is <strong>about 0.024 LOO MRR</strong> — 5.7% of
+      the mean. Every metric has its own threshold, and they are not interchangeable:
+    </p>
+    <div class="table-scroll">
+      <table>
+        <caption>
+          Minimum detectable difference per metric, 10 seeds per arm, α = .05, power .80.
+          Computed as 2.8·sd·√(2/n).
+        </caption>
+        <thead>
+          <tr><th>Protocol</th><th>Metric</th><th class="num">sd</th><th class="num">MDD</th><th class="num">% of mean</th></tr>
+        </thead>
+        <tbody>
+          <tr class="ref"><td>LOO</td><td>MRR</td><td class="num">0.0190</td><td class="num">0.0238</td><td class="num">5.7%</td></tr>
+          <tr><td>LOO</td><td>Hits@1</td><td class="num">0.0229</td><td class="num">0.0287</td><td class="num">11.8%</td></tr>
+          <tr><td>LOO</td><td>Hits@3</td><td class="num">0.0256</td><td class="num">0.0321</td><td class="num">6.8%</td></tr>
+          <tr><td>LOO</td><td>Hits@10</td><td class="num">0.0086</td><td class="num">0.0108</td><td class="num">1.2%</td></tr>
+          <tr><td>Batch-mask</td><td>AUC</td><td class="num">0.0186</td><td class="num">0.0232</td><td class="num">3.3%</td></tr>
+          <tr><td>Batch-mask</td><td>AP</td><td class="num">0.0148</td><td class="num">0.0185</td><td class="num">2.9%</td></tr>
+          <tr><td>Batch-mask</td><td>AUC non-obv.</td><td class="num">0.0209</td><td class="num">0.0261</td><td class="num">3.2%</td></tr>
+          <tr><td>Batch-mask</td><td>MRR</td><td class="num">0.0043</td><td class="num">0.0054</td><td class="num">1.5%</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="prose">
+      <strong>An AUC claim needs a margin of 0.023 to survive</strong>, in absolute terms
+      almost exactly what LOO MRR needs — the two look very different as percentages only
+      because AUC sits on a higher base. Apply the matching row to every comparison Table 1
+      makes before the revision goes out.
+    </p>
+    <div class="table-scroll">
+      <table>
+        <caption>Reading a claimed margin against the measured seed noise.</caption>
+        <thead>
+          <tr><th>Margin over baseline</th><th>Status at n = 10 per arm</th><th>What to do</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="num">&gt; 0.024 MRR</td>
+            <td>Detectable</td>
+            <td>Claim it, with the paired test at fixed split.</td>
+          </tr>
+          <tr>
+            <td class="num">0.010 – 0.024</td>
+            <td>Underpowered</td>
+            <td>More seeds, or soften to a directional statement.</td>
+          </tr>
+          <tr>
+            <td class="num">&lt; 0.010 MRR</td>
+            <td>Inside one half-sd</td>
+            <td>Do not claim a difference.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="prose">
+      The ten runs share one split, which makes them <strong>paired</strong> — same held-out
+      admissions, same 8,283 queries, same denominator. A paired test across seeds is
+      therefore legitimate and is the right instrument for any arm-versus-arm comparison run
+      the same way. That pairing is precisely what is lost the moment the split varies, which
+      is the subject of §6.
+    </p>
+    <div class="gate">
+      <span class="gate-label">This also re-frames v19</span>
+      <p>
+        v19 concluded that JEPA pretraining is indistinguishable from random initialisation,
+        on a B − A mean of −0.008 across three seeds. The seed noise measured here is
+        0.019 sd on a single arm — more than twice that margin. v19's <em>negative</em>
+        result is strengthened by this: the effect it failed to find is well below what three
+        seeds could have resolved. v19's large positive effects (+0.311 for from-scratch
+        training) are far outside the noise and stand unaffected.
+      </p>
+    </div>
+  </section>
+
+  <!-- ============================================================ LIMITS -->
+  <section>
+    <h2><span class="sec">§6</span>What this does not establish</h2>
+
+    <h3>The split axis is unmeasured</h3>
+    <p class="prose">
+      This is the important one. The review asked about <em>which patients</em> were sampled,
+      and every run in this report held out the same 400 admissions. The
+      <code>data_split_seed</code> machinery to answer it now exists and is tested; it simply
+      has not been run. Four additional jobs would give five splits at seed 42 alongside the
+      existing seed sweep, sharing the <code>sp42-s42</code> cell:
+    </p>
+<pre><code>for split in 43 44 45 46; do submit $split 42 4h; done</code></pre>
+    <p class="prose">
+      Expect that spread to be <em>larger</em> than the seed spread, not smaller: a new split
+      changes the held-out admissions, the query population and the denominator all at once.
+      Those runs are also not paired with each other, so they yield a spread to report, never
+      a paired test.
+    </p>
+
+    <h3>The split is by admission, not by patient</h3>
+    <p class="prose">
+      Investigating the membership check surfaced a property of the split that predates v20
+      and is worth stating plainly, because the same reviewer is the one most likely to find
+      it. <code>_split_items</code> permutes admission-level records, and the 4,000
+      admissions come from only 3,018 subjects.
+    </p>
+    <div class="table-scroll">
+      <table>
+        <caption>Patient overlap across the published split, measured on the real dataset.</caption>
+        <thead>
+          <tr><th>Quantity</th><th class="num">Value</th><th>Meaning</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Train admissions / subjects</td><td class="num">3200 / 2549</td><td>Some patients contribute several admissions.</td></tr>
+          <tr><td>Test admissions / subjects</td><td class="num">400 / 383</td><td>Same, on the held-out side.</td></tr>
+          <tr><td>Subjects in both splits</td><td class="num">139</td><td>Present in training <em>and</em> evaluation.</td></tr>
+          <tr><td><strong>Test admissions whose patient is in train</strong></td><td class="num"><strong>147 / 400</strong></td><td><strong>36.8% of the evaluation set.</strong></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="prose">
+      This is pre-existing behaviour and it produced the published number; nothing in v20
+      caused it. But over a third of the evaluation set belongs to a patient the model has
+      already seen, and a grouped split — patients as the unit, not admissions — is a
+      roughly ten-line change to <code>_split_items</code>. It would almost certainly move
+      Table 1 downward, which makes it a decision about the paper rather than a bug fix, and
+      it deserves to be made deliberately rather than discovered in review.
+    </p>
+
+    <h3>Smaller limits</h3>
+    <ul class="prose">
+      <li>
+        <strong>One configuration only.</strong> These ten runs are the paper arm. The seed
+        noise of a <em>different</em> architecture is not assumed to be 0.019 — v19's arm C
+        showed sd 0.141 across three seeds, seven times larger.
+      </li>
+      <li>
+        <strong>Cascade and EIR metrics are absent.</strong> All ten ran with
+        <code>RUN_CASCADE=0</code> and <code>RUN_EIR=0</code>, so those checkpoint blocks are
+        empty. LOO and batch-mask are the two protocols covered here; if Table 1 carries
+        cascade columns they need their own sweep.
+      </li>
+      <li>
+        <strong>The sd is itself uncertain.</strong> At n = 10 its relative standard error is
+        about 24%; the true sd could plausibly be 0.014 or 0.024.
+      </li>
+      <li>
+        <strong>Fixed-hardware determinism was not tested.</strong> No seed was run twice on
+        the same flavour, so the floor of run-to-run variation is unmeasured (§4).
+      </li>
+    </ul>
+  </section>
+
+  <!-- ============================================================ LINEAGE INDEX -->
+  <section>
+    <h2><span class="sec">§7</span>The lineage — v16 through v20</h2>
+    <p class="prose">
+      Five versions of the same model, each asking a more basic question than the last: v18
+      questioned a setting, v19 questioned the method, and v20 questions whether any of the
+      numbers are resolvable at all. §8–§10 work backwards through each version in full, so
+      this document stands alone without the earlier reports.
+    </p>
+
+    <div class="table-scroll">
+      <table>
+        <caption>What each version changed, and what it measured.</caption>
+        <thead>
+          <tr><th>Version</th><th>Kind</th><th>What it changed</th><th>Headline measurement</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>v16</strong><br><span class="mono">stamp 260615</span></td>
+            <td>Experiment</td>
+            <td>The entity-localised note — the Clinical-ModernBERT vector moved onto the entity nodes the note grounds, retiring v15's single NOTE node.</td>
+            <td>LOO MRR <strong>0.418653</strong>, n=8,283, seeded test split. The published number.</td>
+          </tr>
+          <tr>
+            <td><strong>v17</strong></td>
+            <td>Engineering</td>
+            <td>One 719-line <code>trainer.py</code> split six ways; import-time env globals became a dataclass.</td>
+            <td>Equality with v16 to <code>1e-6</code>. <em>No numerics moved, by design.</em></td>
+          </tr>
+          <tr>
+            <td><strong>v18</strong></td>
+            <td>Experiment</td>
+            <td>BFS-balanced whole-patch masking as an opt-in pretext task.</td>
+            <td>No-note <strong>+0.0237</strong> MRR, with-note <strong>−0.0107</strong>. One seed per cell.</td>
+          </tr>
+          <tr>
+            <td><strong>v19</strong></td>
+            <td>Ablation</td>
+            <td>Nothing in the model. One model-selection fix; six arms over the existing env surface.</td>
+            <td>Phase 1 ≈ random init (<strong>−0.008</strong>); from-scratch training <strong>+0.311</strong> MRR.</td>
+          </tr>
+          <tr class="ref">
+            <td><strong>v20</strong></td>
+            <td>Variance</td>
+            <td>Split seed separated from training seed. One field, one line, one test.</td>
+            <td>MRR <strong>0.4174 ± 0.0190</strong> over ten seeds; published value inside the 95% CI.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="table-scroll">
+      <table>
+        <caption>Code and test traceability — what each version touched.</caption>
+        <thead>
+          <tr><th>Version</th><th class="mono">Source touched</th><th>Tests added</th><th>Config surface</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>v16</strong></td>
+            <td class="mono">paper_v16/trainer.py (719 lines), paper_v16/evaluate.py</td>
+            <td>None — one file, untestable by construction.</td>
+            <td>~30 <code>os.environ</code> reads at import.</td>
+          </tr>
+          <tr>
+            <td><strong>v17</strong></td>
+            <td class="mono">src/fawkes/{config,data,model,steps,train,evaluate}.py</td>
+            <td>The Phase-5 gates, all equality checks against <code>baseline/*.json</code>.</td>
+            <td>Same variable names, same defaults — now <code>Config.from_env()</code>.</td>
+          </tr>
+          <tr>
+            <td><strong>v18</strong></td>
+            <td class="mono">src/fawkes/patches.py <span class="chip new">new</span>, steps.py, config.py</td>
+            <td>4 — config validation, partition coverage/balance, mask coherence, end-to-end <code>jepa_step</code>.</td>
+            <td>+2 fields: <code>MASK_STRATEGY</code>, <code>JEPA_PATCHES</code>.</td>
+          </tr>
+          <tr>
+            <td><strong>v19</strong></td>
+            <td class="mono">src/fawkes/train.py (<code>train_readout</code> only)</td>
+            <td>1 — <code>test_readout_selection_rolls_back_the_encoder_too</code>.</td>
+            <td><strong>None.</strong> Six arms from knobs that already existed.</td>
+          </tr>
+          <tr class="ref">
+            <td><strong>v20</strong></td>
+            <td class="mono">src/fawkes/config.py, train.py (<code>_split_items</code>), baseline/old_fawkes.json</td>
+            <td>1 — <code>test_split_follows_data_split_seed_not_seed</code>.</td>
+            <td>+1 field: <code>DATA_SPLIT_SEED</code>, defaulting to the published 42.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="table-scroll">
+      <table>
+        <caption>Artifact provenance — what each version produced and how it is verified.</caption>
+        <thead>
+          <tr><th>Version</th><th>Artifact</th><th>Verified by</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>v16</strong></td>
+            <td class="mono">models/fawkes-entity-note/fawkes_trainer_jepa_entity_note_v16_260615.pt</td>
+            <td><code>baseline/paper_loo_testsplit.json</code> — reproduces the checkpoint's embedded metrics to Δ = 0.00e+00.</td>
+          </tr>
+          <tr>
+            <td><strong>v17</strong></td>
+            <td>No new checkpoint — it re-evaluates v16's.</td>
+            <td>Three gates: LOO equality to <code>1e-6</code>, <code>state_dict</code> key sets, AST-verified absence of module-scope env reads.</td>
+          </tr>
+          <tr>
+            <td><strong>v18</strong></td>
+            <td class="mono">tmp/fawkes-v18-{note,nonote}.log</td>
+            <td><code>quiz_sig=304815655090</code> and <code>n=8283</code> identical across all four runs.</td>
+          </tr>
+          <tr>
+            <td><strong>v19</strong></td>
+            <td class="mono">&lt;user&gt;/fawkes-v19-ablation-{arm}-s{seed}, 14 repos</td>
+            <td><code>n</code> equal across arms within each seed; metrics read from each checkpoint's <code>recovery_test_loo</code>.</td>
+          </tr>
+          <tr class="ref">
+            <td><strong>v20</strong></td>
+            <td class="mono">&lt;user&gt;/fawkes-v20-variance-sp42-s{42…51}, 10 repos</td>
+            <td><code>n=8283</code> identical across all ten — the pinned split's signature. Ten-seed mean within 0.0012 of the published value.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="gate flagged">
+      <span class="gate-label">The artifact rule this series keeps re-learning</span>
+      <p>
+        v16's checkpoint carries a <code>config</code> block written by
+        <code>Config.checkpoint_dict</code> — a hand-picked subset. It omits
+        <code>jepa_epochs</code>, <code>readout_epochs</code> and <code>freeze_encoder</code>,
+        which is why v19's arms C and Cp serialise identically. v20 adds
+        <code>data_split_seed</code> to the same blind spot, deliberately: the block is pinned
+        against the released file and cannot grow (§2). <strong>For v19 and after, the job name
+        and output repository are the provenance record</strong> — a checkpoint in this series
+        cannot identify its own experiment.
+      </p>
+    </div>
+  </section>
+
+  <!-- ============================================================ V19 -->
+  <section>
+    <h2><span class="sec">§8</span>v19 — the JEPA pretraining ablation</h2>
+    <div class="rail">
+      <div>
+        <div class="rail-tag">v19 · ablation harness</div>
+        <div class="rail-body">
+          No new configuration, no new model code. One model-selection bug fixed, one
+          regression test added. Six arms reachable from the existing environment surface.
+        </div>
+      </div>
+    </div>
+    <p class="prose">
+      A reviewer asked how much of the fawkes result comes from JEPA pretraining rather than
+      from having any graph encoder at all. Six arms across three seeds answered it, and the
+      answer was not the one the paper assumes: <strong>a frozen randomly initialised encoder
+      scores the same as the JEPA-pretrained one</strong> (B − A ≈ −0.008, sign flipping
+      across seeds), while the identical architecture trained end-to-end without phase 1 beats
+      both by roughly <strong>0.31 MRR</strong>. An encoder with message passing removed
+      entirely (<code>LAYERS=0</code>) still beat the paper model by 0.23.
+    </p>
+    <div class="table-scroll">
+      <table>
+        <caption>
+          The six arms. Everything unlisted is the v16 entity-note default. Arms reachable
+          from existing knobs — <code>JEPA_EPOCHS=0</code> skips phase 1,
+          <code>LAYERS=0</code> empties the conv stack.
+        </caption>
+        <thead>
+          <tr><th>Arm</th><th>Phase 1</th><th>Phase 2 encoder</th><th class="num">LOO MRR</th><th>Seeds</th></tr>
+        </thead>
+        <tbody>
+          <tr class="ref"><td><strong>A</strong> paper</td><td>JEPA, 60 ep</td><td>frozen</td><td class="num">0.4027 ±0.013</td><td>42, 43, 44</td></tr>
+          <tr><td><strong>B</strong> random frozen</td><td>none</td><td>frozen (random init)</td><td class="num">0.3952 ±0.031</td><td>42, 43, 44</td></tr>
+          <tr><td><strong>C</strong> from scratch</td><td>none</td><td>trained jointly</td><td class="num">0.7135 ±0.141</td><td>42, 43, 44</td></tr>
+          <tr><td><strong>Cp</strong> compute-matched</td><td>none</td><td>trained jointly, 100 ep</td><td class="num">0.7147 ±0.142</td><td>42, 43, 44</td></tr>
+          <tr><td><strong>D</strong> no graph</td><td>none</td><td>no message passing</td><td class="num">0.6293</td><td>42</td></tr>
+          <tr><td><strong>E</strong> pretrain + finetune</td><td>JEPA, 60 ep</td><td>fine-tuned</td><td class="num">0.5442</td><td>42</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="prose">
+      The mechanism v19 proposed: under <code>FREEZE_ENCODER=1</code> the 8,192 × 128 entity
+      embedding table is only ever shaped by the pretext task, and in arm B never trained at
+      all. The frozen protocol — introduced to make phase 2 a clean test of the representation
+      — is what costs the model 0.31 MRR.
+    </p>
+    <p class="prose">
+      v19's one code change was in <code>train_readout</code>: best-VAL selection snapshotted
+      only the scorer, so every arm that trains the encoder got a best-VAL scorer bolted onto a
+      final-epoch encoder — a pair that existed at no epoch. The bug degraded exactly the arms
+      the JEPA claim is measured against, so leaving it in would have flattered the paper. The
+      frozen path was provably untouched, which is why arms A and B ran byte-identical code to
+      v18.
+    </p>
+    <div class="gate flagged">
+      <span class="gate-label">v19's outstanding diagnostic, still outstanding</span>
+      <p>
+        <code>jepa_step</code> returns <code>emb_std</code> specifically to catch
+        target-encoder collapse. If it decayed toward zero during arm A's 60 pretraining
+        epochs, "phase 1 adds nothing" is a training failure rather than a property of JEPA —
+        and A ≈ B together with E &lt; C is the signature collapse would produce. Those traces
+        have still not been pulled. v20 does not bear on this either way.
+      </p>
+    </div>
+  </section>
+
+  <!-- ============================================================ V18 -->
+  <section>
+    <h2><span class="sec">§9</span>v18 — BFS-balanced patch masking</h2>
+    <div class="rail">
+      <div>
+        <div class="rail-tag">v18 · pretext task</div>
+        <div class="rail-body">
+          One new module, one branch in <code>jepa_step</code>, two config fields. The default
+          stayed the v17 behaviour, so v18 is opt-in and every earlier gate still runs.
+        </div>
+      </div>
+    </div>
+    <p class="prose">
+      v16's pretext task masks nodes i.i.d. Bernoulli at <code>NODE_MASK=0.4</code>. v18 added
+      <code>MASK_STRATEGY=patch</code>: <code>patches.py</code> partitions each graph into
+      <code>JEPA_PATCHES=8</code> BFS-balanced patches and masks whole patches, so the model
+      cannot infer a masked node from its immediate neighbours. This matches what
+      <code>clinical_jepa</code> does and what the paper's schematic depicts.
+    </p>
+    <div class="table-scroll">
+      <table>
+        <caption>
+          v18 LOO MRR, seed 42, one run per cell. Note what the baseline column is: for the
+          with-note row it reproduces <code>baseline/paper_loo_testsplit.json</code> on all
+          four metrics, so it is the released checkpoint re-evaluated, <em>not</em> a retrain.
+        </caption>
+        <thead>
+          <tr><th>Variant</th><th class="num">Baseline · random mask</th><th class="num">v18 · patch mask</th><th class="num">Δ</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>No note</td><td class="num">0.2743</td><td class="num">0.2980</td><td class="num up">+0.0237</td></tr>
+          <tr><td>With note (the paper model)</td><td class="num">0.4187</td><td class="num">0.4080</td><td class="num down">−0.0107</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="prose">
+      Both deltas are inside the ±0.019 seed noise v20 measured. <strong>Neither v18 result is
+      resolvable at one seed per cell</strong>, in either direction. That is the clearest
+      concrete consequence of this report for the earlier work: v18's conclusion needs the
+      same ten-seed treatment before it can be stated as a finding.
+    </p>
+    <p class="prose">
+      There is a second problem the baseline column exposes. The with-note comparison sets a
+      <em>freshly trained</em> patch-mask model against the <em>released checkpoint</em>, so
+      the two cells differ by more than the pretext task — they differ by an entire training
+      run, on different hardware, at a different time. v20 puts the width of that difference
+      at ±0.019 on its own. The −0.0107 regression is therefore not just underpowered; it is
+      not a paired comparison in the first place. Repeating v18 should retrain both arms.
+    </p>
+  </section>
+
+  <!-- ============================================================ V17 + V16 -->
+  <section>
+    <h2><span class="sec">§10</span>v17 and v16 — the refactor and the experiment underneath</h2>
+
+    <h3>v17 — the refactor that had to move nothing</h3>
+    <p class="prose">
+      <code>paper_v16/trainer.py</code> was 719 lines that read roughly thirty
+      <code>os.environ</code> values at import time and computed <code>NUMERIC_DIM</code> — a
+      tensor shape — from them. Environment variables had to be set before Python imported the
+      module, two configurations could not coexist in one process, and the trainer was
+      effectively untestable. v17 split it into
+      <code>fawkes/{config,data,model,steps,train,evaluate}.py</code> and turned every global
+      into a <code>Config</code> field, with <code>Config.from_env()</code> reading the same
+      names, the same defaults and the same parsing rules.
+    </p>
+    <p class="prose">
+      The success criterion was equality, not improvement: LOO metrics to <code>1e-6</code>,
+      identical <code>state_dict</code> key sets, and an AST-level gate proving no module-scope
+      environment reads remain. All three still pass under v20.
+    </p>
+
+    <h3>v16 — the experiment that produced the published number</h3>
+    <p class="prose">
+      v15 attached the Clinical-ModernBERT note embedding to a single per-admission
+      <code>NOTE</code> node. v16 retired that node and <strong>localised the same 768-dimensional
+      vector onto the entity nodes the note actually grounds</strong> — by default the endpoints
+      of any edge carrying <code>prov_in_note</code>. Ungrounded entities receive a zero vector.
+      On the shipped dataset this puts the note on 28.6% of nodes.
+    </p>
+    <div class="table-scroll">
+      <table>
+        <caption>The v16 configuration — <code>Config()</code> defaults are the released experiment.</caption>
+        <thead><tr><th>Setting</th><th class="mono">Value</th><th>Note</th></tr></thead>
+        <tbody>
+          <tr><td>Encoder</td><td class="mono">hid=128, layers=2, heads=4</td><td>Two <code>TransformerConv</code> layers; 2,637,954 parameters.</td></tr>
+          <tr><td>Node input</td><td class="mono">numeric_dim=774</td><td>6 demographic slots + 768 note dims — <em>not</em> 778 or 1550.</td></tr>
+          <tr><td>Phase 1</td><td class="mono">jepa_epochs=60, node_mask=0.4</td><td>Masked-node latent prediction, EMA target.</td></tr>
+          <tr><td>Phase 2</td><td class="mono">readout_epochs=40, freeze_encoder=1</td><td>DistMult over the frozen encoder; the v19 finding lives here.</td></tr>
+          <tr><td>Split</td><td class="mono">val_frac=0.1, test_frac=0.1</td><td>Seeded permutation, test taken first.</td></tr>
+          <tr><td>Evaluation</td><td class="mono">loo_cap=40000</td><td>Mask one edge, keep the whole graph as context, filtered ranking.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="prose">
+      Leave-one-out is the paper's measure and it draws no randomness, so it is exactly
+      reproducible given a model and a test set. Everything in this report varies the model
+      and holds the test set; §6's missing experiment does the reverse.
+    </p>
+  </section>
+
+  <!-- ============================================================ PROVENANCE -->
+  <section>
+    <h2><span class="sec">§11</span>Provenance — where every number came from</h2>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Number</th><th>Source</th><th>Verification</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>All 10 LOO rows</td>
+            <td class="mono">&lt;user&gt;/fawkes-v20-variance-sp42-s{42…51}</td>
+            <td>Read from <code>recovery_test_loo</code> inside each pushed checkpoint, not parsed from logs.</td>
+          </tr>
+          <tr>
+            <td>All 10 AUC/AP rows</td>
+            <td class="mono">recovery_test_batchmask</td>
+            <td>A second block in the same checkpoints. <code>loo_evaluate</code> returns no AUC; only <code>evaluate</code> does.</td>
+          </tr>
+          <tr>
+            <td>Eval population</td>
+            <td class="mono">n per run</td>
+            <td><code>n=8283</code> (LOO) and <code>n_mrr=3000</code> (batch-mask) for all ten — equal by construction, and the signature that the split stayed pinned.</td>
+          </tr>
+          <tr>
+            <td>Identical eval questions</td>
+            <td class="mono">qsig</td>
+            <td><code>304815655090</code> across all ten runs <em>and</em> in the released v16 checkpoint — the retrains were asked exactly the paper's questions.</td>
+          </tr>
+          <tr>
+            <td>Published AUC/AP</td>
+            <td class="mono">models/fawkes-entity-note/…v16_260615.pt</td>
+            <td>Read from the released checkpoint's own <code>recovery_test_batchmask</code>: AUC 0.714351, AP 0.627698, non-obvious AUC 0.800028, MRR 0.360833.</td>
+          </tr>
+          <tr>
+            <td>mean, sd, CI, CV, MDD</td>
+            <td class="mono">statistics.mean / stdev, t(9)=2.262</td>
+            <td>Sample sd (n−1). MDD = 2.8·sd·√(2/n) at α=.05, power .80.</td>
+          </tr>
+          <tr>
+            <td>Published v16 number</td>
+            <td class="mono">baseline/paper_loo_testsplit.json</td>
+            <td>MRR 0.418653, n=8,283; reproduces the released checkpoint's embedded metrics to Δ = 0.00e+00.</td>
+          </tr>
+          <tr>
+            <td>Split-pinning claim</td>
+            <td class="mono">test-set gids, real dataset</td>
+            <td>Membership compared directly across four configurations (§2), not inferred from split sizes.</td>
+          </tr>
+          <tr>
+            <td>Patient overlap</td>
+            <td class="mono">subject_id over train/test pairs</td>
+            <td>139 shared subjects; 147 of 400 test admissions have their patient in train.</td>
+          </tr>
+          <tr>
+            <td>Determinism caveat</td>
+            <td class="mono">src/fawkes/train.py::set_seed</td>
+            <td><code>torch.use_deterministic_algorithms(True, warn_only=True)</code> — read from source, not assumed.</td>
+          </tr>
+          <tr class="sub">
+            <td>v19 rows in §8</td>
+            <td class="mono">14 ablation checkpoints</td>
+            <td>Carried forward from Report No. 3 unchanged.</td>
+          </tr>
+          <tr class="sub">
+            <td>v18 rows in §9</td>
+            <td class="mono">tmp/fawkes-v18-{note,nonote}.log</td>
+            <td>Carried forward from Report No. 2; <code>quiz_sig</code> identical across its four runs.</td>
+          </tr>
+          <tr class="sub">
+            <td>v16/v17 in §10</td>
+            <td class="mono">src/fawkes/config.py, docs/LINEAGE.md, PAPER_CODE_MAP.md</td>
+            <td>Dataclass defaults are the released configuration — itself a test.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h4>Reproducing one run</h4>
+<pre><code>hf jobs uv run --detach --flavor t4-small --timeout 4h --secrets HF_TOKEN \
+  --name fawkes-v20-var-sp42-s42 -v ./src:/workspace/src \
+  -e MASK_STRATEGY=random -e USE_NOTE=1 -e GROUND_BY=prov -e EMBED_DIM=768 \
+  -e USE_SCORES=0 -e PRUNE_NO_EVIDENCE=1 -e RUN_CASCADE=0 -e RUN_EIR=0 \
+  -e PUSH=1 -e DATA_SPLIT_SEED=42 -e SEED=42 \
+  -e OUTPUT_REPO=&lt;user&gt;/fawkes-v20-variance-sp42-s42 \
+  scripts/fawkes_patch_masking_hf_job.py</code></pre>
+    <p class="prose">
+      <code>submit-v20-seed-variance.sh</code> loops this over seeds 42–51;
+      <code>print_v20_seed_variance_table.py</code> collects it. The job script is v18's,
+      reused unchanged — it applies its defaults with <code>setdefault</code>, so every
+      <code>-e</code> above wins over them.
+    </p>
+
+    <p class="prose" style="margin-top:1.2rem">
+      <strong>On this report's charts.</strong> The data palette is v19's, carried forward and
+      <em>re-run</em> through the palette validator rather than assumed: the diverging pair
+      passes all six checks in both modes, worst-case CVD ΔE 21.6 light and 19.2 dark against
+      a threshold of 8, with normal-vision ΔE 32.3 and 29.0; the single magnitude hue passes
+      lightness, chroma and contrast in both modes. No new hue was introduced. Figures 1 and 2
+      distinguish their mark types by <em>shape</em> — dot, tick, band, dashed rule — so no
+      series is identified by colour alone, and Figure 3 is the only chart using the diverging
+      pair, with its sign printed on every row. Every chart's numbers appear in an adjacent
+      table, so no value is reachable only by hovering.
+    </p>
+  </section>
+
+  <div class="gate flagged">
+    <span class="gate-label">If you do one thing next</span>
+    <p>
+      Submit the four split runs in §6. Ten seeds answer "is it a lucky initialisation"; the
+      review asked "is it a lucky sample of patients", and that question is still open. Four
+      jobs and one <code>for</code> loop close it — and the machinery is already tested.
+    </p>
+  </div>
+
+  <p class="footnote">
+    <strong>v20 sources:</strong> the ten pushed variance checkpoints and their embedded
+    <code>recovery_test_loo</code> blocks; the working-tree diff
+    (<code>src/fawkes/config.py</code>, <code>src/fawkes/train.py</code>,
+    <code>tests/test_fawkes.py</code>, <code>baseline/old_fawkes.json</code>); the local smoke
+    run and membership check against
+    <code>data/fawkes-training-graph-embedded-260615/</code>; and
+    <code>baseline/paper_loo_testsplit.json</code> for the published value.
+    <strong>Carried forward:</strong> §8 from Report No. 3 (v19 ablation), §9 from Report No. 2
+    (v18 patch masking), §10 from Reports No. 1 and 2 together with
+    <code>docs/LINEAGE.md</code> and <code>docs/PAPER_CODE_MAP.md</code>.
+    This report is self-contained: §7–§10 reproduce the lineage so it can be read without the
+    three earlier reports, which remain the primary record for their own results.
+    Generated 2026-08-06.
+  </p>
+</div>
+
+<div id="tip" role="status" aria-live="polite"></div>
+<script>
+  (function () {
+    var tip = document.getElementById('tip');
+    function show(el, x, y) {
+      var text = el.getAttribute('data-tip');
+      if (!text) return;
+      tip.textContent = text;
+      tip.classList.add('on');
+      var r = tip.getBoundingClientRect();
+      var left = Math.min(Math.max(8, x + 14), window.innerWidth - r.width - 8);
+      var top = y - r.height - 12;
+      if (top < 8) top = y + 18;
+      tip.style.left = left + 'px';
+      tip.style.top = top + 'px';
+    }
+    function hide() { tip.classList.remove('on'); }
+    document.querySelectorAll('[data-tip]').forEach(function (el) {
+      el.addEventListener('mousemove', function (e) { show(el, e.clientX, e.clientY); });
+      el.addEventListener('mouseleave', hide);
+      el.addEventListener('focus', function () {
+        var r = el.getBoundingClientRect();
+        show(el, r.left + r.width / 2, r.top);
+      });
+      el.addEventListener('blur', hide);
+    });
+    window.addEventListener('scroll', hide, { passive: true });
+  })();
+</script>
