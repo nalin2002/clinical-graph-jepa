@@ -112,6 +112,19 @@ existing global Clinical ModernBERT mean with a parameterized uniform-span
 control and entity-conditioned cross-attention over contextual 32-token spans.
 See [the v23 protocol and execution guide](docs/V23_NOTE_INJECTION.md).
 
+Ten paired seeds on the fixed 400-graph test split found no attention gain:
+
+| Note injection | LOO MRR | H@1 | H@3 | H@10 |
+|---|---:|---:|---:|---:|
+| Global mean control | 0.4680 ± 0.0213 | 0.2910 ± 0.0263 | 0.5350 ± 0.0233 | 0.9109 ± 0.0077 |
+| Uniform local spans | **0.4778 ± 0.0204** | **0.3016 ± 0.0274** | **0.5481 ± 0.0194** | **0.9153 ± 0.0052** |
+| Entity-conditioned attention | 0.4582 ± 0.0262 | 0.2802 ± 0.0300 | 0.5224 ± 0.0328 | 0.9108 ± 0.0113 |
+
+Uniform spans improved over the mean by `+0.0098` MRR, but the paired 95% CI
+included zero (`[-0.0128, +0.0324]`). Attention changed MRR by `-0.0098`
+(`[-0.0343, +0.0147]`) and therefore did not support the improvement
+hypothesis. See the [complete v23 result](results/v23-note-injection-summary.md).
+
 ### Architecture comparison
 
 | Stage | Clinical-JEPA, no note | Clinical-JEPA, localized note | Fawkes entity-note |

@@ -18,6 +18,7 @@ ARMS = {
 }
 LOO_METRICS = ("mrr", "hits1", "hits3", "hits10")
 BATCH_METRICS = ("auc", "ap", "mrr")
+TARGET_RELATIONS = ("MANAGED_FOR", "INDICATES", "COMPLICATED_BY", "CONFIRMS")
 LABELS = {"mrr": "MRR", "hits1": "H@1", "hits3": "H@3", "hits10": "H@10",
           "auc": "AUC", "ap": "AP"}
 T_CRITICAL_95 = {10: 2.262, 9: 2.306, 8: 2.365, 7: 2.447, 6: 2.571,
@@ -83,11 +84,53 @@ def paired(runs, new_arm, baseline_arm, block, metrics):
     return result
 
 
+def per_relation_loo(runs):
+    result = {}
+    print("\nLOO per inferred relation — MRR mean ± sample sd")
+    for arm in ARMS:
+        result[arm] = {}
+        cells = []
+        for relation in TARGET_RELATIONS:
+            values = []
+            for seed in SEEDS:
+                if (arm, seed) not in runs:
+                    continue
+                rows = {row["rel"]: row for row in runs[(arm, seed)]["loo"]["per_rel"]}
+                if relation in rows:
+                    values.append(rows[relation]["mrr"])
+            mean, sd = mean_sd(values)
+            result[arm][relation] = {"mrr_mean": mean, "mrr_sd": sd, "n_seeds": len(values)}
+            cells.append(f"{relation}={mean:.4f}±{sd:.4f}")
+        print(f"{arm:<15} {'  '.join(cells)}")
+
+    result["paired_mrr"] = {}
+    for arm in ("v23-uniform", "v23-attention"):
+        key = f"{arm}_minus_v23-mean"
+        result["paired_mrr"][key] = {}
+        for relation in TARGET_RELATIONS:
+            diffs = []
+            for seed in SEEDS:
+                if (arm, seed) not in runs or ("v23-mean", seed) not in runs:
+                    continue
+                new_rows = {row["rel"]: row for row in runs[(arm, seed)]["loo"]["per_rel"]}
+                base_rows = {row["rel"]: row for row in runs[("v23-mean", seed)]["loo"]["per_rel"]}
+                diffs.append(new_rows[relation]["mrr"] - base_rows[relation]["mrr"])
+            mean, sd = mean_sd(diffs)
+            half = T_CRITICAL_95[len(diffs)] * sd / len(diffs) ** 0.5
+            result["paired_mrr"][key][relation] = {
+                "mean_delta": mean, "sd_delta": sd,
+                "ci95": [mean - half, mean + half],
+                "wins": sum(value > 0 for value in diffs), "n": len(diffs),
+            }
+    return result
+
+
 def main():
     runs = load_runs()
     result = {
         "loo": summarize(runs, "loo", LOO_METRICS),
         "batch": summarize(runs, "batch", BATCH_METRICS),
+        "per_relation_loo": per_relation_loo(runs),
         "paired": {},
     }
     for new_arm, baseline_arm in (

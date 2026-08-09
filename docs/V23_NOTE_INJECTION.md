@@ -60,3 +60,10 @@ The primary endpoint is paired leave-one-out MRR over the same 8,283 held-edge
 queries. Report mean and sample standard deviation across seeds, paired 95%
 confidence intervals, win counts, Hits@1/3/10, batch-mask AUC/AP/MRR and the four
 inferred-relation breakdowns stored in each checkpoint.
+
+## Result
+
+All 30 confirmatory jobs completed. Attention did not improve the primary
+endpoint; uniform span pooling was numerically best but not distinguishable from
+the global mean over ten paired seeds. See
+[the full tables and interpretation](../results/v23-note-injection-summary.md).
