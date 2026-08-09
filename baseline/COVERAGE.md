@@ -145,6 +145,26 @@ listed per test; where a row says "digests", see the section above.
 
 ---
 
+## Deliberate divergences from the pins, after Phase 8
+
+Phase 8's pins record what the old code did. When `src/` is changed *on purpose*
+the pin does not become wrong — it becomes the record of the behaviour that was
+replaced. Regenerating it would erase exactly the evidence it exists to hold, so
+each intended divergence is narrowed at the assertion and listed here instead.
+
+| Pin | Key | What changed | How the gate still holds |
+| --- | --- | --- | --- |
+| `old_fawkes.json` → `evaluators.evaluate` | `auc_nonobvious` | The trainer filtered the *positives* to non-`PATIENT`-anchored edges but scored them against the **unfiltered** negative pool, ~68% of which belongs to patient-anchored edges — so it reported a discrimination the model never made, inflated unequally between arms. `_classification_metrics` now indexes the negatives with the same mask (`negatives[nonpat_mask]`); `readout_step` returns one negative per positive in the same order, so the mask applies unchanged. | `test_batchmask_cascade_and_eir_match_trainer` still compares **every other key** with `==`, which is what shows the change is confined to the negative-pool selection. The corrected value is asserted to be below the pinned one. The mechanism has its own unit gate, `test_nonobvious_auc_uses_its_own_negatives`, which fails on the old expression. |
+
+The pinned value is the inflated one by construction. It is also the reason the
+released checkpoint's published `auc_nonobvious` of `0.800028` cannot be quoted:
+re-scored with matched populations the same weights give **0.618908**, and the
+correction reverses the sign of the v21 readout-head comparison it was previously
+the only evidence against. `print_nonobvious_rescore_table.py` computes both
+columns in one pass over all thirty fleet checkpoints plus the released one.
+
+---
+
 ## What no longer has any oracle at all
 
 Two things, both stated so they are not mistaken for coverage:

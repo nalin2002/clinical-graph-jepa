@@ -304,7 +304,7 @@ def _save_and_push(encoder, scorer, cfg, test_metrics, loo, cascade_results, eir
     """Save the checkpoint locally; upload to the Hugging Face OUTPUT_REPO when PUSH=1."""
     checkpoint_path = cfg.checkpoint_name
     torch.save({"encoder": encoder.state_dict(), "scorer": scorer.state_dict(),
-                "config": cfg.checkpoint_dict(),
+                "config": cfg.checkpoint_dict(), "run_config": cfg.run_dict(),
                 "recovery_test_batchmask": test_metrics, "recovery_test_loo": loo,
                 "cascade": cascade_results, "eir": eir}, checkpoint_path)
     if not cfg.push:

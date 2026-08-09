@@ -27,6 +27,7 @@ import json
 import logging
 import math
 from collections import defaultdict
+from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
@@ -36,7 +37,7 @@ from sklearn.metrics import average_precision_score, roc_auc_score
 from .config import Config
 from .data import (NUM_NODE_TYPES, RELATION_CANONICAL, TARGET_RELS, add_inverses, normalize_text,
                    resolve_rel, support_graded, to_data)
-from .model import DistMult, Encoder
+from .model import Encoder, build_scorer
 from .steps import buckets, readout_step
 
 logger = logging.getLogger("fawkes_jepa")
@@ -160,9 +161,10 @@ def _classification_metrics(pos_batches, neg_batches, nonpat_batches):
     all_scores = np.concatenate([positives, negatives])
     auc, ap = roc_auc_score(all_labels, all_scores), average_precision_score(all_labels, all_scores)
     nonobvious_pos = positives[nonpat_mask]
+    nonobvious_neg = negatives[nonpat_mask]      # one negative per positive -> the mask indexes both
     if len(nonobvious_pos) > 5:
-        nonobvious_labels = np.concatenate([np.ones_like(nonobvious_pos), np.zeros_like(negatives)])
-        nonobvious_scores = np.concatenate([nonobvious_pos, negatives])
+        nonobvious_labels = np.concatenate([np.ones_like(nonobvious_pos), np.zeros_like(nonobvious_neg)])
+        nonobvious_scores = np.concatenate([nonobvious_pos, nonobvious_neg])
         auc_nonobvious = roc_auc_score(nonobvious_labels, nonobvious_scores)
     else:
         auc_nonobvious = float('nan')
@@ -468,6 +470,12 @@ def run(args) -> dict:
     checkpoint = torch.load(args.checkpoint, map_location="cpu", weights_only=False)
     config = checkpoint["config"]
     cfg = Config.from_env()
+    # The pinned `config` block cannot carry `decoder`, so until run_config existed a
+    # non-DistMult checkpoint failed a strict state_dict load unless the caller happened
+    # to set DECODER. Checkpoints that record it now describe their own head.
+    run_config = checkpoint.get("run_config") or {}
+    if "decoder" in run_config:
+        cfg = replace(cfg, decoder=run_config["decoder"])
     expected = {
         "use_note": cfg.use_note,
         "ground_by": cfg.ground_by,
@@ -496,7 +504,7 @@ def run(args) -> dict:
 
     device = torch.device(args.device)
     encoder = Encoder(cfg).to(device)
-    scorer = DistMult(cfg).to(device)
+    scorer = build_scorer(cfg).to(device)
     encoder.load_state_dict(checkpoint["encoder"])
     scorer.load_state_dict(checkpoint["scorer"])
     metrics = loo_evaluate(encoder, scorer, graphs, device, cfg, cap=args.cap)

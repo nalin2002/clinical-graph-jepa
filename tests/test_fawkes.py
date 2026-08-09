@@ -32,8 +32,8 @@ from conftest import (BASELINE, DATA, ROOT, assert_digests_match, assert_state_d
 
 from fawkes.config import Config
 from fawkes.data import resolve_rel, to_data
-from fawkes.evaluate import (_load_graphs, cascade_evaluate, eir_uplift_eval, evaluate,
-                             loo_evaluate)
+from fawkes.evaluate import (_classification_metrics, _load_graphs, cascade_evaluate,
+                             eir_uplift_eval, evaluate, loo_evaluate)
 from fawkes.model import JEPA, DistMult, Encoder
 from fawkes.patches import balanced_bfs_partition, patch_mask
 from fawkes.train import _split_items, jepa_step, readout_step, train_readout
@@ -331,7 +331,18 @@ def test_batchmask_cascade_and_eir_match_trainer():
     encoder, scorer, _ = _load_paper_model(cfg)
 
     loader = DataLoader(graphs, batch_size=1, shuffle=False)
-    assert evaluate(encoder, scorer, loader, device, cfg) == pinned["evaluate"]
+    # `auc_nonobvious` is the one value this repo deliberately moved after the pin was
+    # recorded: the trainer scored non-PATIENT positives against the *whole* negative
+    # pool, ~68% of which belongs to patient-anchored edges. The pin keeps the inflated
+    # number because its job is to record what the old code did, so the corrected metric
+    # is asserted separately — and every other key must still match the trainer exactly,
+    # which is what shows the fix is confined to the negative-pool selection.
+    metrics = evaluate(encoder, scorer, loader, device, cfg)
+    corrected = metrics.pop("auc_nonobvious")
+    assert metrics == {k: v for k, v in pinned["evaluate"].items() if k != "auc_nonobvious"}
+    assert corrected < pinned["evaluate"]["auc_nonobvious"], (
+        "the matched pool should be harder than the pool padded with patient-anchored "
+        "negatives; if this ever fails the inflation argument needs re-checking")
 
     order = [resolve_rel(r) for r in cfg.cascade_order]
     assert cascade_evaluate(encoder, scorer, graphs, order, device, cfg) == \
@@ -434,6 +445,80 @@ def test_jepa_step_runs_with_patch_masking():
     model = JEPA(cfg)
     loss, emb_std = jepa_step(model, batch, torch.device("cpu"), cfg)
     assert torch.isfinite(loss) and float(emb_std) > 0
+
+
+# ---- run_config: a checkpoint records the knobs its experiment turned ----
+
+def test_run_config_carries_every_knob_checkpoint_dict_omits():
+    """The two blocks together must cover the fields an experiment varies.
+
+    `checkpoint_dict` is pinned against the released file and cannot grow, so
+    every knob turned since v18 went unrecorded — v19's arms C and Cp serialised
+    identically, and a v21 MLP checkpoint could not be told from a v20 DistMult
+    one. If a future experiment adds a field to `RUN_FIELDS` this stays true; if
+    it turns a knob that is in neither block, this is the test that should have
+    caught it.
+    """
+    varied = {"jepa_epochs", "readout_epochs", "freeze_encoder", "mask_strategy",
+              "jepa_patches", "decoder", "data_split_seed"}
+    recorded = set(Config().checkpoint_dict()) | set(Config().run_dict())
+    assert varied <= recorded
+
+
+def test_run_config_round_trips_through_from_checkpoint():
+    """A non-default arm must rebuild from its own checkpoint, without the environment.
+
+    The `decoder` case is the one that bit: loading a v21 MLP checkpoint without
+    DECODER=mlp fails a strict state_dict load on the `mlp.0.*` keys.
+    """
+    arm = Config(decoder="mlp", mask_strategy="patch", jepa_patches=8,
+                 freeze_encoder=False, jepa_epochs=0, data_split_seed=43)
+    rebuilt = Config.from_checkpoint(arm.checkpoint_dict(), arm.run_dict())
+
+    for field in ("decoder", "mask_strategy", "jepa_patches", "freeze_encoder",
+                  "jepa_epochs", "data_split_seed"):
+        assert getattr(rebuilt, field) == getattr(arm, field), field
+
+
+def test_from_checkpoint_without_run_config_is_unchanged():
+    """Released checkpoints carry no run_config; they must load exactly as before."""
+    released = Config().checkpoint_dict()
+    assert Config.from_checkpoint(released) == Config.from_checkpoint(released, None)
+    assert Config.from_checkpoint(released).decoder == Config().decoder
+
+
+# ---- auc_nonobvious scores against a matched negative pool ----
+
+def test_nonobvious_auc_uses_its_own_negatives():
+    """auc_nonobvious must score non-PATIENT positives against the negatives drawn
+    FOR those positives, not against the whole pool.
+
+    `readout_step` returns `neg_scores[:, 0]` — one negative per positive, in the
+    same order — so `nonpat_mask` indexes the negatives exactly as it indexes the
+    positives. Filtering only the positives leaves the negatives of the
+    patient-anchored edges in the comparison, and those are the easy ones the
+    metric exists to exclude, so it reports a discrimination the model never made.
+
+    Here the six non-patient edges are near chance while the four patient-anchored
+    negatives sit far below every positive. A metric that leaves them in cannot
+    help but look good.
+    """
+    positives = torch.tensor([0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 10.0, 11.0, 12.0, 13.0])
+    negatives = torch.tensor([0.5, 1.5, 2.5, 3.5, 4.5, 5.5, -10.0, -11.0, -12.0, -13.0])
+    nonpatient = torch.tensor([True] * 6 + [False] * 4)
+
+    _auc, _ap, auc_nonobvious = _classification_metrics([positives], [negatives], [nonpatient])
+
+    from sklearn.metrics import roc_auc_score
+    matched = roc_auc_score(np.concatenate([np.ones(6), np.zeros(6)]),
+                            np.concatenate([positives[:6].numpy(), negatives[:6].numpy()]))
+    unfiltered = roc_auc_score(np.concatenate([np.ones(6), np.zeros(10)]),
+                               np.concatenate([positives[:6].numpy(), negatives.numpy()]))
+
+    assert auc_nonobvious == pytest.approx(matched, abs=1e-12)
+    assert unfiltered > matched, (
+        "this fixture no longer separates the two computations, so it cannot gate "
+        "the bug — widen the gap between the patient-anchored negatives and the rest")
 
 
 # ---- best-VAL selection when the encoder is not frozen ----

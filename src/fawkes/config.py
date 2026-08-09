@@ -40,6 +40,13 @@ def _default_cascade_order():
     return ["MANAGED_FOR", "CONFIRMS", "COMPLICATED_BY", "INDICATES"]
 
 
+#: Fields written to the checkpoint's ``run_config`` block — the knobs the
+#: experiments since v18 have turned, none of which ``checkpoint_dict`` can
+#: carry because that block is pinned against the released v16 file.
+RUN_FIELDS = ("jepa_epochs", "readout_epochs", "freeze_encoder", "mask_strategy",
+              "jepa_patches", "decoder", "data_split_seed")
+
+
 @dataclass
 class Config:
     """One experiment. Defaults are the v16 (260615) entity-grounded-note run.
@@ -195,12 +202,18 @@ class Config:
         )
 
     @classmethod
-    def from_checkpoint(cls, saved: dict) -> "Config":
+    def from_checkpoint(cls, saved: dict, run: dict | None = None) -> "Config":
         """Rebuild the architecture-relevant fields from a checkpoint's ``config``.
 
         Only the keys ``checkpoint_dict`` writes are recoverable; everything else
         falls back to the dataclass default. This is what lets a released
         checkpoint be loaded without setting any environment variable.
+
+        ``run`` is the optional ``run_config`` block (see :meth:`run_dict`),
+        absent from every checkpoint written before it existed. When present it
+        supplies the experiment knobs ``config`` cannot carry — most importantly
+        ``decoder``, without which a non-DistMult checkpoint fails a strict
+        ``state_dict`` load.
         """
         known = {
             "hid": "hid", "layers": "layers", "heads": "heads",
@@ -212,6 +225,7 @@ class Config:
             "loo_cap": "loo_cap", "data_repo": "data_repo", "seed": "seed",
         }
         overrides = {attr: saved[key] for key, attr in known.items() if key in saved}
+        overrides.update({key: value for key, value in (run or {}).items() if key in RUN_FIELDS})
         return replace(cls(), **overrides)
 
     def checkpoint_dict(self) -> dict:
@@ -234,6 +248,20 @@ class Config:
             "cascade_order": self.cascade_order, "loo_cap": self.loo_cap,
             "data_repo": self.data_repo, "seed": self.seed,
         }
+
+    def run_dict(self) -> dict:
+        """The ``run_config`` block — the experiment knobs ``checkpoint_dict`` cannot carry.
+
+        ``checkpoint_dict`` is pinned byte-for-byte against the released v16 file
+        by ``test_checkpoint_dict_matches_released_config``, so it cannot grow a
+        key without breaking the gate that proves the paper artifact is intact.
+        Every knob turned since v18 therefore went unrecorded: v19's arms C and Cp
+        serialised identically, and a v21 MLP checkpoint was indistinguishable
+        from a v20 DistMult one, leaving the output repository name as the only
+        provenance. This is a separate top-level key, so the pinned block is
+        untouched and checkpoints written before it simply do not have it.
+        """
+        return {field: getattr(self, field) for field in RUN_FIELDS}
 
     @property
     def checkpoint_name(self) -> str:

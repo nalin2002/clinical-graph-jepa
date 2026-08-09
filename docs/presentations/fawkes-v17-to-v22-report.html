@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>FAWKES v17&rarr;v22 &mdash; Clinical Graph-JEPA CONSOLIDATED RESULTS LOG (v22: patch masking buys Hits@10 only, costs 1.6&times; variance; v21: DistMult&rarr;MLP readout +0.0530 at 10/10 seeds, distributions disjoint &mdash; the win; v20: noise floor &plusmn;0.019; v19: phase 1 &asymp; random init; v18/v17 below) + Method Foundation + Known Defects &mdash; 260809</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'SF Mono', 'Menlo', monospace; background: #0a0a0a; color: #e0ddd8; padding: 24px; line-height: 1.6; }
+  h1 { font-size: 13px; letter-spacing: 4px; text-transform: uppercase; color: #f0e8d8; border-bottom: 1px solid #333; padding-bottom: 8px; margin-bottom: 4px; }
+  .sub { font-size: 9px; color: #555; letter-spacing: 2px; margin-bottom: 24px; }
+  h2 { font-size: 11px; letter-spacing: 3px; text-transform: uppercase; color: #c8a060; margin-top: 32px; margin-bottom: 10px; border-left: 3px solid #c8a060; padding-left: 12px; }
+  h3 { font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: #888; margin-top: 16px; margin-bottom: 6px; }
+  table { border-collapse: collapse; width: 100%; margin: 8px 0 16px; font-size: 9px; }
+  th { background: #1a1714; color: #c8a060; text-align: left; padding: 5px 8px; border: 1px solid #2a2520; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; font-size: 8px; }
+  td { padding: 4px 8px; border: 1px solid #1a1714; vertical-align: top; }
+  tr:nth-child(even) { background: #0e0e0c; }
+  tr:nth-child(odd) { background: #121210; }
+  td:first-child { font-weight: 600; color: #d4c4b4; }
+  pre { font-size: 9px; color: #b0a898; background: #0e0e0c; padding: 8px; border-left: 2px solid #2a2520; margin: 6px 0; white-space: pre-wrap; }
+  code { background: #1a1714; color: #c8a060; padding: 1px 4px; border-radius: 2px; font-size: 9px; }
+  .dim { font-size: 8px; color: #555; }
+  .g { color: #60c080; } .r { color: #c06050; } .y { color: #c8a060; } .b { color: #7cb8d4; }
+  .recommend { background: #1a2a1a !important; border-left: 3px solid #60c080; }
+  .reject { background: #2a1a1a !important; color: #888; }
+  .card { background: #141210; border: 1px solid #2a2520; padding: 10px; margin: 6px 0; }
+  .card .t { font-size: 9px; font-weight: 700; color: #c8a060; letter-spacing: 1px; text-transform: uppercase; }
+  .card .d { font-size: 9px; color: #999; margin-top: 4px; }
+  .divider { border-top: 1px solid #1a1714; margin: 20px 0; }
+  .metric { display: inline-block; min-width: 150px; margin: 4px 12px 4px 0; }
+  .metric .v { font-size: 16px; color: #c8a060; font-weight: 700; }
+  .metric .l { font-size: 8px; color: #666; text-transform: uppercase; letter-spacing: 1px; }
+  .step { background: #141210; border: 1px solid #2a2520; border-left: 3px solid #2a2520; padding: 10px 14px; margin: 8px 0; }
+  .step.bad { border-left-color: #c06050; }
+  .step.good { border-left-color: #60c080; }
+  .step .t { font-size: 9px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #c8a060; margin-bottom: 4px; }
+  .step .d { font-size: 9px; color: #aaa; }
+  .explain { background: #12110e; border: 2px solid #c8a060; padding: 18px 22px; margin: 4px 0 26px; }
+  .explain .title { font-size: 13px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: #f0e8d8; margin-bottom: 12px; }
+  .explain p { font-size: 13px; color: #ddd8d0; line-height: 1.75; margin: 9px 0; }
+  .explain strong { color: #f0e8d8; }
+  .explain ul { margin: 8px 0 8px 22px; }
+  .explain li { font-size: 13px; color: #ddd8d0; line-height: 1.7; margin: 7px 0; }
+  .explain .one { margin-top: 14px; padding-top: 12px; border-top: 1px solid #2a2520; color: #c8a060; font-size: 13px; }
+</style>
+</head>
+<body>
+
+<h1>FAWKES &mdash; Clinical Graph-JEPA &middot; v17 &rarr; v22 Consolidated Log</h1>
+<div class="sub">260809 | six versions, newest first | + v22 (newest, top of the log): patch masking on the MLP head moves the headline metric by <strong>+0.0066 &plusmn; 0.0274</strong> &mdash; nothing &mdash; but lifts <strong>Hits@10 +0.0185, t=5.29, survives Bonferroni</strong>, and inflates MRR variance <strong>1.6&times;</strong>. v21 is the real win: <code>DECODER=mlp</code>, zero source changes, <strong>LOO MRR 0.4174&rarr;0.4705 (+0.0530), 10/10 seeds, distributions disjoint</strong>. v20 set the <strong>&plusmn;0.019 noise floor</strong> that makes every claim above readable. v19 found <strong>phase 1 &asymp; random init (&minus;0.008)</strong> while unfreezing the encoder is worth <strong>+0.311</strong>. v18 (patch masking, 1 seed) and v17 (the refactor that had to move nothing) retained below. <strong class="g">260809 CORRECTION: the <code>auc_nonobvious</code> defect is FIXED and all 30 fleet checkpoints + the released one re-scored &mdash; the v21 sign flip is confirmed (&minus;0.0789 at 0/10 &rarr; +0.0334 at 10/10) and the published 0.800028 becomes 0.618908.</strong> Method foundation + known defects at the end.</div>
+
+<div class="card" style="border-color:#60c080">
+<div class="t" style="color:#60c080">&#9656; THE OBJECTIVE &mdash; and the one number that measures it</div>
+<div class="d">
+<strong>Objective.</strong> Show that a <strong>Graph-JEPA world model</strong> over per-admission clinical knowledge graphs can <strong>recover held-out clinical relationships</strong> &mdash; specifically the four LLM-inferred cross-links (<code>MANAGED_FOR</code>, <code>INDICATES</code>, <code>COMPLICATED_BY</code>, <code>CONFIRMS</code>) that carry the paper's claim.
+<br><br>
+<strong>The metric that IS the objective = leave-one-out (LOO) MRR.</strong> Mask exactly ONE edge, keep the entire rest of the graph as context, rank the true tail against same-type candidates in the same graph, filtered. <strong>No randomness &mdash; exactly reproducible given a model and a test set.</strong> It is what the paper reports and what every number in this log is measured on unless a row says <em>batch-mask</em>. LOO evaluates almost exclusively the four inferred relations: the filtered protocol drops patient-anchored backbone edges, because after removing the other true tails of <code>(patient, relation)</code> fewer than two candidates usually remain.
+<br><br>
+<strong>Current best on the objective (10 paired seeds, fixed split):</strong> <strong class="g">v21 &mdash; random masking + MLP readout, LOO MRR 0.4705 &plusmn; 0.0167</strong>, up from the published v16 DistMult configuration's 0.4174 &plusmn; 0.0190. <strong class="r">The uncomfortable finding underneath it (v19):</strong> the JEPA pretext task &mdash; the part the method is named after &mdash; sits inside the noise floor on every variation tried, while the readout head and encoder trainability are what move the model.
+</div>
+</div>
+
+<!-- ============================================================ -->
+<h2 style="border-left-color:#60c080;color:#60c080">&#9656; RESULTS LOG (v22 &rarr; v17) &mdash; newest first</h2>
+<!-- ============================================================ -->
+
+<div class="card" style="border-color:#c8a060">
+<div class="t" style="color:#c8a060">&#9679; v22 &middot; 260808 &mdash; patch masking + MLP readout: buys ONE metric, costs variance</div>
+<div class="d">
+<strong>Zero source changes. Two environment variables (<code>MASK_STRATEGY=patch</code> + <code>DECODER=mlp</code>), 10 new jobs, 20 reused. The third cell of a 2&times;2. Seeds 42&ndash;51, split 42 &mdash; every run scores the same 8,283 LOO edges, so all comparisons are paired.</strong>
+<br><br><strong>All three arms, leave-one-out, mean &plusmn; sd over 10 seeds (n=8,283 every run):</strong>
+<table>
+<tr><th>Arm</th><th>Pretext</th><th>Readout</th><th>MRR</th><th>H@1</th><th>H@3</th><th>H@10</th></tr>
+<tr><td>v20</td><td>random</td><td>DistMult</td><td>0.4174 &plusmn;0.0190</td><td>0.2431 &plusmn;0.0229</td><td>0.4702 &plusmn;0.0256</td><td>0.8688 &plusmn;0.0086</td></tr>
+<tr class="recommend"><td><strong>v21</strong></td><td>random</td><td>MLP</td><td><strong>0.4705 &plusmn;0.0167</strong></td><td>0.3013 &plusmn;0.0171</td><td>0.5300 &plusmn;0.0235</td><td>0.8980 &plusmn;0.0112</td></tr>
+<tr><td>v22</td><td>patch</td><td>MLP</td><td>0.4770 &plusmn;0.0263</td><td>0.3027 &plusmn;0.0326</td><td>0.5422 &plusmn;0.0283</td><td><strong>0.9166 &plusmn;0.0110</strong></td></tr>
+</table>
+<strong>v22 &minus; v21 &mdash; the mask strategy, isolated at the MLP head (paired, n=10; a 95% CI excluding zero IS the two-sided paired t-test at .05):</strong>
+<table>
+<tr><th>Metric</th><th>&Delta;</th><th>95% CI</th><th>t</th><th>Ahead</th><th>Verdict</th></tr>
+<tr class="reject"><td>MRR</td><td>+0.0066</td><td>&minus;0.0130, +0.0262</td><td>0.76</td><td>6/10</td><td>not distinguishable from 0</td></tr>
+<tr class="reject"><td>H@1</td><td>+0.0014</td><td>&minus;0.0237, +0.0265</td><td>0.13</td><td>5/10</td><td>as close to exactly zero as a measurement gets</td></tr>
+<tr class="reject"><td>H@3</td><td>+0.0122</td><td>&minus;0.0099, +0.0343</td><td>1.25</td><td>7/10</td><td>not distinguishable from 0</td></tr>
+<tr class="recommend"><td><strong>H@10</strong></td><td><strong>+0.0185</strong></td><td>+0.0106, +0.0265</td><td><strong>5.29</strong></td><td>9/10</td><td class="g"><strong>SIGNIFICANT &mdash; survives Bonferroni (&alpha;=.05/7, t&#8329;=3.69)</strong></td></tr>
+</table>
+<strong>The variance cost &mdash; across-seed sd, same split, same seeds:</strong>
+<table>
+<tr><th>Metric</th><th>v21 sd</th><th>v22 sd</th><th>ratio</th></tr>
+<tr class="reject"><td>H@1</td><td>0.0171</td><td>0.0326</td><td>1.91&times;</td></tr>
+<tr class="reject"><td>MRR</td><td>0.0167</td><td>0.0263</td><td>1.58&times;</td></tr>
+<tr><td>H@3</td><td>0.0235</td><td>0.0283</td><td>1.20&times;</td></tr>
+<tr><td>H@10</td><td>0.0112</td><td>0.0110</td><td>0.99&times;</td></tr>
+</table>
+<strong>Why the pattern is coherent, not noise-shaped:</strong>
+<br>&bull; <strong>Eight of ten seeds land above 0.478</strong> (every one beating v21's mean) while two &mdash; seeds 51 and 49 &mdash; drop to 0.4162 and 0.4448. Patch masking is a larger gain most of the time and an occasional substantial loss; that long left tail produces both the flat mean and the 1.6&times; variance.
+<br>&bull; <strong>H@10 moves, H@1 does not.</strong> A harder pretext task rescues targets that would otherwise fall out of the ranking entirely, without sharpening the fine discrimination that decides rank 1 from rank 2.
+<br>&bull; <strong class="g">v18 independently replicates the H@10 effect at a DIFFERENT readout head, four versions earlier: +0.0184 (DistMult, 1 seed) vs +0.0185 (MLP, 10 paired seeds) &mdash; agreement to 0.0001.</strong> Meanwhile their MRR deltas do not agree in sign (&minus;0.0107 vs +0.0066). <strong>The metric that replicates is the metric that survives correction; the metrics that do not replicate are the ones neither report can distinguish from zero.</strong>
+<br><br><strong>Batch-mask protocol</strong> (n_mrr=3,000 &mdash; NOT comparable with LOO): v22 AUC 0.8054&plusmn;0.0128 / AP 0.7204&plusmn;0.0245 / MRR 0.3750&plusmn;0.0047. v22&minus;v21 = +0.0066 / +0.0100 / +0.0009, all 7/10, <strong>none distinguishable from zero</strong>; all three v22&minus;v20 differences significant at 10/10. <strong>Both protocols say the same thing: the readout head moved the model, the pretext task did not.</strong>
+<br><br><strong class="r">Honest caveats:</strong> (1) v22 changes <strong>phase 1</strong>, so unlike v21-vs-v20 the two encoders are genuinely different models &mdash; the pairing controls the split and the seed, not the encoder. (2) H@10 is near saturation at 0.90, so +0.019 is better stated as a <strong>~19% reduction in the miss rate</strong>, and it is the least discriminating of the four metrics. (3) <code>JEPA_PATCHES=8</code> / <code>NODE_MASK=0.4</code> throughout &mdash; patch count was never swept.
+<br><br><strong class="g">Decision: report v21 (random + MLP) as the configuration.</strong> It matches v22 on MRR, H@1 and H@3 while being 1.6&times; tighter on the headline metric and needing one environment variable rather than two. Report v22 as a secondary result for what it actually establishes &mdash; H@10 +0.019 [+0.011, +0.027], 9/10 seeds, replicating v18's independent +0.018 at a different head. Repos: <code>&lt;user&gt;/fawkes-v22-patch-mlp-sp42-s{42&hellip;51}</code>.
+</div>
+</div>
+
+<div class="card" style="border-color:#60c080">
+<div class="t" style="color:#60c080">&#9679; v21 &middot; 260807 &mdash; THE READOUT HEAD WAS THE WRONG ONE. The decisive win.</div>
+<div class="d">
+<strong>A switch that has existed in the paper implementation since v16 and had never been flipped. <code>build_scorer</code> returns DistMult for <code>DECODER=distmult</code> and an MLP <code>Scorer</code> otherwise &mdash; it has done so since the original trainer. Nobody had run it. Running it is the second-largest effect ever measured in this project, and the largest one that keeps the paper's frozen-encoder protocol intact.</strong>
+<table>
+<tr><th>Metric (LOO, 10 paired seeds)</th><th>DistMult (v20)</th><th>MLP (v21)</th><th>paired &Delta;</th><th>95% CI</th><th>Ahead</th></tr>
+<tr class="recommend"><td><strong>MRR</strong></td><td>0.4174 &plusmn;0.0190</td><td><strong>0.4705 &plusmn;0.0167</strong></td><td><strong>+0.0530 &plusmn;0.0181</strong></td><td>+0.0401, +0.0660</td><td class="g">10/10</td></tr>
+<tr class="recommend"><td>H@1</td><td>0.2431</td><td>0.3013</td><td>+0.0582 &plusmn;0.0218</td><td>+0.0426, +0.0738</td><td class="g">10/10</td></tr>
+<tr class="recommend"><td>H@3</td><td>0.4702</td><td>0.5300</td><td>+0.0597 &plusmn;0.0230</td><td>+0.0433, +0.0762</td><td class="g">10/10</td></tr>
+<tr class="recommend"><td>H@10</td><td>0.8688</td><td>0.8980</td><td>+0.0292 &plusmn;0.0089</td><td>+0.0228, +0.0356</td><td class="g">10/10</td></tr>
+</table>
+<strong class="g">The distributions do not overlap.</strong> DistMult's best run scores 0.4438; the MLP's worst scores 0.4493. There is no seed you could have drawn that would reverse the ordering &mdash; a stronger statement than the paired test. Under exchangeable arms, P(that ordering) = 1/C(20,10) &asymp; <strong>5.4&times;10&#8315;&#8310;</strong>. The MLP is also <em>tighter</em> (sd 0.0167 vs 0.0190): the gain does not cost stability. The effect is <strong>2.2&times; the 0.0238 minimum detectable difference</strong> v20 established.
+<br><br><strong>Where the gain lands &mdash; per relation, mean over the 10 paired seeds. These five relations account for all 8,283 LOO queries:</strong>
+<table>
+<tr><th>Relation</th><th>n</th><th>chance MRR</th><th>DistMult</th><th>MLP</th><th>&Delta;</th><th>Ahead</th><th>Paper target?</th></tr>
+<tr class="recommend"><td><strong>CONFIRMS</strong></td><td>125</td><td>0.216</td><td>0.3823</td><td>0.5038</td><td><strong>+0.1215</strong></td><td class="g">10/10</td><td>yes</td></tr>
+<tr class="recommend"><td><strong>INDICATES</strong></td><td>1,459</td><td>0.277</td><td>0.5235</td><td>0.6323</td><td><strong>+0.1087</strong></td><td class="g">10/10</td><td>yes</td></tr>
+<tr class="recommend"><td><strong>COMPLICATED_BY</strong></td><td>1,147</td><td>0.219</td><td>0.4508</td><td>0.5380</td><td><strong>+0.0872</strong></td><td class="g">10/10</td><td>yes</td></tr>
+<tr class="recommend"><td><strong>MANAGED_FOR</strong></td><td>5,527</td><td>0.201</td><td>0.3822</td><td>0.4123</td><td>+0.0302</td><td class="g">10/10</td><td>yes</td></tr>
+<tr class="reject"><td>TARGETS_ORGANISM</td><td>25</td><td>0.547</td><td>0.6675</td><td>0.6178</td><td>&minus;0.0498</td><td class="r">3/10</td><td>no &mdash; n=25, not a finding</td></tr>
+</table>
+<strong>The aggregate is dragged DOWN by the largest relation, not propped up by it.</strong> MANAGED_FOR gains least (+0.0302) and carries two thirds of the queries; the smaller, harder relations gain two to four times as much. This is not "the model got better at the easy majority" &mdash; every one of the four relations the paper is about improves at 10/10 seeds.
+<br><br><strong>Batch-mask:</strong> AUC 0.7145&rarr;0.7988 (+0.0843), AP 0.6299&rarr;0.7105 (+0.0806), MRR 0.3627&rarr;0.3741 (+0.0114) &mdash; all 10/10.
+<br><br><strong class="r">The one apparent regression was a BROKEN METRIC.</strong> <code>auc_nonobvious</code> showed the MLP losing by 0.0713 at 0/10 seeds &mdash; the only negative anywhere in the experiment. <code>_classification_metrics</code> filtered the <em>positives</em> to non-patient-anchored edges but scored them against the <em>unfiltered</em> negative pool, which is <strong>67.7% patient-anchored</strong> (2,509 positives vs all 7,766 negatives). Those are easy to beat, so the metric was inflated for both arms and inflated <em>unequally</em>. v21 measured the correction on 3 seeds and predicted a sign flip to +0.041. <strong class="g">FIXED and re-scored at fleet scale &mdash; see the correction section below; the flip is confirmed at +0.0334, 10/10 seeds.</strong>
+<br><br><strong>The MLP head:</strong> <code>Linear(3d&rarr;d) &rarr; ReLU &rarr; Linear(d&rarr;1)</code> over <code>[h_src ; h_tgt ; rel_emb]</code>, ~49k parameters more than DistMult's bilinear <code>(h[u] &middot; rel &middot; h[v]).sum(-1)</code>. Same architecture <code>clinical_jepa</code> scores edges with, differing only in ReLU vs GELU. <strong class="y">Parameters are not controlled &mdash; this shows the head is better, not that it is "better architecture" rather than "more capacity".</strong> Repos: <code>&lt;user&gt;/fawkes-v21-mlp-sp42-s{42&hellip;51}</code>.
+</div>
+</div>
+
+<div class="card" style="border-color:#60c080">
+<div class="t" style="color:#60c080">&#9679; v20 &middot; 260806 &mdash; the seed-variance study: the published number survives, and the error bar is wider than the effects</div>
+<div class="d">
+<strong>A reviewer asked for mean &plusmn; std across seeds and splits. v20 answers the seed half: ten retrains of the exact paper configuration on the published split, differing only in <code>SEED</code>. One config field (<code>DATA_SPLIT_SEED</code>), one line in <code>_split_items</code>, one regression test. No model code, no change to any published number.</strong>
+<br><br><strong>Ten retrains, seeds 42&ndash;51 (n=8,283 every run &mdash; the pinned split guarantees it, which is what makes every later comparison paired):</strong>
+<table>
+<tr><th>Protocol</th><th>Metric</th><th>mean &plusmn; sd</th><th>95% CI of the mean</th><th>published v16</th><th>&Delta; in sd</th></tr>
+<tr class="recommend"><td>LOO</td><td><strong>MRR</strong></td><td><strong>0.4174 &plusmn; 0.0190</strong></td><td>0.4038&ndash;0.4310</td><td>0.418653</td><td class="g">+0.07</td></tr>
+<tr><td>LOO</td><td>Hits@1</td><td>0.2431 &plusmn; 0.0229</td><td>0.2267&ndash;0.2595</td><td>0.247495</td><td class="g">+0.19</td></tr>
+<tr><td>LOO</td><td>Hits@3</td><td>0.4702 &plusmn; 0.0256</td><td>0.4519&ndash;0.4885</td><td>0.473741</td><td class="g">+0.14</td></tr>
+<tr><td>LOO</td><td>Hits@10</td><td>0.8688 &plusmn; 0.0086</td><td>0.8626&ndash;0.8749</td><td>0.863576</td><td class="g">&minus;0.61</td></tr>
+<tr class="recommend"><td>batch-mask</td><td>AUC</td><td>0.7145 &plusmn; 0.0186</td><td>0.7012&ndash;0.7278</td><td>0.714351</td><td class="g">&minus;0.01</td></tr>
+<tr><td>batch-mask</td><td>AP</td><td>0.6299 &plusmn; 0.0148</td><td>0.6193&ndash;0.6405</td><td>0.627698</td><td class="g">&minus;0.15</td></tr>
+<tr class="reject"><td>batch-mask</td><td>AUC non-obv. <span class="dim">(as published &mdash; broken)</span></td><td>0.8129 &plusmn; 0.0209</td><td>0.7980&ndash;0.8278</td><td>0.800028</td><td class="y">&minus;0.62 &mdash; <strong class="r">metric defective; corrected to 0.6224 &plusmn; 0.0105</strong></td></tr>
+<tr><td>batch-mask</td><td>MRR</td><td>0.3627 &plusmn; 0.0043</td><td>0.3596&ndash;0.3658</td><td>0.360833</td><td class="g">&minus;0.44</td></tr>
+</table>
+<strong class="g">Eight metrics across two protocols, and every published value falls inside its interval.</strong> The ten-seed mean lands <strong>0.0012 from the published value</strong>; AUC agrees to <strong>0.0002</strong>. A systematic regression anywhere between v16 and v20 would have shifted the whole distribution, not centred it on the published number. Nothing in Table 1's headline was cherry-picked.
+<br><br><strong>&#9432; The evaluation population is byte-identical to the paper's:</strong> every run reports <code>quiz_sig = 304815655090</code> &mdash; and so does the released v16 checkpoint. That signature hashes the evaluation questions themselves, so the ten retrains were asked <strong>exactly the same questions</strong>. Whatever moves between these runs, the measuring instrument does not.
+<br><br><strong>The noise floor &mdash; minimum detectable difference (MDD), 10 seeds/arm, &alpha;=.05, power .80, computed as 2.8&middot;sd&middot;&radic;(2/n):</strong>
+<table>
+<tr><th>Protocol</th><th>Metric</th><th>sd</th><th>CV</th><th>MDD</th><th>% of mean</th></tr>
+<tr class="recommend"><td>LOO</td><td><strong>MRR</strong></td><td>0.0190</td><td>4.6%</td><td><strong>0.0238</strong></td><td>5.7%</td></tr>
+<tr class="reject"><td>LOO</td><td>Hits@1</td><td>0.0229</td><td class="r">9.4%</td><td>0.0287</td><td>11.8%</td></tr>
+<tr><td>LOO</td><td>Hits@3</td><td>0.0256</td><td>5.4%</td><td>0.0321</td><td>6.8%</td></tr>
+<tr><td>LOO</td><td>Hits@10</td><td>0.0086</td><td>1.0%</td><td>0.0108</td><td>1.2%</td></tr>
+<tr><td>batch-mask</td><td>AUC</td><td>0.0186</td><td>2.6%</td><td>0.0232</td><td>3.3%</td></tr>
+<tr><td>batch-mask</td><td>MRR</td><td>0.0043</td><td>1.2%</td><td>0.0054</td><td>1.5%</td></tr>
+</table>
+<strong>Reading a claimed margin:</strong> &gt;0.024 MRR = detectable, claim it with the paired test at fixed split &middot; 0.010&ndash;0.024 = underpowered, more seeds or soften to a directional statement &middot; &lt;0.010 = do not claim a difference. <strong>Hits@1 is the least stable metric in Table 1 by roughly an order of magnitude over the steadiest</strong> &mdash; a top-1 metric changes whenever a single ranking flips at the boundary, while Hits@10 sits close enough to saturation that the same flips rarely cross it.
+<br><br><strong class="y">Two findings that reframe the whole lineage:</strong>
+<br>(1) <strong>Seed 42 does not reproduce the published number as a point</strong> &mdash; 0.3962 vs 0.418653, z=&minus;1.12, rank 2/10. That is expected, not a defect: <code>set_seed</code> calls <code>torch.use_deterministic_algorithms(True, warn_only=True)</code>, and the scatter reductions under <code>TransformerConv</code> fall back to non-deterministic CUDA kernels. <strong>No retrain in this lineage has EVER reproduced the published number as a point</strong> &mdash; every apparent reproduction in Reports 1&ndash;3 re-evaluates the released checkpoint (&Delta; = 0.00e+00 because it loads the same weights). <strong>The mean is the reproduction check; the single cell is not.</strong>
+<br>(2) <strong>The same MRR is 4.4&times; more stable under batch-mask than under LOO</strong> (sd 0.0043 vs 0.0190) despite LOO scoring 8,283 queries against batch-mask's 3,000. More queries normally means a tighter estimate, so this is the <em>protocol</em>, not sampling noise.
+<br><br><strong class="r">What it does NOT establish &mdash; the split axis is unmeasured.</strong> All ten runs (and every run in v21 and v22) share <code>DATA_SPLIT_SEED=42</code>, holding out the same 400 admissions. The reviewer's actual question &mdash; <em>is it a lucky sample of patients</em> &mdash; is still open. Four jobs and one <code>for</code> loop close it; the machinery exists and is tested. Repos: <code>&lt;user&gt;/fawkes-v20-variance-sp42-s{42&hellip;51}</code>.
+</div>
+</div>
+
+<div class="card" style="border-color:#c06050">
+<div class="t" style="color:#c06050">&#9679; v19 &middot; 260805 &mdash; the JEPA pretraining ablation: phase 1 is not carrying the result</div>
+<div class="d">
+<strong>A reviewer asked how much of the result comes from JEPA pretraining rather than from having any graph encoder at all. Six arms, 14 runs, three seeds. No new configuration and no new model code &mdash; every arm falls out of knobs <code>Config</code> already exposed (<code>JEPA_EPOCHS=0</code> makes the pretraining loop body never execute and returns a freshly constructed encoder; <code>LAYERS=0</code> builds an empty conv stack so <code>forward</code> falls straight through to <code>type_emb + entity_emb + num_proj</code>). The answer is not the one the paper assumes.</strong>
+<table>
+<tr><th>Arm</th><th>Phase 1</th><th>Phase 2 encoder</th><th>LOO MRR</th><th>vs A (paired within seed)</th><th>Seeds</th></tr>
+<tr><td>A &mdash; paper</td><td>JEPA, 60 ep</td><td>frozen</td><td>0.4027 &plusmn;0.013</td><td>&mdash;</td><td>42,43,44</td></tr>
+<tr class="reject"><td><strong>B &mdash; random frozen</strong></td><td>none</td><td>frozen (random init)</td><td>0.3952 &plusmn;0.031</td><td class="r"><strong>&minus;0.0076 &plusmn; 0.0178</strong> (&minus;0.019/+0.013/&minus;0.017 &mdash; sign flips)</td><td>42,43,44</td></tr>
+<tr class="recommend"><td><strong>C &mdash; from scratch</strong></td><td>none</td><td>trained jointly</td><td><strong>0.7135 &plusmn;0.141</strong></td><td class="g"><strong>+0.3107 &plusmn; 0.1544</strong> (positive at every seed)</td><td>42,43,44</td></tr>
+<tr><td>Cp &mdash; compute-matched</td><td>none</td><td>trained jointly, 100 ep</td><td>0.7147 &plusmn;0.142</td><td>+0.3119 &mdash; budget is not the explanation</td><td>42,43,44</td></tr>
+<tr class="recommend"><td><strong>D &mdash; no graph at all</strong></td><td>none</td><td>no message passing</td><td>0.6293</td><td class="g">+0.2331</td><td>42</td></tr>
+<tr><td>E &mdash; pretrain + finetune</td><td>JEPA, 60 ep</td><td>fine-tuned</td><td>0.5442</td><td class="y">+0.1480 vs A, but <strong class="r">&minus;0.2475 vs C</strong></td><td>42</td></tr>
+</table>
+<strong>Four measurements, one mechanism:</strong>
+<br>&bull; <strong>A &asymp; B.</strong> A frozen <em>randomly initialised</em> encoder scores the same as the JEPA-pretrained one. The spread (0.0178) is more than twice the mean effect (&minus;0.0076), and the sign flips across seeds. <strong>That is the whole measured effect of JEPA pretraining.</strong>
+<br>&bull; <strong>C &gt;&gt; A by +0.311.</strong> The identical architecture trained end-to-end without phase 1. Its smallest single-seed value (+0.1325) is still <strong>seven times</strong> the magnitude of the B&minus;A mean.
+<br>&bull; <strong>D separates memorisation from reasoning.</strong> With message passing removed entirely, 0.6293 is what learned entity identity alone buys &mdash; DistMult over a table that has seen which entities plausibly attach to which relations across 3,200 admissions. Honest decomposition at seed 42: <strong>0.6293 from entity memorisation, +0.1624 from message passing on top (arm C), the paper model at 0.3962 below both.</strong>
+<br>&bull; <strong class="r">E &lt; C by 0.2475 &mdash; the JEPA initialisation is worse than random.</strong> A representation that were merely <em>neutral</em> would land on top of C, not a quarter of an MRR below it.
+<br><br><strong>The proposed mechanism:</strong> under <code>FREEZE_ENCODER=1</code> the <strong>8,192 &times; 128 hashed-entity embedding table</strong> receives no gradient in phase 2. In arm A it is shaped only by the pretext task; in arm B it is never trained at all and stays at its random initialisation for the whole run. Arms C/Cp/D train it on edge recovery itself. <strong>The frozen protocol &mdash; adopted so phase 2 would test the representation rather than let the GNN co-adapt to the decoder &mdash; succeeds at that, and the cost of the guarantee turns out to be most of the achievable performance.</strong>
+<br><br><strong>The one code change, and its direction matters:</strong> <code>train_readout</code>'s best-VAL selection snapshotted only the <em>scorer</em>. Under <code>FREEZE_ENCODER=1</code> that is complete; every arm that <em>trains</em> the encoder got a best-VAL scorer bolted onto a final-epoch encoder &mdash; a pair that existed at no epoch. <strong>The bug degraded exactly the arms the JEPA claim is measured against, so leaving it in would have flattered the paper.</strong> Fixed by deep-copying the encoder state at the selected epoch, guarded on <code>not cfg.freeze_encoder</code>, so arms A and B run byte-identical code to v18. Gate: <code>test_readout_selection_rolls_back_the_encoder_too</code> &mdash; best VAL 0.707434, returned pair re-evaluated at 0.705473 before the fix, 0.707434 after.
+<br><br><strong class="r">&#9888; This report's conclusions are conditional on ONE outstanding diagnostic, still outstanding at v22.</strong> <code>jepa_step</code> returns <code>emb_std</code> specifically to catch target-encoder collapse. If it decayed toward zero during arm A's 60 pretraining epochs, "phase 1 adds nothing" is a <em>training failure</em>, not a property of JEPA &mdash; and <strong>A &asymp; B together with E &lt; C is exactly the signature collapse would produce</strong>. One <code>hf jobs logs &lt;id&gt; | grep "LATENCY] JEPA"</code> decides whether v19 is a finding about JEPA or a bug report about one training run. Repos: <code>&lt;user&gt;/fawkes-v19-ablation-{A,B,C,Cp,D,E}-s{42,43,44}</code>, 14 repos.
+</div>
+</div>
+
+<div class="card" style="border-color:#c8a060">
+<div class="t" style="color:#c8a060">&#9679; v18 &middot; 260804 &mdash; BFS-balanced patch masking: right idea, one seed per cell</div>
+<div class="d">
+<strong>The first experiment on the pretext task. One new module (<code>src/fawkes/patches.py</code>), one branch in <code>jepa_step</code>, two config fields. The default stayed v17's behaviour, so v18 is opt-in and every earlier gate still runs.</strong>
+<br><br><strong>The problem with the v16/v17 mask.</strong> Phase 1 masked nodes <strong>i.i.d. Bernoulli</strong> at <code>node_mask=0.4</code>. Masking independently means a masked node's immediate neighbours are almost always still visible &mdash; a node of degree 5 keeps ~3 visible neighbours &mdash; so the pretext task is solvable by <strong>local interpolation</strong>: read the surviving neighbours, average, done. A task solvable one hop out never forces the encoder to learn anything longer-range, which is exactly the capability edge recovery needs.
+<br><br><strong>What v18 does instead.</strong> Partition each graph into <code>JEPA_PATCHES=8</code> balanced, connected-ish patches by multi-source BFS (farthest-point seeding: highest degree first, then greedily maximising distance from existing seeds), then mask <strong>whole patches</strong> until the <code>node_mask</code> fraction is reached. Targets become coherent regions, so a masked node's neighbours are usually masked too. Keeping the last-drawn patch as context makes the &ge;1-target/&ge;1-context guarantee hold <strong>by construction</strong> rather than by retrying. Copied near-verbatim from <code>clinical_jepa/graph/patches.py</code> rather than imported, because <code>tests/test_import_boundaries.py</code> forbids the two lineages from importing each other.
+<br><br><strong>Results &mdash; 4 runs (2 variants &times; 2 mask strategies), one seed per cell, LOO n=8,283. All four report <code>quiz_sig=304815655090</code>:</strong>
+<table>
+<tr><th>Variant &middot; metric</th><th>v17 random</th><th>v18 patch</th><th>&Delta;</th><th>&Delta;%</th><th></th></tr>
+<tr class="recommend"><td><strong>No-note</strong> &middot; MRR</td><td>0.2743</td><td><strong>0.2980</strong></td><td class="g">+0.0237</td><td>+8.6%</td><td class="g">&#9650;</td></tr>
+<tr class="recommend"><td>No-note &middot; Hits@1</td><td>0.1079</td><td>0.1300</td><td class="g">+0.0221</td><td>+20.5%</td><td class="g">&#9650;</td></tr>
+<tr class="recommend"><td>No-note &middot; Hits@3</td><td>0.2901</td><td>0.3250</td><td class="g">+0.0349</td><td>+12.0%</td><td class="g">&#9650;</td></tr>
+<tr class="recommend"><td>No-note &middot; Hits@10</td><td>0.7104</td><td>0.7240</td><td class="g">+0.0136</td><td>+1.9%</td><td class="g">&#9650;</td></tr>
+<tr class="reject"><td><strong>With-note</strong> &middot; MRR</td><td>0.4187</td><td>0.4080</td><td class="r">&minus;0.0107</td><td>&minus;2.6%</td><td class="r">&#9660;</td></tr>
+<tr class="reject"><td>With-note &middot; Hits@1</td><td>0.2475</td><td>0.2220</td><td class="r">&minus;0.0255</td><td>&minus;10.3%</td><td class="r">&#9660;</td></tr>
+<tr class="reject"><td>With-note &middot; Hits@3</td><td>0.4737</td><td>0.4710</td><td class="r">&minus;0.0027</td><td>&minus;0.6%</td><td class="r">&#9660;</td></tr>
+<tr class="recommend"><td>With-note &middot; Hits@10</td><td>0.8636</td><td><strong>0.8820</strong></td><td class="g">+0.0184</td><td>+2.1%</td><td class="g">&#9650; <span class="dim">replicates at v22</span></td></tr>
+</table>
+<strong>v18's own reading:</strong> patch masking <strong>recovers part of what the note was providing</strong>. The no-note model has nothing but structure and 6 demographic features, so an easy pretext task is a wasted one; the with-note model already receives that semantic content through a 768-d Clinical-ModernBERT channel, so a harder pretext task mostly adds noise. The note's advantage narrowed from <strong>+0.144 to +0.110 LOO MRR</strong>. Supporting evidence: <strong>cascade headroom</strong> (LOO ceiling &minus; backbone-only floor) was <em>negative</em> for two of four inferred relations in the v17 no-note model &mdash; COMPLICATED_BY &minus;0.004, INDICATES &minus;0.009, i.e. the full graph made it <em>worse</em> than the backbone alone &mdash; and <strong>all four turn positive under v18</strong> (+0.038 / +0.049 / +0.047 / +0.016). Non-obvious AUC also rose in <em>both</em> arms (+0.0435 no-note, +0.0160 note) while plain AUC slipped.
+<br><br><strong class="r">What v20 and v22 later established about this result:</strong>
+<br>(1) <strong>Both deltas sit inside the &plusmn;0.019 seed noise v20 measured.</strong> Neither v18 cell is resolvable at one seed per cell, in either direction.
+<br>(2) <strong>The with-note comparison is not even paired</strong> &mdash; its baseline column reproduces <code>baseline/paper_loo_testsplit.json</code> on all four metrics, so it is the <em>released checkpoint re-evaluated</em>, not a retrained random-mask arm. The two cells differ by an entire training run, on different hardware, at a different time.
+<br>(3) <strong class="g">But its Hits@10 delta of +0.0184 replicates v22's +0.0185 to 0.0001</strong> &mdash; at a different readout head, with a different baseline and a different statistical design. That is the one v18 effect that survives.
+<br><br><strong class="y">Small-n relations are not evidence.</strong> CONFIRMS (n=125, +0.097) and TARGETS_ORGANISM (n=25, +0.175) produce the biggest-looking deltas in v18 and deserve the least weight. The trustworthy relations are MANAGED_FOR, INDICATES and COMPLICATED_BY, which carry 8,133 of the 8,283 queries.
+</div>
+</div>
+
+<div class="card" style="border-color:#7cb8d4">
+<div class="t" style="color:#7cb8d4">&#9679; v17 &middot; 260804 &mdash; the refactor that had to move nothing (and made v18&ndash;v22 cheap)</div>
+<div class="d">
+<strong>An engineering release, not an experiment. No numerics, no defaults, no tensor operations, and no environment-variable names changed &mdash; and that claim is gated, not asserted.</strong>
+<br><br><strong>What v16 was, and the four problems:</strong> <code>paper_v16/trainer.py</code>, 719 lines, plus a separate checkpoint-only <code>evaluate.py</code>. (1) It configured itself from the environment <strong>at import time</strong> &mdash; ~30 <code>os.environ</code> reads ran on import, and <code>NUMERIC_DIM</code>, a <em>tensor shape</em>, was computed at import. Variables had to be set before the import, two configurations could not coexist in one process, and the trainer was effectively untestable. (2) Everything shared one namespace &mdash; data loading, the model, both training phases, four evaluators and reporting interleaved; the standalone <code>evaluate.py</code> reached into <code>trainer.USE_NOTE</code>. (3) <strong><code>--help</code> trained the model</strong> &mdash; <code>main()</code> took no arguments and ran unconditionally, so <code>fawkes-train --help</code> completed a full training run and, with <code>PUSH=1</code> the default, <strong>uploaded the result to the Hub</strong>. (4) The tensor code was unreadable (<code>b</code>, <code>nt</code>, <code>ei</code>, <code>tot_llm</code>) with a hardcoded date-stamped checkpoint filename.
+<br><br><strong>The split &mdash; cut at the file's own existing comment banners (lines 256 "shared encoder", 327 "downstream readout", 423 "EIR scoring"), not at invented boundaries:</strong>
+<table>
+<tr><th>module</th><th>contents</th><th>later touched by</th></tr>
+<tr><td><code>config.py</code></td><td><code>Config</code> &mdash; every knob; <code>from_env()</code>, <code>from_checkpoint()</code>, <code>checkpoint_dict()</code>, <code>checkpoint_name</code></td><td>v18, v20</td></tr>
+<tr><td><code>data.py</code></td><td>vocabularies, <code>score_vec</code>, <code>load_full_dataset</code>, <code>to_data</code></td><td>&mdash;</td></tr>
+<tr><td><code>model.py</code></td><td><code>Encoder</code>, <code>JEPA</code>, <code>DistMult</code>, <code>Scorer</code></td><td>&mdash; (v21's MLP head was already here)</td></tr>
+<tr><td><code>steps.py</code></td><td>per-batch tensor work: <code>jepa_step</code>, <code>readout_step</code>, <code>valid_mask</code>, <code>buckets</code>, negative sampling</td><td>v18</td></tr>
+<tr><td><code>train.py</code></td><td>the run: <code>set_seed</code>, data prep/split, both phases, reporting, <code>main</code></td><td>v19, v20</td></tr>
+<tr><td><code>evaluate.py</code></td><td>the four evaluators, shared ranking helpers, checkpoint CLI</td><td>&mdash; (holds the v21 metric defect)</td></tr>
+<tr><td><code>patches.py</code></td><td>BFS patch partition + <code>patch_mask</code></td><td>v18 &mdash; new</td></tr>
+</table>
+<strong>The config refactor &mdash; the substantive design change.</strong> Every import-time global became a field on a <code>Config</code> dataclass; the environment is read only on demand by <code>Config.from_env()</code>, with the same variable names, defaults, and parsing rules (including the <code>"1"/"true"/"yes"</code> truthiness rule). <code>NUMERIC_DIM</code> became the <code>numeric_dim</code> property (<code>BASE_NUMERIC + embed_dim if use_note else 0</code>) &mdash; the tensor shape is now derived from a value you hold, not from whatever the environment said at import.
+<pre>v16 &mdash; set env before import, one config per process     v17 &mdash; explicit, two configs coexist
+USE_NOTE  = env_flag("USE_NOTE", "1")                    from fawkes.config import Config
+EMBED_DIM = int(env("EMBED_DIM", 768))                   with_note = Config()              # released v16 run
+NUMERIC_DIM = 6 + (EMBED_DIM if USE_NOTE else 0)         no_note   = Config(use_note=False)
+# tensor shape fixed at import                           no_note.numeric_dim    # 6
+                                                         with_note.numeric_dim  # 774 (property)</pre>
+<strong>Equality, gated three ways &mdash; all still passing under v22:</strong>
+<table>
+<tr><th>Gate</th><th>What it proves</th></tr>
+<tr class="recommend"><td>LOO to <strong>1e-6</strong></td><td>Loading the released checkpoint and running <code>loo_evaluate</code> reproduces <code>baseline/paper_loo.json</code> on every metric.</td></tr>
+<tr class="recommend"><td><code>state_dict</code> key sets</td><td><code>Encoder()</code> / <code>DistMult()</code> keys equal <code>baseline/paper_keys.json</code> &mdash; these are <em>attribute paths</em>, which survive class renames but not attribute renames, so this catches exactly the drift a refactor risks.</td></tr>
+<tr class="recommend"><td>AST walk</td><td>Importing <code>fawkes</code> with no environment set raises no error and reads no <code>os.environ</code> at module scope.</td></tr>
+</table>
+<strong>The plan carried an explicit stop rule:</strong> if either numeric gate could not be met, the refactor would be abandoned and <code>trainer.py</code> kept verbatim inside the package &mdash; <em>"an unverifiable refactor of the paper artifact is not worth the readability gain."</em> The gates passed, so the split stood. Phase 0 had frozen the old tree beside the new one as an oracle, never edited; Phase 8 deleted it after recording what it produced into <code>baseline/</code>.
+<br><br><strong>Exactly three deliberate behaviour changes:</strong> (1) new checkpoints get variant-derived names <code>fawkes_entity_note.pt</code> / <code>fawkes_no_note.pt</code> (existing files keep their names and load unchanged, so every sha256 in <code>models/MANIFEST.json</code> stays byte-stable); (2) <code>CUBLAS_WORKSPACE_CONFIG</code> moved from import into <code>set_seed</code>, which still precedes the first cuBLAS handle; (3) <code>fawkes-train</code> parses arguments first through a parser that accepts no options, so <code>--help</code> prints usage and exits instead of training and publishing.
+<br><br><strong class="g">Why this is the load-bearing release for everything above it.</strong> It is precisely the verbatim-preservation requirement that carried <code>DECODER</code> forward for v21 to find. v18 became a two-field change; v19 needed <strong>no new configuration at all</strong>; v20 needed one field; v21 and v22 needed <strong>zero source changes</strong>. Six experiments were reachable from one environment surface because v17 built that surface and proved it moved nothing.
+<br><br><strong class="y">&#9888; Lineage hazard, because the repository name inverts it:</strong> <code>fawkes</code> IS the implementation behind the paper (<code>paper/clinical_jepa.pdf</code>); <code>clinical_jepa</code> is NOT &mdash; it is the separate modular revision pipeline that v18 borrowed the patch algorithm from. Documented in <code>docs/LINEAGE.md</code>, stated in both package docstrings, and enforced by <code>tests/test_import_boundaries.py</code>, which asserts the two packages never import each other. The "16" is an experiment number from a separate line of work, not the successor to <code>clinical_jepa</code>'s v5/v6 architecture names. <code>git log --follow</code> does not survive the parallel-tree restructure &mdash; <code>docs/LINEAGE.md</code> is the provenance.
+</div>
+</div>
+
+<!-- ============================================================ -->
+<h2 style="border-left-color:#60c080;color:#60c080">&#9656; CORRECTION (260809) &mdash; <code>auc_nonobvious</code> fixed and the whole fleet re-scored</h2>
+<!-- ============================================================ -->
+
+<div class="card" style="border-color:#60c080">
+<div class="t" style="color:#60c080">&#9679; The defect, the one-line fix, and what it does to every number that used it</div>
+<div class="d">
+<strong>The defect (pre-v21, carried through three reports).</strong> <code>_classification_metrics</code> filtered the <em>positives</em> to non-<code>PATIENT</code>-anchored edges &mdash; the harder entity-to-entity subset the metric exists to isolate &mdash; but concatenated them against the <strong>whole</strong> negative pool, including the negatives drawn for patient-anchored positives. <code>readout_step</code> returns <code>neg_scores[:, 0]</code>: one negative per positive, same length, same order, so the mask indexes the negatives exactly as it indexes the positives. Leaving them unmasked scored <strong>2,509 non-patient positives against all 7,766 negatives, 67.7% of which belong to patient-anchored edges.</strong> Those are the easy ones, so the metric reported a discrimination the model never made &mdash; and inflated the arms <em>unequally</em>.
+<pre>&mdash; as shipped                                    &mdash; fixed (src/fawkes/evaluate.py)
+nonobvious_pos = positives[nonpat_mask]        nonobvious_pos = positives[nonpat_mask]
+nonobvious_scores = np.concatenate(            nonobvious_neg = negatives[nonpat_mask]     # &lt;-- the fix
+    [nonobvious_pos, negatives])               nonobvious_scores = np.concatenate(
+#                    ^^^^^^^^^ unfiltered          [nonobvious_pos, nonobvious_neg])</pre>
+<strong>Re-scored: all 30 fleet checkpoints + the released v16 checkpoint, both ways in one forward pass, CPU, fixed split 42 (<code>print_nonobvious_rescore_table.py</code>).</strong>
+<table>
+<tr><th>Arm</th><th>Pretext &middot; readout</th><th>as shipped</th><th class="g">matched (corrected)</th><th>&Delta;</th><th>sd shipped &rarr; matched</th></tr>
+<tr><td>v20</td><td>random &middot; DistMult</td><td>0.8131 &plusmn;0.0211</td><td class="g"><strong>0.6224 &plusmn;0.0105</strong></td><td class="r">&minus;0.1907</td><td>0.0211 &rarr; 0.0105 (2.0&times; tighter)</td></tr>
+<tr class="recommend"><td><strong>v21</strong></td><td>random &middot; MLP</td><td>0.7342 &plusmn;0.0418</td><td class="g"><strong>0.6559 &plusmn;0.0044</strong></td><td class="r">&minus;0.0783</td><td>0.0418 &rarr; 0.0044 (<strong>9.5&times; tighter</strong>)</td></tr>
+<tr><td>v22</td><td>patch &middot; MLP</td><td>0.7118 &plusmn;0.0383</td><td class="g"><strong>0.6500 &plusmn;0.0094</strong></td><td class="r">&minus;0.0618</td><td>0.0383 &rarr; 0.0094 (4.1&times; tighter)</td></tr>
+</table>
+<strong class="g">&#10003; The sign flip is confirmed at fleet scale &mdash; and it was the only negative result in the whole v21 experiment:</strong>
+<table>
+<tr><th>Paired comparison (n=10)</th><th>as shipped</th><th>Ahead</th><th class="g">matched (corrected)</th><th>Ahead</th><th>Verdict on the fix</th></tr>
+<tr class="recommend"><td><strong>v21 &minus; v20</strong> (readout head)</td><td class="r">&minus;0.0789 [&minus;0.1052, &minus;0.0526]</td><td class="r">0/10</td><td class="g"><strong>+0.0334 [+0.0261, +0.0408]</strong></td><td class="g"><strong>10/10</strong></td><td class="g"><strong>SIGN FLIPS &mdash; significant both ways, opposite directions</strong></td></tr>
+<tr class="recommend"><td><strong>v22 &minus; v20</strong> (full stack)</td><td class="r">&minus;0.1013 [&minus;0.1361, &minus;0.0666]</td><td class="r">0/10</td><td class="g"><strong>+0.0275 [+0.0175, +0.0376]</strong></td><td class="g"><strong>10/10</strong></td><td class="g"><strong>SIGN FLIPS</strong></td></tr>
+<tr><td>v22 &minus; v21 (mask strategy)</td><td>&minus;0.0224 [&minus;0.0570, +0.0121]</td><td>1/10</td><td>&minus;0.0059 [&minus;0.0133, +0.0014]</td><td>2/10</td><td class="y">not distinguishable from 0 either way &mdash; consistent with every other v22 metric</td></tr>
+</table>
+<strong class="r">&#9888; The published number is wrong by 0.18. The released checkpoint, re-scored directly:</strong>
+<table>
+<tr><th>Released v16 checkpoint &mdash; <code>auc_nonobvious</code></th><th>Value</th><th>vs published</th><th>Read</th></tr>
+<tr><td>published (stored in the checkpoint)</td><td>0.800028</td><td>&mdash;</td><td>what Table 1 currently says</td></tr>
+<tr><td>as shipped, recomputed here</td><td>0.801412</td><td>+0.001384</td><td class="g"><strong>the reproduction check</strong> &mdash; the correction is being applied to the right quantity</td></tr>
+<tr class="recommend"><td><strong>matched (corrected)</strong></td><td class="g"><strong>0.618908</strong></td><td class="r"><strong>&minus;0.181120</strong></td><td class="g"><strong>what Table 1 should say</strong></td></tr>
+</table>
+<strong>Three things the correction establishes beyond the sign:</strong>
+<br>&bull; <strong class="g">It removes the last piece of evidence against v21.</strong> <code>auc_nonobvious</code> was the <em>only</em> metric anywhere in the readout-head experiment pointing at DistMult. Corrected, the MLP wins it at 10/10 like everything else &mdash; v21 is now unanimous across every metric on both protocols.
+<br>&bull; <strong>The broken metric was also the noisy one.</strong> Correcting it tightens v21's sd from 0.0418 to <strong>0.0044</strong>. The variance was never the model &mdash; it was the shifting composition of a mixed negative pool. v20's report flagged non-obvious AUC as the widest-spread metric in the sweep; that was the defect, not the model.
+<br>&bull; <strong class="y">The honest level is ~0.62&ndash;0.66, not ~0.80.</strong> Every arm drops. Non-obvious edge recovery is a genuinely harder problem than the published number implied, and the corrected figure is the one that survives review.
+<br><br><strong class="dim">Method &amp; caveat.</strong> Both columns come from the <em>same</em> forward pass, so the <code>shipped</code> column is directly comparable to the value stored in each checkpoint &mdash; it reproduces the fleet's stored numbers to ~0.001&ndash;0.010 per run (arm mean 0.8131 vs the fleet's stored 0.8129) and the released checkpoint's to <strong>0.0014</strong>. That is what establishes the reproduction before the <code>matched</code> column is read. Re-scoring ran on <strong>CPU</strong>: <code>freeze_eval</code> seeds the held/negative draw per graph id, but a CPU <code>torch.Generator</code> does not reproduce a CUDA generator's stream, so absolute values shift slightly against the fleet. Every arm here is drawn identically, so the paired comparisons are unaffected &mdash; the same caveat, and the same reasoning, as v21 &sect;4.
+</div>
+</div>
+
+<!-- ============================================================ -->
+<h2 style="border-left-color:#60c080;color:#60c080">&#9656; The effect ledger &mdash; everything this project has measured on LOO MRR</h2>
+<!-- ============================================================ -->
+
+<div class="card" style="border-color:#60c080">
+<div class="t" style="color:#60c080">&#9679; Largest first &mdash; and the pattern is the finding</div>
+<div class="d">
+<table>
+<tr><th>Change</th><th>Effect</th><th>Evidence</th><th>Status</th></tr>
+<tr class="recommend"><td><strong>Unfreezing the encoder (train end-to-end)</strong></td><td><strong>+0.311</strong></td><td>v19 arm C, 3 seeds, positive at every seed</td><td class="y">&#128993; real but abandons the frozen protocol the method is built around</td></tr>
+<tr class="recommend"><td><strong>DistMult &rarr; MLP readout</strong></td><td><strong>+0.053</strong></td><td>v21, 10 paired seeds, distributions disjoint, 2.2&times; MDD</td><td class="g">&#128994; <strong>ADOPT &mdash; the reported configuration</strong></td></tr>
+<tr><td><em>Seed alone (the noise floor)</em></td><td><em>&plusmn;0.019</em></td><td>v20, 10 seeds, fixed split</td><td class="b">&#128309; the yardstick every row is read against</td></tr>
+<tr class="reject"><td>Random &rarr; patch masking (MLP head)</td><td>+0.007</td><td>v22, 10 paired seeds, t=0.76, 6/10</td><td class="r">&#128308; inside noise (but H@10 +0.019 is real)</td></tr>
+<tr class="reject"><td>Random &rarr; patch masking (DistMult head)</td><td>&minus;0.011</td><td>v18, 1 seed, unpaired</td><td class="r">&#128308; inside noise, and not a paired comparison</td></tr>
+<tr class="reject"><td>JEPA pretraining vs random init</td><td>&minus;0.008</td><td>v19 arms A/B, 3 seeds, sign flips</td><td class="r">&#128308; inside noise &mdash; conditional on the <code>emb_std</code> check</td></tr>
+</table>
+<strong class="r">Read as a whole, the table says something no individual report could: EVERY change to the self-supervised pretext task &mdash; the part of the method the paper is named after &mdash; sits inside the noise floor. The two changes that moved the model are the readout head and whether the encoder is frozen at all.</strong> That is worth confronting directly in the paper rather than leaving as an inference across six reports.
+<br><br><strong>The 2&times;2 design &mdash; three of four cells have ten paired seeds each:</strong>
+<table>
+<tr><th>Pretext task</th><th>DistMult readout</th><th>MLP readout</th></tr>
+<tr><td><strong>random mask</strong> (the v16 default)</td><td>v20 &middot; <strong>0.4174 &plusmn;0.0190</strong> &mdash; the published configuration</td><td class="recommend">v21 &middot; <strong>0.4705 &plusmn;0.0167</strong> &mdash; the recommendation</td></tr>
+<tr><td><strong>patch mask</strong> (v18's task)</td><td class="reject">v18, ONE seed: 0.4080 &mdash; unpaired, vs the released checkpoint. <strong>The missing cell.</strong></td><td>v22 &middot; 0.4770 &plusmn;0.0263</td></tr>
+</table>
+<span class="dim">The interaction &mdash; whether patch masking behaves differently at the two heads &mdash; has a point estimate of about +0.016 on MRR and <strong>no interval at all</strong>. A retrained (patch, DistMult) arm at ten seeds would settle it and would simultaneously give v18's original question the paired, powered answer it never got.</span>
+</div>
+</div>
+
+<h3>What to report &mdash; the Table 1 rows</h3>
+<pre>Leave-one-out (n = 8,283)   [v21: random mask, MLP readout]
+  MRR     0.471 &plusmn; 0.017        Hits@1   0.301 &plusmn; 0.017
+  Hits@3  0.530 &plusmn; 0.024        Hits@10  0.898 &plusmn; 0.011
+
+Batch-mask (n = 3,000)
+  AUC     0.799 &plusmn; 0.016        AP       0.711 &plusmn; 0.028
+  MRR     0.374 &plusmn; 0.003        AUC-nonobv  0.656 &plusmn; 0.004   [corrected metric, 260809]
+
+(mean &plusmn; sd over 10 training seeds, 42-51, fixed test split, MLP readout)</pre>
+<p class="dim">Keep the two blocks <strong>visibly separate</strong>: they are different protocols and their MRR columns differ by ~0.10 &mdash; a reader who sees one MRR beside an AUC will assume they came from the same evaluation. Report the <strong>sd, not the standard error</strong>, and state n: at ten runs the sd is itself known only to about &plusmn;24%, so more than two significant figures overstates what was measured. Name the seed range in the text ("seeds 42&ndash;51") &mdash; it costs a clause and forecloses the question of whether the set was chosen after seeing results. <strong class="g"><code>auc_nonobvious</code> is now quotable</strong> &mdash; the metric was fixed and all thirty arms re-scored on 260809, so the corrected <strong>0.656 &plusmn; 0.004</strong> replaces the defective column. Do <em>not</em> carry the old 0.800 anywhere: the same released weights score <strong>0.619</strong> under matched populations. <strong>Secondary result:</strong> patch masking improves Hits@10 by +0.019 (95% CI [+0.011, +0.027], 9/10 seeds, replicating v18's independent +0.018 at a different readout head) and leaves MRR / Hits@1 / Hits@3 unchanged while increasing their variance. <strong class="y">Adopting v21 also retires the released checkpoint as the paper artifact</strong> &mdash; <code>models/fawkes-entity-note/&hellip;v16_260615.pt</code> is a DistMult model, so a v21 checkpoint must be released alongside and the paper must say which one it describes.</p>
+
+<!-- ============================================================ -->
+<h2 style="border-left-color:#6090c0;color:#6090c0">&#9656; Method foundation &mdash; the v16 experiment every version above varies</h2>
+<!-- ============================================================ -->
+
+<div class="card" style="border-color:#6090c0">
+<div class="t" style="color:#6090c0">&#9679; The experiment, the data, the two phases</div>
+<div class="d">
+A JEPA world model over per-admission clinical knowledge graphs, trained in two phases on <strong>4,000 admission graphs (3,018 subjects, 85,290 LLM edges)</strong>. <strong>v16's own contribution</strong> &mdash; the "entity-note" name &mdash; was localising the 768-d Clinical-ModernBERT note vector onto <strong>the entity nodes the note actually grounds</strong> (the endpoints of any edge carrying <code>prov_in_note</code>, <strong>28.6% of nodes</strong> on the shipped dataset; ungrounded entities get a zero vector), retiring v15's single per-admission <code>NOTE</code> node. <code>NOTE</code> and <code>HAS_NOTE</code> remain in the vocabulary, unused, as evidence of that retirement.
+<table>
+<tr><th>Component</th><th>Setting</th><th>Note</th></tr>
+<tr><td>Encoder</td><td><code>hid=128, layers=2, heads=4</code>, edge emb 32</td><td>Two <code>TransformerConv</code> layers; <strong>2,637,954</strong> params (no-note 2,441,346; 2,356,354 at v19's <code>LAYERS=0</code>)</td></tr>
+<tr><td>Node input</td><td><code>numeric_dim=774</code></td><td>6 demographic slots + 768 note dims &mdash; not 778, not 1550</td></tr>
+<tr class="recommend"><td><strong>Phase 1 &mdash; the world model</strong></td><td><code>jepa_epochs=60, node_mask=0.4</code></td><td>Masked-node <strong>latent</strong> prediction, BYOL-style, EMA target encoder, stop-grad. <strong>The phase v18 changed and v19 ablated away.</strong></td></tr>
+<tr class="recommend"><td><strong>Phase 2 &mdash; the readout</strong></td><td><code>readout_epochs=40, freeze_encoder=1</code></td><td>Frozen-encoder edge recovery, InfoNCE over same-type negatives, the four inferred relations upweighted (<code>target_weight=3.0</code>), scorer rolled back to best VAL-AUC epoch. <strong>v19's finding and v21's arm both live here.</strong></td></tr>
+<tr><td>Readout head</td><td><code>decoder=distmult</code></td><td><strong>The v21 switch.</strong> The MLP alternative shipped alongside it since v16 and was never run.</td></tr>
+<tr><td>Masking</td><td><code>node_mask=0.4, edge_mask=0.3</code>, held-edge ratio [0.1, 0.6]</td><td>i.i.d. Bernoulli through v17; <code>MASK_STRATEGY=patch</code> from v18</td></tr>
+<tr><td>Schedule / split</td><td>batch 16, lr 1e-3, seed 42; 3,200 / 400 / 400</td><td>Seeded permutation, <strong>test drawn first</strong>. Split seed separated from training seed at v20.</td></tr>
+<tr><td>Evaluation</td><td><code>loo_cap=40000</code></td><td>Mask one edge, keep the graph as context, filtered ranking</td></tr>
+</table>
+<strong>Published v16 numbers:</strong> LOO MRR <strong>0.418653</strong> (n=8,283, seeded test split, <code>baseline/paper_loo_testsplit.json</code>); batch-mask AUC 0.714351 / AP 0.627698 / MRR 0.360833 / <code>auc_nonobvious</code> 0.800028 (n_mrr=3,000). <span class="dim">Note: <code>baseline/paper_loo.json</code> (MRR 0.440249, n=40,000) is <strong>not</strong> the published number &mdash; it is the whole 4,000-record file under the shipped evaluator's <code>&gt;= 2</code> edge filter with no split, and exists only to gate the evaluator refactor.</span>
+</div>
+</div>
+
+<div class="card">
+<div class="t">&#9679; The four evaluators &mdash; they answer different questions and are NOT interchangeable</div>
+<div class="d">
+<table>
+<tr><th>Evaluator</th><th>Protocol</th><th>Randomness</th><th>Used for</th></tr>
+<tr class="recommend"><td><code>loo_evaluate</code></td><td>Mask exactly ONE edge, keep the entire rest of the graph as context; rank the true tail against same-type candidates in the same graph, <strong>filtered</strong> for other true tails, ties favouring the true tail</td><td class="g"><strong>None &mdash; exactly reproducible</strong></td><td class="g"><strong>The honest per-relation measure. What the paper reports and what every headline number in this log is.</strong></td></tr>
+<tr><td><code>evaluate</code></td><td>Batch-mask: ~30% of edges held out together, ranking capped at <code>MRR_CAP=3000</code></td><td class="y">Draws masks + negatives</td><td>Harder and noisier; the only evaluator that computes AUC/AP; also drives best-VAL model selection inside the training loop</td></tr>
+<tr><td><code>cascade_evaluate</code></td><td>Recover the inferred relations in order, feeding each one's gold edges to the next &mdash; produces the floor (backbone only) / ceiling (LOO) bracket</td><td>&mdash;</td><td>v18's headroom analysis. <strong>Disabled since v19</strong> (<code>RUN_CASCADE=0</code>) &mdash; those checkpoint blocks are empty.</td></tr>
+<tr><td><code>eir_uplift_eval</code></td><td>Refiner precision/recall against v8-gold triples</td><td>&mdash;</td><td>Off by default; full-gold F1 is hub-dominated. <strong>Disabled since v19</strong> (<code>RUN_EIR=0</code>).</td></tr>
+</table>
+<strong class="r">&#9888; The easiest error in this project, and the hardest to spot in review:</strong> LOO MRR and batch-mask MRR are the <em>same metric name on different evaluations</em> &mdash; 0.4174 vs 0.3627 for the identical v20 checkpoints. <strong>A Table 1 row quoting AUC is describing the batch-mask evaluation, so its MRR must come from that block too.</strong> Never put an AUC from one protocol beside an MRR from the other.
+</div>
+</div>
+
+<!-- ============================================================ -->
+<h2 style="border-left-color:#c06050;color:#c06050">&#9656; Known defects &amp; open items &mdash; carried, dated, and unfixed</h2>
+<!-- ============================================================ -->
+
+<table>
+<tr><th style="width:18px">#</th><th>Item</th><th>Detail</th><th>Cost of leaving it</th><th>Since</th></tr>
+<tr class="recommend"><td>1</td><td><strong class="g">&#10003; FIXED (260809) &mdash; <code>auc_nonobvious</code></strong></td><td><code>_classification_metrics</code> filtered the positives to non-patient-anchored edges but scored them against the <strong>unfiltered</strong> negative pool (67.7% patient-anchored). Fixed with <code>negatives[nonpat_mask]</code>; gated by <code>test_nonobvious_auc_uses_its_own_negatives</code>, which fails on the old expression.</td><td class="g"><strong>Re-scored across all 30 fleet checkpoints + the released one.</strong> The v21 sign flip is confirmed (&minus;0.0789 at 0/10 &rarr; <strong>+0.0334 at 10/10</strong>), v21's sd tightens 9.5&times;, and the published <strong>0.800028 is corrected to 0.618908</strong>. Deliberate divergence from the Phase-8 pin recorded in <code>baseline/COVERAGE.md</code>.</td><td>pre-v21</td></tr>
+<tr class="recommend"><td>2</td><td><strong class="g">&#10003; FIXED (260809) &mdash; checkpoint provenance</strong></td><td><code>checkpoint_dict()</code> is pinned byte-for-byte against the released v16 file, so <strong>it cannot grow</strong>. Rather than break that gate, the seven omitted knobs (<code>jepa_epochs</code>, <code>readout_epochs</code>, <code>freeze_encoder</code>, <code>mask_strategy</code>, <code>jepa_patches</code>, <code>decoder</code>, <code>data_split_seed</code>) now go in a <strong>separate <code>run_config</code> block</strong> written beside it, and <code>Config.from_checkpoint(config, run_config)</code> reads it back.</td><td class="y"><strong>Applies to future runs only</strong> &mdash; the 30 existing checkpoints predate the block and still rely on their repository names. From the next run, a checkpoint identifies its own arm, and <code>fawkes-eval</code> picks the right head automatically instead of failing a strict <code>state_dict</code> load without <code>DECODER=mlp</code>.</td><td>v19</td></tr>
+<tr class="reject"><td>3</td><td><strong>The split is by admission, not by patient</strong></td><td>4,000 admissions from 3,018 subjects. Train 3,200 adm / 2,549 subj; test 400 adm / 383 subj; <strong>139 subjects in both</strong>; <strong>147 of 400 test admissions (36.8%) belong to a patient the model trained on</strong>.</td><td class="r">Pre-existing &mdash; it produced the published number. A grouped split is ~10 lines in <code>_split_items</code> and would almost certainly move Table 1 <em>downward</em>, which makes it a decision about the paper rather than a bug fix. <strong>Deserves to be made deliberately rather than discovered in review.</strong></td><td>pre-v20</td></tr>
+<tr class="reject"><td>4</td><td><strong>The split axis is unmeasured</strong></td><td>All 30 runs in v20/v21/v22 use <code>DATA_SPLIT_SEED=42</code> and hold out the same 400 admissions.</td><td class="r">The reviewer's <em>actual</em> question &mdash; is it a lucky sample of patients &mdash; is unanswered. The machinery exists and is tested. Expect the split spread to be <strong>larger</strong> than the seed spread (a new split changes held-out admissions, query population and denominator at once) and those runs are <strong>not paired</strong>, so they yield a spread to report, never a paired test.</td><td>v20</td></tr>
+<tr class="reject"><td>5</td><td><strong><code>emb_std</code> collapse check never pulled</strong></td><td><code>jepa_step</code> returns <code>emb_std</code> specifically to catch target-encoder collapse; it is logged every ten epochs by <code>pretrain_jepa</code>.</td><td class="r"><strong>v19's entire conclusion is conditional on it.</strong> A &asymp; B together with E &lt; C is exactly the signature collapse would produce. One <code>grep</code> decides whether v19 is a finding about JEPA or a bug report about one training run.</td><td>v19</td></tr>
+<tr class="reject"><td>6</td><td>The (patch, DistMult) cell is one unpaired seed</td><td>v18's cell compares a freshly trained patch model against the <em>released checkpoint</em>, not a retrained random-mask baseline.</td><td class="y">The mask&times;head interaction has a point estimate (~+0.016 MRR) and no interval. Ten paired seeds would close the 2&times;2 and re-answer v18's original question properly.</td><td>v18</td></tr>
+<tr class="reject"><td>7</td><td>No test covers the MLP readout path</td><td><code>grep "Scorer\|decoder" tests/test_fawkes.py</code> returns nothing. The config parsing is pinned but no test ever instantiates the model. Ten jobs ran clean; the regression gate that would catch a future break does not exist.</td><td class="y">A silent break in the now-recommended configuration.</td><td>v21</td></tr>
+<tr class="reject"><td>8</td><td>Neither pretext task has been tested unfrozen</td><td>v19 showed the frozen protocol costs ~0.31 MRR. Every masking comparison in this series &mdash; v18 and v22 included &mdash; compares two <strong>frozen</strong> representations.</td><td class="y">The regime v19 suggests is the wrong one. If phase 1 survives the collapse check, v18's and v22's sweeps are worth repeating unfrozen, where the ranking may not hold.</td><td>v19</td></tr>
+</table>
+
+<div class="card" style="border-color:#c06050">
+<div class="t" style="color:#c06050">&#9679; If you do ONE thing next</div>
+<div class="d">
+<strong class="g">&#10003; Done (260809) &mdash; <code>_classification_metrics</code> is fixed and all thirty checkpoints re-scored</strong>, along with the released one. Table 1's non-obvious AUC column is now quotable at 0.656 &plusmn; 0.004 (MLP), and the published 0.800 must be replaced with 0.619 wherever it appears. Provenance (<code>run_config</code>) is fixed for future runs.
+<br><br><strong>1 &middot; Pull <code>emb_std</code> from the three arm-A job logs.</strong> Now the highest-value open item. Everything in v19 &mdash; the report that most challenges the paper's premise &mdash; is conditional on phase 1 having trained successfully, and it is one <code>grep</code>.
+<br><strong>2 &middot; Submit the four split runs.</strong> Ten seeds answer "is it a lucky initialisation"; the review asked "is it a lucky sample of patients". Four jobs and one <code>for</code> loop close it.
+<br><strong>3 &middot; Run the missing (patch, DistMult) cell at ten seeds.</strong> It closes the 2&times;2 and gives v18's original question the paired, powered answer it never got.
+</div>
+</div>
+
+<!-- ============================================================ -->
+<h2>&#9656; Reproduce &mdash; every run is command &rarr; repo &rarr; numbers</h2>
+<!-- ============================================================ -->
+
+<div class="card">
+<div class="t">&#9679; One run (v22 shown; the whole series differs only in the flagged lines)</div>
+<div class="d">
+<pre>hf jobs uv run --detach --flavor t4-small --timeout 4h --secrets HF_TOKEN \
+  --name fawkes-v22-patch-mlp-sp42-s42 -v ./src:/workspace/src \
+  -e MASK_STRATEGY=patch -e JEPA_PATCHES=8 -e NODE_MASK=0.4 \      # v22 only (v18's flags)
+  -e DECODER=mlp \                                                 # v21 and v22
+  -e USE_NOTE=1 -e GROUND_BY=prov -e EMBED_DIM=768 \
+  -e USE_SCORES=0 -e PRUNE_NO_EVIDENCE=1 -e RUN_CASCADE=0 -e RUN_EIR=0 \
+  -e PUSH=1 -e DATA_SPLIT_SEED=42 -e SEED=42 \                     # DATA_SPLIT_SEED since v20
+  -e OUTPUT_REPO=&lt;user&gt;/fawkes-v22-patch-mlp-sp42-s42 \
+  scripts/fawkes_patch_masking_hf_job.py</pre>
+<table>
+<tr><th>Version</th><th>Submit script</th><th>Collect script</th><th>Repos</th><th>Delta vs the row above</th></tr>
+<tr><td>v22</td><td><code>submit-v22-patch-mlp.sh</code></td><td><code>print_v22_patch_mlp_table.py</code></td><td><code>fawkes-v22-patch-mlp-sp42-s{42&hellip;51}</code></td><td>+3 masking flags</td></tr>
+<tr><td>v21</td><td><code>submit-v21-mlp-decoder.sh</code></td><td><code>print_v21_decoder_table.py</code></td><td><code>fawkes-v21-mlp-sp42-s{42&hellip;51}</code></td><td><code>-e DECODER=mlp</code> &mdash; that is the entire difference from v20</td></tr>
+<tr><td>v20</td><td><code>submit-v20-seed-variance.sh</code></td><td><code>print_v20_seed_variance_table.py</code></td><td><code>fawkes-v20-variance-sp42-s{42&hellip;51}</code></td><td>the paper arm, loops seeds 42&ndash;51</td></tr>
+<tr><td>v19</td><td><code>submit-v19-ablations.sh</code></td><td><code>print_v19_ablation_table.py</code></td><td><code>fawkes-v19-ablation-{A,B,C,Cp,D,E}-s{42,43,44}</code></td><td>A drops the last two flags; B drops <code>FREEZE_ENCODER=0</code>; Cp adds <code>READOUT_EPOCHS=100</code>; D adds <code>LAYERS=0</code>; E drops <code>JEPA_EPOCHS=0</code></td></tr>
+<tr><td>v18</td><td>&mdash;</td><td>&mdash;</td><td><code>tmp/fawkes-v18-{note,nonote}.log</code></td><td><code>MASK_STRATEGY=patch JEPA_PATCHES=8 NODE_MASK=0.4 USE_NOTE={1,0} PUSH=0 fawkes-train</code></td></tr>
+<tr><td>v17</td><td>&mdash;</td><td><code>pytest tests/test_fawkes.py</code></td><td>no new checkpoint &mdash; it re-evaluates v16's</td><td><code>USE_NOTE=0 fawkes-eval --checkpoint &hellip; --data &hellip; --device cpu</code></td></tr>
+</table>
+<span class="dim"><strong>Provenance rules this series learned the hard way:</strong> (1) every number in the log is read from <code>recovery_test_loo</code> / <code>recovery_test_batchmask</code> <strong>inside each pushed checkpoint</strong>, never parsed from logs. (2) <code>n</code> is the split's signature &mdash; n=8,283 (LOO) and n_mrr=3,000 (batch-mask) across all 30 v20/v21/v22 runs; v19's n varies by <em>seed</em> (8,283 / 7,733 / 8,126) but is equal across <em>arms</em> within a seed, which is why every v19 comparison is paired within seed. (3) <code>quiz_sig=304815655090</code> across v18's four runs, all ten v20 runs, and the released v16 checkpoint &mdash; the models were asked byte-identical questions. (4) Paired CIs come from t(9)=2.262; a CI excluding zero IS the two-sided paired t-test at .05; no scipy needed. (5) The job name and output repository are the only provenance record &mdash; see defect #2.</span>
+</div>
+</div>
+
+<div class="explain">
+<div class="title">&#9654; In Plain English &mdash; Read This First</div>
+<p><strong>What the model does.</strong> Each hospital admission becomes a <strong>graph</strong>: diagnoses, medications, procedures, cultures and services as dots, with typed connections between them. Some connections come free from the hospital tables; the interesting ones &mdash; <em>this drug manages that diagnosis</em>, <em>this problem complicated that one</em> &mdash; were drafted by an LLM. The model's job is to <strong>put back a connection we deliberately hid</strong>. That skill is what "refining the graph" means, and the score is <strong>LOO MRR</strong>: hide exactly one edge, show the model everything else, see how highly it ranks the right answer.</p>
+<p><strong>How it was supposed to work.</strong> Two phases. <strong>Phase 1</strong> is the JEPA world model: hide chunks of the graph and make the model predict the <em>meaning</em> of what's missing, with no labels. <strong>Phase 2</strong> freezes that and trains a small head to score edges. The claim is that phase 1 is where the intelligence comes from.</p>
+<p><strong>What six versions of careful measurement actually found:</strong></p>
+<ul>
+<li><strong>v20 built the ruler first.</strong> Retraining the exact same configuration ten times, changing nothing but the random seed, moves the score by <strong>&plusmn;0.019</strong>. Any claimed improvement smaller than about <strong>0.024</strong> is indistinguishable from luck. The published number survived this check &mdash; the ten-run average landed 0.0012 away from it.</li>
+<li><strong>v21 found the actual win, and it was sitting in the code the whole time.</strong> Swapping the edge-scoring head from DistMult to a small MLP &mdash; a switch that had existed since the beginning and had <em>never been flipped</em> &mdash; raised the score from <strong>0.417 to 0.471</strong>. It won at all ten seeds, and the two sets of results don't even overlap. All four of the relations the paper is about improved.</li>
+<li><strong class="r">v19 asked the uncomfortable question.</strong> How much of the result comes from the JEPA pretraining? Answer: <strong>none that can be measured.</strong> A frozen, <em>completely untrained</em> encoder scores the same. Meanwhile the same architecture trained normally, with no pretraining at all, beats the paper model by <strong>+0.311</strong>. The likely cause is the freezing itself: a large lookup table of entity embeddings never receives any training signal in phase 2.</li>
+<li><strong>v18 and v22 tried making the pretraining harder</strong> (hide whole neighbourhoods instead of scattered dots). On the headline metric: nothing, twice. But one narrower metric &mdash; whether the right answer lands in the top ten &mdash; improved by the same amount in <em>both</em> experiments, four versions and one architecture apart. That agreement is why it is reported as real while the rest is not.</li>
+<li><strong>v17 is why any of this was affordable.</strong> It split the 719-line original into modules and proved &mdash; against a frozen copy of the old code &mdash; that not a single number moved. Because it preserved every setting verbatim, four of the five experiments above needed <strong>zero or almost zero new code</strong>. v21's entire discovery was one environment variable that v17 had faithfully carried forward.</li>
+</ul>
+<p><strong class="r">One honest correction to the story.</strong> The paper is named after the self-supervised pretraining, and on the evidence collected here, <strong>every change to that pretraining sits inside the noise</strong>. The two things that genuinely move the model are the readout head and whether the encoder is allowed to train. Before rewriting anything, one check is owed: v19's conclusion is <strong>conditional</strong> on the pretraining having trained successfully at all, and the diagnostic that would confirm it (<code>emb_std</code>, already logged) has still not been read.</p>
+<p class="one"><strong>In one line:</strong> report <strong>v21 &mdash; random masking with the MLP readout, LOO MRR 0.471 &plusmn; 0.017 over ten seeds</strong> &mdash; note patch masking's Hits@10 gain as a secondary result, fix the one broken metric before anything ships, and confront directly that the pretext task the method is named after has not yet been shown to matter.</p>
+</div>
+
+<div class="divider"></div>
+
+<div class="card" style="border-color: #c8a060;">
+<div class="t">Document Version History</div>
+<div class="d">
+<strong>v16 (260615)</strong> &mdash; <strong>THE PAPER ARTIFACT.</strong> Entity-localised note: the 768-d Clinical-ModernBERT vector moved onto the entity nodes it actually grounds (28.6% of nodes under <code>ground_by=prov</code>), retiring v15's single per-admission <code>NOTE</code> node. Released checkpoint + every published number. <strong>LOO MRR 0.418653, n=8,283.</strong><br>
+<strong>v17 (260804)</strong> &mdash; <strong>ENGINEERING RELEASE, gated on equality.</strong> 719-line <code>paper_v16/trainer.py</code> split six ways (<code>config/data/model/steps/train/evaluate</code>); ~30 import-time <code>os.environ</code> reads became a <code>Config</code> dataclass; <code>NUMERIC_DIM</code> became a property. Three gates &mdash; LOO to 1e-6, <code>state_dict</code> key sets, AST-verified absence of module-scope env reads &mdash; with an explicit stop rule if either numeric gate failed. Exactly three behaviour changes: variant-derived checkpoint names, <code>CUBLAS_WORKSPACE_CONFIG</code> moved into <code>set_seed</code>, and the argparse guard that stops <code>--help</code> from training and publishing. <strong>No numerics moved, by design</strong> &mdash; and it is that verbatim preservation that carried <code>DECODER</code> forward for v21 to find.<br>
+<strong>v18 (260804)</strong> &mdash; <strong>BFS-BALANCED PATCH MASKING</strong> (opt-in): partition each graph into 8 patches, mask whole patches, killing the local-interpolation shortcut in the i.i.d. Bernoulli mask. One module, one branch, two config fields. No-note <strong>+0.0237</strong> MRR (every metric, every relation improves); with-note <strong>&minus;0.0107</strong>. Note lift narrowed +0.144&rarr;+0.110. Cascade headroom flipped positive on all four inferred relations in the no-note arm. <strong>One seed per cell</strong>, and the with-note baseline is the released checkpoint, not a retrain &mdash; so unpaired as well as underpowered.<br>
+<strong>v19 (260805)</strong> &mdash; <strong>THE JEPA PRETRAINING ABLATION &mdash; six arms, 14 runs, no new configuration.</strong> Frozen random init &asymp; JEPA-pretrained (<strong>&minus;0.008</strong>, sign flips); from-scratch end-to-end <strong>+0.311</strong>; no message passing at all still <strong>+0.233</strong>; pretrain-then-finetune <strong>0.2475 BELOW</strong> from-scratch &mdash; the JEPA initialisation is worse than random. Mechanism: <code>FREEZE_ENCODER=1</code> leaves the 8,192&times;128 entity table shaped only by the pretext task. One model-selection bug fixed (best-VAL snapshotted the scorer but not the encoder), in the direction that had been flattering the paper. <strong class="r">Conditional on an <code>emb_std</code> collapse check still not run.</strong><br>
+<strong>v20 (260806)</strong> &mdash; <strong>SEED VARIANCE &mdash; defending Table 1.</strong> <code>DATA_SPLIT_SEED</code> separated from <code>SEED</code> (one field, one line, one test), then ten retrains of the paper configuration. <strong>LOO MRR 0.4174 &plusmn; 0.0190</strong>; all eight published metrics across both protocols inside the 95% CI; AUC agreeing to 0.0002. Established the <strong>&plusmn;0.019 noise floor</strong> and the <strong>0.0238 minimum detectable difference</strong> every comparison since is read against. Also found: no retrain in the lineage has ever reproduced the published number as a <em>point</em>, and the split is by admission, not patient (36.8% test overlap).<br>
+<strong>v21 (260807)</strong> &mdash; <strong>THE READOUT HEAD WAS THE WRONG ONE.</strong> <code>DECODER=mlp</code> &mdash; a switch present since v16, never run, <strong>zero source changes</strong>. LOO MRR 0.4174&rarr;<strong>0.4705</strong>, paired <strong>+0.0530 &plusmn; 0.0181</strong>, <strong>10/10 seeds, distributions disjoint</strong> (DistMult best 0.4438 &lt; MLP worst 0.4493), 2.2&times; the detection floor. All four inferred relations improve at 10/10, gaining most where the queries are hardest. The one apparent regression (<code>auc_nonobvious</code> &minus;0.0713) was proven a <strong>measurement artefact</strong> &mdash; positives filtered, negatives not &mdash; that flips to <strong>+0.041</strong> when matched, and that also inflates the released checkpoint's published 0.800028.<br>
+<strong class="g">v22 (260808)</strong> &mdash; <strong>PATCH MASKING AT THE MLP HEAD &mdash; the third cell of the 2&times;2.</strong> On the headline metric, nothing: MRR <strong>+0.0066 &plusmn; 0.0274</strong>, t=0.76, ahead at 6/10, inside the noise floor. One metric survives correction for testing seven: <strong>Hits@10 +0.0185, t=5.29, 9/10 seeds</strong> &mdash; and it <strong>independently replicates v18's +0.0184 to 0.0001</strong> at a different readout head, while their MRR deltas disagree in sign. Cost: <strong>1.6&times; MRR variance, 1.9&times; on Hits@1</strong>, from a long left tail (8 of 10 seeds beat v21's mean; two collapse). <strong>Decision: report v21.</strong><br>
+<strong class="b">v17&rarr;v22 consolidated (260809, this doc)</strong> &mdash; the six reports compressed into one newest-first log: per-version result cards, the cross-version effect ledger, the 2&times;2 design grid, the Table 1 rows to write, the v16 method foundation, the four-evaluator contract, and the carried defects with their dates. Supersedes nothing &mdash; each original report remains the primary record for its own numbers.<br>
+<strong class="g">260809 &mdash; TWO DEFECTS FIXED, one of them re-measured.</strong> (1) <code>_classification_metrics</code> now scores non-<code>PATIENT</code> positives against <code>negatives[nonpat_mask]</code> instead of the whole pool, gated by a new unit test that fails on the old expression. All thirty fleet checkpoints and the released v16 checkpoint were re-scored both ways in one pass (<code>print_nonobvious_rescore_table.py</code>): the shipped column reproduces the stored values to ~0.001&ndash;0.010 (released checkpoint to 0.0014), so the correction is verified before it is read. <strong>v21&minus;v20 flips from &minus;0.0789 (0/10) to +0.0334 (10/10), v22&minus;v20 from &minus;0.1013 to +0.0275, v21's sd tightens 9.5&times;, and the published 0.800028 becomes 0.618908.</strong> The Phase-8 pin keeps the inflated value as the historical record; the deliberate divergence is documented in <code>baseline/COVERAGE.md</code>. (2) Checkpoints now carry a <code>run_config</code> block with the seven knobs <code>checkpoint_dict()</code> cannot hold, and <code>fawkes-eval</code> reads the decoder back from it &mdash; <strong>future runs only</strong>; the existing thirty still rely on their repository names.
+</div>
+</div>
+
+<div class="card">
+<div class="t">Module Identity</div>
+<div class="d">
+<strong>Name:</strong> Fawkes &mdash; the masked figure, and the spark behind the mask. De-identification is the mask every MIMIC patient wears: the clinical structure speaks, the identity stays hidden.<br>
+<strong>Role:</strong> Convert MIMIC-IV admissions into per-admission typed knowledge graphs, pretrain a Graph-JEPA world model over them, and recover held-out clinical relationships from the frozen latents.<br>
+<strong>Lineage:</strong> Eir &middot; Veritas &middot; Graph-JEPA &middot; <strong>Fawkes</strong>. &mdash; <span class="dim"><code>fawkes</code> is the paper implementation; <code>clinical_jepa</code> is the separate modular revision pipeline. The two never import each other (<code>tests/test_import_boundaries.py</code>).</span><br>
+<strong>Tagline:</strong> Builds the patient-graph corpus behind the mask &mdash; and learns to read it.
+</div>
+</div>
+
+<p class="dim" style="text-align: center; margin-top: 40px;">
+FAWKES v17&rarr;v22 &mdash; consolidated results log + method foundation + known defects. <strong>v22:</strong> patch masking at the MLP head moves MRR +0.0066 (inside noise) but Hits@10 +0.0185 (t=5.29, survives Bonferroni, replicating v18's +0.0184 at a different head) at 1.6&times; the MRR variance &mdash; report v21. <strong>v21:</strong> <code>DECODER=mlp</code>, zero source changes, LOO MRR 0.4174&rarr;0.4705 (+0.0530), 10/10 seeds, distributions disjoint, all four inferred relations improve &mdash; <strong>the recommended configuration</strong>. <strong>v20:</strong> ten retrains, 0.4174 &plusmn; 0.0190, published value inside the 95% CI, noise floor &plusmn;0.019 / MDD 0.0238. <strong>v19:</strong> phase 1 &asymp; random init (&minus;0.008); unfreezing the encoder +0.311; JEPA init worse than random. <strong>v18:</strong> patch masking, no-note +0.0237 / with-note &minus;0.0107, one seed per cell. <strong>v17:</strong> the refactor that had to move nothing &mdash; and proved it to 1e-6.<br>
+Eir &middot; Veritas &middot; Graph-JEPA &middot; Fawkes &nbsp;|&nbsp; Source: MIMIC-IV (de-identified, PhysioNet DUA &mdash; all datasets private) &nbsp;|&nbsp; 260809
+</p>
+
+</body>
+</html>
