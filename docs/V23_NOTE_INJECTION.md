@@ -48,8 +48,9 @@ The confirmatory run uses seeds 42--51 and the fixed v22 split seed 42:
 SOURCE_REF=<full-commit-sha> ./submit-v23-note-attention.sh
 ```
 
-This submits both `uniform` and `attention`. Existing v22 seed-matched
-checkpoints are reused as the exact global-mean baseline. Aggregate all arms:
+This submits `mean`, `uniform` and `attention` on the same A10G flavor. The
+`mean` arm is the exact v22 pooling path retrained on matching hardware, avoiding
+a cross-GPU numerical confound. Aggregate all arms:
 
 ```bash
 python print_v23_note_attention_table.py

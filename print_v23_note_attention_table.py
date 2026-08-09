@@ -12,7 +12,7 @@ from huggingface_hub import hf_hub_download
 
 SEEDS = range(42, 52)
 ARMS = {
-    "v22-mean": "kushagrayadv/fawkes-v22-patch-mlp-sp42-s{seed}",
+    "v23-mean": "nalin9/fawkes-v23-mean-note-sp42-s{seed}",
     "v23-uniform": "nalin9/fawkes-v23-uniform-note-sp42-s{seed}",
     "v23-attention": "nalin9/fawkes-v23-attention-note-sp42-s{seed}",
 }
@@ -91,8 +91,8 @@ def main():
         "paired": {},
     }
     for new_arm, baseline_arm in (
-            ("v23-uniform", "v22-mean"),
-            ("v23-attention", "v22-mean"),
+            ("v23-uniform", "v23-mean"),
+            ("v23-attention", "v23-mean"),
             ("v23-attention", "v23-uniform")):
         key = f"{new_arm}_minus_{baseline_arm}"
         result["paired"][key] = {
