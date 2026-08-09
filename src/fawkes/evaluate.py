@@ -35,8 +35,8 @@ from sklearn.metrics import average_precision_score, roc_auc_score
 
 from .config import Config
 from .data import (NUM_NODE_TYPES, RELATION_CANONICAL, TARGET_RELS, add_inverses, normalize_text,
-                   resolve_rel, support_graded, to_data)
-from .model import DistMult, Encoder
+                   load_note_memories, resolve_rel, support_graded, to_data)
+from .model import Encoder, build_scorer
 from .steps import buckets, readout_step
 
 logger = logging.getLogger("fawkes_jepa")
@@ -61,7 +61,12 @@ def encode_context_graph(encoder, graph, edge_index, edge_type, edge_feat, cfg):
         edge_index, edge_type = add_inverses(edge_index, edge_type)
         edge_feat = None
     return encoder(graph.node_type, graph.entity_id, graph.numfeat,
-                   edge_index, edge_type, edge_feat, graph.sem_id)
+                   edge_index, edge_type, edge_feat, graph.sem_id,
+                   batch_index=torch.zeros(graph.num_nodes, dtype=torch.long, device=graph.node_type.device),
+                   note_memory=getattr(graph, "note_memory", None),
+                   note_memory_mask=getattr(graph, "note_memory_mask", None),
+                   note_span_token_counts=getattr(graph, "note_span_token_counts", None),
+                   note_grounded=getattr(graph, "note_grounded", None))
 
 
 def filtered_candidates(node_type, src, dst, rel, src_nodes, dst_nodes, edge_type):
@@ -367,7 +372,15 @@ def _encode_kept_edges(encoder, data, kept, node_type, device):
         kept_edge_type = torch.zeros((0,), dtype=torch.long, device=device)
     kept_edge_index, kept_edge_type = add_inverses(kept_edge_index, kept_edge_type)
     return encoder(node_type, data.entity_id.to(device), data.numfeat.to(device),
-                   kept_edge_index, kept_edge_type, None, data.sem_id.to(device))
+                   kept_edge_index, kept_edge_type, None, data.sem_id.to(device),
+                   batch_index=torch.zeros(data.num_nodes, dtype=torch.long, device=device),
+                   note_memory=(data.note_memory.to(device) if hasattr(data, "note_memory") else None),
+                   note_memory_mask=(data.note_memory_mask.to(device)
+                                     if hasattr(data, "note_memory_mask") else None),
+                   note_span_token_counts=(data.note_span_token_counts.to(device)
+                                           if hasattr(data, "note_span_token_counts") else None),
+                   note_grounded=(data.note_grounded.to(device)
+                                  if hasattr(data, "note_grounded") else None))
 
 
 def _model_added_triples(scorer, hidden, held, names, node_type_list, add_counts, device):
@@ -473,22 +486,24 @@ def run(args) -> dict:
         "ground_by": cfg.ground_by,
         "embed_dim": cfg.embed_dim,
         "use_scores": cfg.use_scores,
+        "note_injection": cfg.note_injection,
     }
     mismatches = {
-        key: (config.get(key), value)
+        key: (config.get(key, "mean" if key == "note_injection" else None), value)
         for key, value in expected.items()
-        if config.get(key) != value
+        if config.get(key, "mean" if key == "note_injection" else None) != value
     }
     if mismatches:
         raise ValueError(
             "Environment does not match checkpoint configuration: "
-            f"{mismatches}. Set USE_NOTE/GROUND_BY/EMBED_DIM/USE_SCORES before launch."
+            f"{mismatches}. Set USE_NOTE/GROUND_BY/EMBED_DIM/USE_SCORES/NOTE_INJECTION before launch."
         )
 
     raw, demographics = _load_graphs(Path(args.data), args.max_graphs)
+    note_memories = load_note_memories(cfg)
     graphs = []
     for graph in raw:
-        data = to_data(graph, demographics, cfg)
+        data = to_data(graph, demographics, cfg, note_memories=note_memories)
         if data.num_nodes >= 3 and data.edge_index.size(1) >= 2:
             graphs.append(data)
     if not graphs:
@@ -496,7 +511,7 @@ def run(args) -> dict:
 
     device = torch.device(args.device)
     encoder = Encoder(cfg).to(device)
-    scorer = DistMult(cfg).to(device)
+    scorer = build_scorer(cfg).to(device)
     encoder.load_state_dict(checkpoint["encoder"])
     scorer.load_state_dict(checkpoint["scorer"])
     metrics = loo_evaluate(encoder, scorer, graphs, device, cfg, cap=args.cap)

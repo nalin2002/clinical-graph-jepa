@@ -155,6 +155,50 @@ def load_full_dataset(cfg):
     return graphs, demographics
 
 
+def load_note_memories(cfg):
+    """Load the v23 fixed-width Clinical ModernBERT span-memory sidecar.
+
+    The sidecar is deliberately separate from the graph JSONL: embedding arrays
+    in JSON would be both much larger and much slower to parse. Rows are joined
+    by ``hadm_id`` and every graph must resolve exactly once.
+    """
+    if cfg.note_injection == "mean":
+        return None
+    if cfg.note_memory_path:
+        path = cfg.note_memory_path
+        if not os.path.isfile(path):
+            raise RuntimeError(f"[FAILURE] NOTE_MEMORY_PATH not found: {path}")
+    else:
+        if not cfg.note_memory_repo:
+            raise RuntimeError(
+                "[FAILURE] NOTE_INJECTION requires NOTE_MEMORY_REPO or NOTE_MEMORY_PATH")
+        from huggingface_hub import hf_hub_download
+        path = hf_hub_download(
+            cfg.note_memory_repo, cfg.note_memory_file, repo_type="dataset")
+
+    from safetensors.torch import load_file
+    tensors = load_file(path)
+    required = {"memory", "mask", "hadm_ids", "span_token_counts"}
+    missing = sorted(required - set(tensors))
+    if missing:
+        raise RuntimeError(f"[FAILURE] note-memory sidecar missing tensors {missing}")
+    memory, mask = tensors["memory"], tensors["mask"].bool()
+    hadm_ids, counts = tensors["hadm_ids"], tensors["span_token_counts"]
+    expected = (hadm_ids.numel(), cfg.note_max_spans, cfg.embed_dim)
+    if tuple(memory.shape) != expected:
+        raise RuntimeError(
+            f"[FAILURE] note memory shape {tuple(memory.shape)} != {expected}")
+    if tuple(mask.shape) != expected[:2] or tuple(counts.shape) != expected[:2]:
+        raise RuntimeError("[FAILURE] note memory mask/count shapes do not match memory")
+    index = {str(int(hadm_id)): i for i, hadm_id in enumerate(hadm_ids.tolist())}
+    if len(index) != hadm_ids.numel():
+        raise RuntimeError("[FAILURE] duplicate hadm_id in note-memory sidecar")
+    logger.info(
+        f"[NOTE-MEMORY] {len(index)} admissions x {cfg.note_max_spans} spans "
+        f"from {path} mode={cfg.note_injection}")
+    return {"memory": memory, "mask": mask, "counts": counts, "index": index}
+
+
 def numeric(demo_rec):
     if demo_rec is None:
         return [0.0] * BASE_NUMERIC
@@ -228,6 +272,8 @@ def _node_features(graph, type_ids, grounded, demo_feats, subject_id, cfg):
     vector LOCALIZED onto the grounded entities (NO NOTE node); the rest get zeros."""
     if not cfg.use_note:
         return [list(demo_feats) for _ in range(len(type_ids))]
+    if cfg.note_injection != "mean":
+        return [list(demo_feats) for _ in range(len(type_ids))]
     note_embedding = graph.get("note_embedding")
     if note_embedding is not None and len(note_embedding) != cfg.embed_dim:
         raise ValueError(f"[FAILURE] note_embedding dim {len(note_embedding)} != EMBED_DIM {cfg.embed_dim} subj {subject_id}")
@@ -236,7 +282,7 @@ def _node_features(graph, type_ids, grounded, demo_feats, subject_id, cfg):
     return [demo_feats + (note_embedding if i in grounded else zero_note) for i in range(len(type_ids))]
 
 
-def to_data(graph, demographics, cfg):
+def to_data(graph, demographics, cfg, note_memories=None):
     """One raw admission graph -> a PyG ``Data`` with FORWARD edges only
     (inverses are added per use by ``add_inverses``)."""
     subject_id = str(graph.get("subject_id"))
@@ -258,6 +304,19 @@ def to_data(graph, demographics, cfg):
     data.edge_feat = torch.tensor(edge_scores, dtype=torch.float) if edge_scores else torch.zeros((0, SCORE_DIM), dtype=torch.float)   # (v9) per-edge v8 score vector
     data.sem_id = torch.zeros(len(type_ids), dtype=torch.long)
     data.n_grounded = torch.tensor([len(grounded)], dtype=torch.long)   # (v16) entities carrying the note vector (for the [NOTE] log)
+    if cfg.note_injection != "mean":
+        if note_memories is None:
+            raise RuntimeError("[FAILURE] span note injection requested without loaded note memories")
+        hadm_id = str(graph.get("hadm_id"))
+        memory_index = note_memories["index"].get(hadm_id)
+        if memory_index is None:
+            raise RuntimeError(f"[FAILURE] no note memory for hadm_id={hadm_id}")
+        # Leading graph dimension makes PyG concatenate a batch to (B, S, D).
+        data.note_memory = note_memories["memory"][memory_index].unsqueeze(0)
+        data.note_memory_mask = note_memories["mask"][memory_index].unsqueeze(0)
+        data.note_span_token_counts = note_memories["counts"][memory_index].unsqueeze(0)
+        data.note_grounded = torch.tensor(
+            [i in grounded for i in range(len(type_ids))], dtype=torch.bool)
     data.gid = torch.tensor(
         [int(subject_id) if str(subject_id).isdigit() else int(hashlib.md5(str(subject_id).encode()).hexdigest()[:12], 16)],
         dtype=torch.long)

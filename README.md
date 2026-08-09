@@ -104,6 +104,14 @@ The two `clinical_jepa` variants are one class and one config flag
 (`use_note_embeddings`), not two models: their checkpoints have identical
 `state_dict` key sets and differ only in two tensor shapes.
 
+### v23 discharge-note attention ablation
+
+The `codex/v23-attention-note` experiment keeps the v22 patch-mask + MLP
+configuration fixed and changes only discharge-note pooling. It compares the
+existing global Clinical ModernBERT mean with a parameterized uniform-span
+control and entity-conditioned cross-attention over contextual 32-token spans.
+See [the v23 protocol and execution guide](docs/V23_NOTE_INJECTION.md).
+
 ### Architecture comparison
 
 | Stage | Clinical-JEPA, no note | Clinical-JEPA, localized note | Fawkes entity-note |

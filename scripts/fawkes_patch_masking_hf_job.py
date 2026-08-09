@@ -5,6 +5,7 @@
 #   "huggingface_hub>=1.25.1",
 #   "numpy>=1.26",
 #   "scikit-learn>=1.3",
+#   "safetensors>=0.4.5",
 #   "torch==2.4.1",
 #   "torch-geometric==2.6.1",
 # ]
@@ -122,7 +123,12 @@ def find_source_root(requested: str | None) -> Path:
 
 
 def log_environment(source_root: Path) -> None:
-    keys = sorted(set(DEFAULTS) | {"DATA_REPO", "DATA_FILE", "DATA_PATH", "OUTPUT_REPO", "FAWKES_SRC"})
+    keys = sorted(set(DEFAULTS) | {
+        "DATA_REPO", "DATA_FILE", "DATA_PATH", "OUTPUT_REPO", "FAWKES_SRC",
+        "NOTE_INJECTION", "NOTE_MEMORY_REPO", "NOTE_MEMORY_FILE",
+        "NOTE_MEMORY_PATH", "NOTE_SPAN_TOKENS", "NOTE_MAX_SPANS",
+        "NOTE_ATTN_HEADS", "DECODER", "DATA_SPLIT_SEED", "SEED",
+    })
     print(f"[FAWKES-HF] source_root={source_root}", flush=True)
     print("[FAWKES-HF] no git clone or code snapshot download is performed", flush=True)
     print("[FAWKES-HF] trainer environment:", flush=True)

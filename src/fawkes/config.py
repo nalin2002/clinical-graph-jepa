@@ -83,6 +83,13 @@ class Config:
     use_note: bool = True                 # (v16) inject the Clinical-ModernBERT note vector onto grounded ENTITY nodes (v15 NOTE node retired)
     embed_dim: int = 768                  # (v15) note_embedding dim (Clinical-ModernBERT hidden)
     ground_by: str = "prov"               # (v16) where the note goes: prov=entities with a prov_in_note edge | name=entities named in the note | all=every entity
+    note_injection: str = "mean"          # (v23) mean=v22 path | uniform/attention=span-memory injection
+    note_memory_repo: str | None = None   # (v23) Hub dataset containing the safetensors sidecar
+    note_memory_file: str = "fawkes_note_memory_v23.safetensors"
+    note_memory_path: str | None = None   # (v23) optional local sidecar; bypasses Hub download
+    note_span_tokens: int = 32
+    note_max_spans: int = 64
+    note_attn_heads: int = 4
 
     # ---- JEPA pretraining ----
     node_mask: float = 0.4
@@ -121,6 +128,15 @@ class Config:
             raise ValueError(f"[FAILURE] MASK_STRATEGY {self.mask_strategy!r} not in ('random', 'patch')")
         if self.mask_strategy == "patch" and self.jepa_patches < 2:
             raise ValueError(f"[FAILURE] JEPA_PATCHES {self.jepa_patches} < 2; patch masking needs a context patch")
+        if self.note_injection not in ("mean", "uniform", "attention"):
+            raise ValueError(
+                f"[FAILURE] NOTE_INJECTION {self.note_injection!r} not in "
+                "('mean', 'uniform', 'attention')")
+        if self.note_injection != "mean" and not self.use_note:
+            raise ValueError("[FAILURE] span note injection requires USE_NOTE=1")
+        if self.hid % self.note_attn_heads:
+            raise ValueError(
+                f"[FAILURE] HID {self.hid} not divisible by NOTE_ATTN_HEADS {self.note_attn_heads}")
 
     @property
     def numeric_dim(self) -> int:
@@ -129,7 +145,7 @@ class Config:
         A tensor shape derived from the configuration — ``NUMERIC_DIM`` in the
         original, where it was computed at import.
         """
-        return BASE_NUMERIC + (self.embed_dim if self.use_note else 0)
+        return BASE_NUMERIC + (self.embed_dim if self.use_note and self.note_injection == "mean" else 0)
 
     @classmethod
     def from_env(cls) -> "Config":
@@ -167,6 +183,13 @@ class Config:
             use_note=_flag("USE_NOTE", "1"),
             embed_dim=int(os.environ.get("EMBED_DIM", 768)),
             ground_by=os.environ.get("GROUND_BY", "prov").lower(),
+            note_injection=os.environ.get("NOTE_INJECTION", "mean").lower(),
+            note_memory_repo=_env("NOTE_MEMORY_REPO", None),
+            note_memory_file=os.environ.get("NOTE_MEMORY_FILE", "fawkes_note_memory_v23.safetensors"),
+            note_memory_path=_env("NOTE_MEMORY_PATH", None),
+            note_span_tokens=int(os.environ.get("NOTE_SPAN_TOKENS", 32)),
+            note_max_spans=int(os.environ.get("NOTE_MAX_SPANS", 64)),
+            note_attn_heads=int(os.environ.get("NOTE_ATTN_HEADS", 4)),
             node_mask=float(os.environ.get("NODE_MASK", 0.4)),
             edge_mask=float(os.environ.get("EDGE_MASK", 0.3)),
             mask_strategy=os.environ.get("MASK_STRATEGY", "random").lower(),
@@ -204,9 +227,14 @@ class Config:
         """
         known = {
             "hid": "hid", "layers": "layers", "heads": "heads",
+            "decoder": "decoder", "data_split_seed": "data_split_seed",
             "use_note": "use_note", "ground_by": "ground_by", "embed_dim": "embed_dim",
+            "note_injection": "note_injection", "note_memory_repo": "note_memory_repo",
+            "note_memory_file": "note_memory_file", "note_span_tokens": "note_span_tokens",
+            "note_max_spans": "note_max_spans", "note_attn_heads": "note_attn_heads",
             "use_scores": "use_scores", "prune_no_evidence": "prune_no_evidence",
             "node_mask": "node_mask", "edge_mask": "edge_mask",
+            "mask_strategy": "mask_strategy", "jepa_patches": "jepa_patches",
             "mask_schedule": "mask_schedule", "mask_lo": "mask_lo", "mask_hi": "mask_hi",
             "target_weight": "target_weight", "cascade_order": "cascade_order",
             "loo_cap": "loo_cap", "data_repo": "data_repo", "seed": "seed",
@@ -221,7 +249,7 @@ class Config:
         released checkpoint carries exactly these keys and
         ``evaluate.py`` compares four of them against the running config.
         """
-        return {
+        result = {
             "model": "graph_jepa_entity_note_v16",
             "hid": self.hid, "layers": self.layers, "heads": self.heads,
             "use_note": self.use_note, "ground_by": self.ground_by,
@@ -234,6 +262,21 @@ class Config:
             "cascade_order": self.cascade_order, "loo_cap": self.loo_cap,
             "data_repo": self.data_repo, "seed": self.seed,
         }
+        if self.note_injection != "mean":
+            result.update({
+                "model": "graph_jepa_entity_note_v23",
+                "note_injection": self.note_injection,
+                "note_memory_repo": self.note_memory_repo,
+                "note_memory_file": self.note_memory_file,
+                "note_span_tokens": self.note_span_tokens,
+                "note_max_spans": self.note_max_spans,
+                "note_attn_heads": self.note_attn_heads,
+                "decoder": self.decoder,
+                "mask_strategy": self.mask_strategy,
+                "jepa_patches": self.jepa_patches,
+                "data_split_seed": self.data_split_seed,
+            })
+        return result
 
     @property
     def checkpoint_name(self) -> str:

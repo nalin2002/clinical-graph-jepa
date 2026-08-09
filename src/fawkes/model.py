@@ -25,6 +25,61 @@ from torch_geometric.nn import TransformerConv
 from .data import NUM_NODE_TYPES, NUM_RELATIONS, SCORE_DIM
 
 
+class SpanNoteInjector(nn.Module):
+    """Fuse a graph entity with its admission's local note-span memory.
+
+    ``uniform`` is the parameter-matched control: it uses token-count-weighted
+    span averaging. ``attention`` learns entity-conditioned weights. Both use
+    the same value projection, output projection and gated residual fusion.
+    """
+
+    def __init__(self, cfg):
+        super().__init__()
+        self.mode = cfg.note_injection
+        self.heads = cfg.note_attn_heads
+        self.head_dim = cfg.hid // self.heads
+        self.scale = self.head_dim ** -0.5
+        self.query = nn.Linear(cfg.hid, cfg.hid, bias=False)
+        self.key = nn.Linear(cfg.embed_dim, cfg.hid, bias=False)
+        self.value = nn.Linear(cfg.embed_dim, cfg.hid, bias=False)
+        self.out = nn.Linear(cfg.hid, cfg.hid, bias=False)
+        self.gate = nn.Linear(2 * cfg.hid, cfg.hid)
+
+    def forward(self, hidden, batch_index, memory, memory_mask, span_token_counts, grounded):
+        if any(value is None for value in (
+                batch_index, memory, memory_mask, span_token_counts, grounded)):
+            raise ValueError("[FAILURE] v23 note injection received incomplete note-memory tensors")
+        if memory.dim() != 3:
+            raise ValueError(f"[FAILURE] note_memory rank {memory.dim()} != 3")
+        memory = memory.to(dtype=hidden.dtype)
+        batch_index = batch_index.long()
+        num_graphs, num_spans, _ = memory.shape
+        if batch_index.numel() != hidden.size(0) or int(batch_index.max()) >= num_graphs:
+            raise ValueError("[FAILURE] node-to-graph batch index does not match note memory")
+
+        values = self.value(memory).view(num_graphs, num_spans, self.heads, self.head_dim)
+        node_values = values[batch_index]
+        valid = memory_mask.bool()[batch_index]
+        if not bool(valid.any(dim=1).all()):
+            raise ValueError("[FAILURE] an admission has no valid note spans")
+
+        if self.mode == "uniform":
+            weights = span_token_counts.to(dtype=hidden.dtype)[batch_index] * valid
+            weights = weights / weights.sum(dim=1, keepdim=True).clamp(min=1)
+            weights = weights.unsqueeze(-1).expand(-1, -1, self.heads)
+        else:
+            queries = self.query(hidden).view(-1, self.heads, self.head_dim)
+            keys = self.key(memory).view(num_graphs, num_spans, self.heads, self.head_dim)
+            scores = (queries.unsqueeze(1) * keys[batch_index]).sum(-1) * self.scale
+            scores = scores.masked_fill(~valid.unsqueeze(-1), torch.finfo(scores.dtype).min)
+            weights = torch.softmax(scores, dim=1)
+
+        context = (weights.unsqueeze(-1) * node_values).sum(dim=1).reshape(-1, hidden.size(-1))
+        context = self.out(context)
+        gate = torch.sigmoid(self.gate(torch.cat([hidden, context], dim=-1)))
+        return context * gate * grounded.to(dtype=hidden.dtype).unsqueeze(-1)
+
+
 class Encoder(nn.Module):
     """The world model: hashed-entity + type + numeric input, TransformerConv stack."""
 
@@ -37,6 +92,7 @@ class Encoder(nn.Module):
         self.rel_emb = nn.Embedding(NUM_RELATIONS, cfg.edge_emb)
         self.score_gate = nn.Sequential(
             nn.Linear(SCORE_DIM, cfg.edge_emb), nn.ReLU(), nn.Linear(cfg.edge_emb, 1))   # (v14) v8 evidence -> per-edge gate
+        self.note_injector = SpanNoteInjector(cfg) if cfg.note_injection != "mean" else None
         self.edge_dim = cfg.edge_emb                        # (v14) gate scales the relation embedding; no concat -> edge_dim unchanged
         self.convs = nn.ModuleList(
             TransformerConv(cfg.hid, cfg.hid // cfg.heads, heads=cfg.heads, concat=True,
@@ -44,9 +100,15 @@ class Encoder(nn.Module):
             for _ in range(cfg.layers))
         self.norms = nn.ModuleList(nn.LayerNorm(cfg.hid) for _ in range(cfg.layers))
 
-    def forward(self, node_type, entity_id, numfeat, edge_index, edge_type, edge_feat=None, sem_id=None):
+    def forward(self, node_type, entity_id, numfeat, edge_index, edge_type, edge_feat=None, sem_id=None,
+                batch_index=None, note_memory=None, note_memory_mask=None,
+                note_span_token_counts=None, note_grounded=None):
         entity = self.entity_emb(entity_id) if self.cfg.use_entity_emb else 0
         hidden = self.type_emb(node_type) + entity + self.num_proj(numfeat)
+        if self.note_injector is not None:
+            hidden = hidden + self.note_injector(
+                hidden, batch_index, note_memory, note_memory_mask,
+                note_span_token_counts, note_grounded)
         edge_attr = self.rel_emb(edge_type)
         if self.cfg.use_scores:
             if edge_feat is None:

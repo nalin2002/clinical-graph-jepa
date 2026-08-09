@@ -34,7 +34,7 @@ from fawkes.config import Config
 from fawkes.data import resolve_rel, to_data
 from fawkes.evaluate import (_load_graphs, cascade_evaluate, eir_uplift_eval, evaluate,
                              loo_evaluate)
-from fawkes.model import JEPA, DistMult, Encoder
+from fawkes.model import JEPA, DistMult, Encoder, SpanNoteInjector
 from fawkes.patches import balanced_bfs_partition, patch_mask
 from fawkes.train import _split_items, jepa_step, readout_step, train_readout
 
@@ -240,8 +240,13 @@ def test_config_from_env_matches_trainer_globals(environment):
     """
     pinned = load_pin(PIN)["trainer_globals"]
     field_to_global = pinned["field_to_global"]
-    assert {f.name for f in fields(Config)} == set(field_to_global), (
-        "a Config field has no counterpart in trainer.py — map it or justify it here")
+    config_fields = {f.name for f in fields(Config)}
+    assert set(field_to_global) <= config_fields, (
+        "a legacy Config field no longer has a counterpart in trainer.py")
+    assert config_fields - set(field_to_global) == {
+        "note_injection", "note_memory_repo", "note_memory_file", "note_memory_path",
+        "note_span_tokens", "note_max_spans", "note_attn_heads",
+    }, "an unreviewed field was added outside the v23 note-injection surface"
 
     entry = pinned["environments"][environment]
     env = {"PATH": os.environ.get("PATH", ""), "PYTHONPATH": str(ROOT / "src"),
@@ -266,7 +271,102 @@ def test_config_from_env_matches_trainer_globals(environment):
     # Config() and an unset environment describe the same experiment -- the
     # class docstring's claim, which nothing else checks.
     if environment == "defaults":
-        assert asdict(Config()) == entry["globals"]
+        defaults = asdict(Config())
+        assert {key: defaults[key] for key in field_to_global} == entry["globals"]
+
+
+# ---- (v23) entity-conditioned discharge-note injection ----
+
+def _identity(linear):
+    with torch.no_grad():
+        linear.weight.copy_(torch.eye(linear.out_features, linear.in_features))
+
+
+def test_v23_uniform_pool_is_token_count_weighted_and_grounded():
+    cfg = Config(hid=4, heads=1, embed_dim=4, note_injection="uniform", note_attn_heads=1)
+    injector = SpanNoteInjector(cfg)
+    _identity(injector.value)
+    _identity(injector.out)
+    with torch.no_grad():
+        injector.gate.weight.zero_()
+        injector.gate.bias.fill_(100)
+    hidden = torch.zeros(2, 4)
+    memory = torch.tensor([[[1.0] * 4, [3.0] * 4]])
+    output = injector(
+        hidden, torch.tensor([0, 0]), memory, torch.tensor([[True, True]]),
+        torch.tensor([[1, 3]]), torch.tensor([True, False]))
+    assert torch.allclose(output[0], torch.full((4,), 2.5))
+    assert torch.equal(output[1], torch.zeros(4))
+
+
+def test_v23_attention_selects_different_spans_for_different_entities():
+    cfg = Config(hid=4, heads=1, embed_dim=4, note_injection="attention", note_attn_heads=1)
+    injector = SpanNoteInjector(cfg)
+    for layer in (injector.query, injector.key, injector.value, injector.out):
+        _identity(layer)
+    with torch.no_grad():
+        injector.gate.weight.zero_()
+        injector.gate.bias.fill_(100)
+    hidden = torch.tensor([[1.0, 0, 0, 0], [0, 1.0, 0, 0]])
+    memory = torch.tensor([[[5.0, 0, 0, 0], [0, 5.0, 0, 0]]])
+    output = injector(
+        hidden, torch.tensor([0, 0]), memory, torch.tensor([[True, True]]),
+        torch.tensor([[1, 1]]), torch.tensor([True, True]))
+    assert output[0, 0] > output[0, 1]
+    assert output[1, 1] > output[1, 0]
+
+
+def test_v23_config_preserves_v22_default_shapes_and_validates_modes():
+    assert Config().note_injection == "mean"
+    assert Config().numeric_dim == 774
+    assert Config(note_injection="attention").numeric_dim == 6
+    with pytest.raises(ValueError):
+        Config(note_injection="bogus")
+    with pytest.raises(ValueError):
+        Config(use_note=False, note_injection="attention")
+
+
+def test_v23_note_memory_survives_pyg_batch_and_encoder():
+    from torch_geometric.loader import DataLoader
+
+    cfg = Config(
+        hid=8, heads=2, layers=1, edge_emb=4, embed_dim=4,
+        note_injection="attention", note_attn_heads=2,
+        note_max_spans=2, ground_by="all")
+    graph = {
+        "subject_id": "7", "hadm_id": 11,
+        "nodes": [
+            {"id": "p", "type": "PATIENT", "name": "patient"},
+            {"id": "d", "type": "DIAGNOSIS", "name": "pneumonia"},
+            {"id": "m", "type": "MEDICATION", "name": "ceftriaxone"},
+            {"id": "r", "type": "PROCEDURE", "name": "radiograph"},
+        ],
+        "edges": [
+            {"source": "p", "target": "d", "relation": "HAS_DIAGNOSIS"},
+            {"source": "p", "target": "m", "relation": "TAKES_MEDICATION"},
+            {"source": "p", "target": "r", "relation": "UNDERWENT_PROCEDURE"},
+            {"source": "m", "target": "d", "relation": "MANAGED_FOR"},
+        ],
+    }
+    memories = {
+        "memory": torch.randn(1, 2, 4).half(),
+        "mask": torch.tensor([[True, True]]),
+        "counts": torch.tensor([[4, 2]]),
+        "index": {"11": 0},
+    }
+    data = to_data(graph, {"7": {"gender": "M", "age": 60}}, cfg, memories)
+    batch = next(iter(DataLoader([data, data.clone()], batch_size=2, shuffle=False)))
+    assert batch.note_memory.shape == (2, 2, 4)
+    encoder = Encoder(cfg)
+    hidden = encoder(
+        batch.node_type, batch.entity_id, batch.numfeat,
+        batch.edge_index, batch.edge_type, None, batch.sem_id,
+        batch_index=batch.batch, note_memory=batch.note_memory,
+        note_memory_mask=batch.note_memory_mask,
+        note_span_token_counts=batch.note_span_token_counts,
+        note_grounded=batch.note_grounded)
+    assert hidden.shape == (8, 8)
+    assert torch.isfinite(hidden).all()
 
 
 def _sample_graphs(cfg, n):

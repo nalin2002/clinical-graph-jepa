@@ -52,7 +52,13 @@ def _encode_context(model, batch, context_nodes, num_nodes, cfg):
         ctx_edge_index, ctx_edge_type = add_inverses(ctx_edge_index, ctx_edge_type)
         ctx_edge_feat = None
     return model.ctx(batch.node_type[context_nodes], batch.entity_id[context_nodes], batch.numfeat[context_nodes],
-                     ctx_edge_index, ctx_edge_type, ctx_edge_feat, batch.sem_id[context_nodes])
+                     ctx_edge_index, ctx_edge_type, ctx_edge_feat, batch.sem_id[context_nodes],
+                     batch_index=batch.batch[context_nodes],
+                     note_memory=getattr(batch, "note_memory", None),
+                     note_memory_mask=getattr(batch, "note_memory_mask", None),
+                     note_span_token_counts=getattr(batch, "note_span_token_counts", None),
+                     note_grounded=(batch.note_grounded[context_nodes]
+                                    if hasattr(batch, "note_grounded") else None))
 
 
 def _encode_targets(model, batch, cfg):
@@ -63,7 +69,12 @@ def _encode_targets(model, batch, cfg):
         full_edge_index, full_edge_type = add_inverses(batch.edge_index, batch.edge_type)
         full_edge_feat = None
     return model.tgt(batch.node_type, batch.entity_id, batch.numfeat,
-                     full_edge_index, full_edge_type, full_edge_feat, batch.sem_id)
+                     full_edge_index, full_edge_type, full_edge_feat, batch.sem_id,
+                     batch_index=batch.batch,
+                     note_memory=getattr(batch, "note_memory", None),
+                     note_memory_mask=getattr(batch, "note_memory_mask", None),
+                     note_span_token_counts=getattr(batch, "note_span_token_counts", None),
+                     note_grounded=getattr(batch, "note_grounded", None))
 
 
 def _slot_queries(model, batch, context_repr, target_mask, context_mask, context_nodes, target_nodes, cfg):
@@ -152,7 +163,12 @@ def _encode_observed(encoder, batch, observed, training, cfg):
     grad_mode = torch.enable_grad() if (training and not cfg.freeze_encoder) else torch.no_grad()
     with grad_mode:
         return encoder(batch.node_type, batch.entity_id, batch.numfeat,
-                       obs_edge_index, obs_edge_type, obs_edge_feat, batch.sem_id)
+                       obs_edge_index, obs_edge_type, obs_edge_feat, batch.sem_id,
+                       batch_index=batch.batch,
+                       note_memory=getattr(batch, "note_memory", None),
+                       note_memory_mask=getattr(batch, "note_memory_mask", None),
+                       note_span_token_counts=getattr(batch, "note_span_token_counts", None),
+                       note_grounded=getattr(batch, "note_grounded", None))
 
 
 def _readout_loss(pos_scores, neg_scores, neg_dst, held_dst, held_rel, device, cfg):

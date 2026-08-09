@@ -28,7 +28,7 @@ from torch_geometric.loader import DataLoader
 
 from .config import Config
 from .data import (NODE_TYPES, RELATION_ALIASES, RELATION_CANONICAL, TARGET_RELS, has_evidence,
-                   load_full_dataset, resolve_rel, support_graded, to_data)
+                   load_full_dataset, load_note_memories, resolve_rel, support_graded, to_data)
 from .evaluate import cascade_evaluate, eir_uplift_eval, evaluate, loo_evaluate
 from .model import JEPA, build_scorer
 from .steps import jepa_step, readout_step
@@ -83,11 +83,11 @@ def _audit_vocab(raw):
         raise RuntimeError(f"[FAILURE] unknown relations={unknown_relations} types={unknown_types}; no fallback.")
 
 
-def _convert_graphs(raw, demographics, cfg):
+def _convert_graphs(raw, demographics, cfg, note_memories=None):
     """Raw records -> (PyG Data, raw graph) pairs, dropping graphs too small to mask."""
     items = []
     for g in raw:
-        d = to_data(g, demographics, cfg)
+        d = to_data(g, demographics, cfg, note_memories=note_memories)
         if d.num_nodes >= 3 and d.edge_index.size(1) >= 4:
             items.append((d, g))   # keep raw graph alongside for the EIR eval
     if cfg.use_note:
@@ -120,10 +120,11 @@ def _split_items(items, cfg):
 def prepare_data(cfg):
     """Load, audit, convert and split the dataset. Returns (train, val, test) pairs."""
     raw, demographics = load_full_dataset(cfg)
+    note_memories = load_note_memories(cfg)
     if cfg.prune_no_evidence:
         _log_prune_stats(raw)
     _audit_vocab(raw)
-    items = _convert_graphs(raw, demographics, cfg)
+    items = _convert_graphs(raw, demographics, cfg, note_memories=note_memories)
     return _split_items(items, cfg)
 
 
@@ -314,7 +315,7 @@ def _save_and_push(encoder, scorer, cfg, test_metrics, loo, cascade_results, eir
     api = HfApi()
     api.create_repo(cfg.output_repo, repo_type="model", exist_ok=True, private=True)
     api.upload_file(path_or_fileobj=checkpoint_path, path_in_repo=checkpoint_path, repo_id=cfg.output_repo, repo_type="model")
-    logger.info(f"[DONE] v16 ENTITY-NOTE -> https://huggingface.co/{cfg.output_repo}/blob/main/{checkpoint_path} | LOO MRR={loo['mrr']:.3f} | use_note={cfg.use_note} ground_by={cfg.ground_by} use_scores={cfg.use_scores}")
+    logger.info(f"[DONE] FAWKES -> https://huggingface.co/{cfg.output_repo}/blob/main/{checkpoint_path} | LOO MRR={loo['mrr']:.3f} | use_note={cfg.use_note} note_injection={cfg.note_injection} ground_by={cfg.ground_by} use_scores={cfg.use_scores}")
 
 
 # ---- entry point ----
@@ -355,7 +356,7 @@ def main(argv=None):
 
     logging.basicConfig(level=logging.INFO, format='%(asctime)s | %(levelname)s | %(name)s | %(message)s')
     cfg = Config.from_env()
-    logger.info(f"[ENTRY] ENTITY-NOTE v18 | data={cfg.data_repo} use_note={cfg.use_note} ground_by={cfg.ground_by} embed_dim={cfg.embed_dim} numeric_dim={cfg.numeric_dim} use_scores={cfg.use_scores} prune_no_evidence={cfg.prune_no_evidence} mask_schedule={cfg.mask_schedule}[{cfg.mask_lo},{cfg.mask_hi}] target_weight={cfg.target_weight} cascade={cfg.run_cascade} order={cfg.cascade_order} jepa_ep={cfg.jepa_epochs} readout_ep={cfg.readout_epochs} loo_cap={cfg.loo_cap} run_eir={cfg.run_eir} "
+    logger.info(f"[ENTRY] ENTITY-NOTE v23 | data={cfg.data_repo} use_note={cfg.use_note} note_injection={cfg.note_injection} note_memory={cfg.note_memory_repo or cfg.note_memory_path} ground_by={cfg.ground_by} embed_dim={cfg.embed_dim} numeric_dim={cfg.numeric_dim} use_scores={cfg.use_scores} prune_no_evidence={cfg.prune_no_evidence} mask_schedule={cfg.mask_schedule}[{cfg.mask_lo},{cfg.mask_hi}] target_weight={cfg.target_weight} cascade={cfg.run_cascade} order={cfg.cascade_order} jepa_ep={cfg.jepa_epochs} readout_ep={cfg.readout_epochs} loo_cap={cfg.loo_cap} run_eir={cfg.run_eir} "
                 f"hid={cfg.hid} mask_strategy={cfg.mask_strategy} jepa_patches={cfg.jepa_patches} node_mask={cfg.node_mask} edge_mask={cfg.edge_mask} entity_emb={cfg.use_entity_emb} decoder={cfg.decoder} loss={cfg.loss} neg_k={cfg.neg_k} freeze_eval={cfg.freeze_eval} deterministic={cfg.deterministic} val={cfg.val_frac} test={cfg.test_frac} seed={cfg.seed} data_split_seed={cfg.data_split_seed}")
     set_seed(cfg)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
