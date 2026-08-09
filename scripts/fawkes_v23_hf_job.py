@@ -14,12 +14,12 @@
 
 from __future__ import annotations
 
-import io
 import os
 from pathlib import Path
 import sys
 import tarfile
-import urllib.request
+
+from huggingface_hub import hf_hub_download
 
 
 DEFAULTS = {
@@ -55,21 +55,20 @@ def configure() -> None:
 
 
 def fetch_source() -> Path:
-    repository = os.environ.get("SOURCE_REPO", "nalin2002/clinical-graph-jepa")
+    repository = os.environ.get("SOURCE_REPO", "nalin9/clinical-graph-jepa-v23-source")
     revision = os.environ["SOURCE_REF"]
-    url = f"https://github.com/{repository}/archive/{revision}.tar.gz"
-    print(f"[SOURCE] {url}", flush=True)
-    with urllib.request.urlopen(url, timeout=120) as response:
-        archive = response.read()
+    filename = f"{revision}.tar.gz"
+    archive_path = hf_hub_download(repository, filename, repo_type="dataset")
+    print(f"[SOURCE] hf://datasets/{repository}/{filename}", flush=True)
     root = Path("/tmp/fawkes-v23-source")
     root.mkdir(parents=True, exist_ok=True)
-    with tarfile.open(fileobj=io.BytesIO(archive), mode="r:gz") as tar:
+    with tarfile.open(archive_path, mode="r:gz") as tar:
         for member in tar.getmembers():
             target = (root / member.name).resolve()
             if root.resolve() not in target.parents and target != root.resolve():
                 raise RuntimeError(f"unsafe archive member: {member.name}")
         tar.extractall(root)
-    source_dirs = list(root.glob("*/src"))
+    source_dirs = [path for path in [root / "src", *root.glob("*/src")] if path.is_dir()]
     if len(source_dirs) != 1 or not (source_dirs[0] / "fawkes" / "train.py").is_file():
         raise RuntimeError(f"could not resolve fawkes source under {root}")
     return source_dirs[0]
