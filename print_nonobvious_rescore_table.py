@@ -36,17 +36,29 @@ SEEDS = (42, 43, 44, 45, 46, 47, 48, 49, 50, 51)
 SPLIT = 42
 T95 = 2.262   # t(9, .975)
 
-# name -> (decoder, local cache dir stem). The v20 checkpoints are cached under two
-# names: data/fawkes_v20/ from the variance sweep, and data/fawkes_v21/distmult-* as
-# v21's paired baseline. They are the same ten files.
+# name -> (use_note, decoder, local cache dir stem). The v20 checkpoints are cached
+# under two names: data/fawkes_v20/ from the variance sweep, and data/fawkes_v21/
+# distmult-* as v21's paired baseline. They are the same ten files.
+#
+# The no-note arms trained AFTER the fix, so their stored auc_nonobvious is already
+# correct — but it was computed on the job's GPU, and a CPU generator draws different
+# negatives. Re-scoring them here too puts all six arms on one device, which is what
+# makes the note-vs-no-note column comparable rather than merely both-corrected.
 ARMS = {
-    "v20": ("distmult", "data/fawkes_v20/"),
-    "v21": ("mlp",      "data/fawkes_v21/mlp-"),
-    "v22": ("mlp",      "data/fawkes_v22/v22-"),
+    "v20":        (True,  "distmult", "data/fawkes_v20/"),
+    "v21":        (True,  "mlp",      "data/fawkes_v21/mlp-"),
+    "v22":        (True,  "mlp",      "data/fawkes_v22/v22-"),
+    "v20-nonote": (False, "distmult", "data/fawkes_no_note/v20-nonote-"),
+    "v21-nonote": (False, "mlp",      "data/fawkes_no_note/v21-nonote-"),
+    "v22-nonote": (False, "mlp",      "data/fawkes_no_note/v22-nonote-"),
 }
-COMPARISONS = [("v21", "v20", "readout head"),
-               ("v22", "v21", "mask strategy"),
-               ("v22", "v20", "the full stack")]
+COMPARISONS = [("v21", "v20", "readout head, with note"),
+               ("v22", "v21", "mask strategy, with note"),
+               ("v21-nonote", "v20-nonote", "readout head, no note"),
+               ("v22-nonote", "v21-nonote", "mask strategy, no note"),
+               ("v20", "v20-nonote", "the note lift at the published config"),
+               ("v21", "v21-nonote", "the note lift at the MLP head"),
+               ("v22", "v22-nonote", "the note lift under patch masking")]
 
 
 @torch.no_grad()
