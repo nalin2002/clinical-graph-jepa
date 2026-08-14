@@ -1,0 +1,633 @@
+{
+  "benchmark": "fawkes_graph_qa_20",
+  "comparisons": [
+    {
+      "default": "outputs/fawkes_graph_qa_v23_mean.json",
+      "ablation": "outputs/fawkes_graph_qa_v23_mean_no_note_ablation.json",
+      "n_questions": 20,
+      "note_effect": "checkpoint_default_minus_inference_note_ablation",
+      "all_questions": {
+        "macro_group_f1_default": 0.7411111111111112,
+        "macro_group_f1_ablation": 0.7055555555555555,
+        "delta": 0.03555555555555555,
+        "ci95": [
+          0.009166666666666668,
+          0.06833333333333333
+        ],
+        "wins": 5,
+        "exact_match_delta": 0.0,
+        "exact_match_ci95": [
+          0.0,
+          0.0
+        ],
+        "edge_hits1": {
+          "default": 0.38055555555555554,
+          "ablation": 0.3638888888888889,
+          "delta": 0.016666666666666666,
+          "ci95": [
+            0.0,
+            0.03749999999999999
+          ],
+          "wins": 3
+        },
+        "edge_hits3": {
+          "default": 0.591111111111111,
+          "ablation": 0.5280555555555556,
+          "delta": 0.06305555555555556,
+          "ci95": [
+            0.008055555555555552,
+            0.13111111111111112
+          ],
+          "wins": 5
+        },
+        "edge_hits10": {
+          "default": 0.95,
+          "ablation": 0.9136111111111112,
+          "delta": 0.03638888888888889,
+          "ci95": [
+            -0.02222222222222222,
+            0.12166666666666666
+          ],
+          "wins": 3
+        },
+        "question_hit1": {
+          "default": 0.65,
+          "ablation": 0.65,
+          "delta": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "wins": 0
+        },
+        "question_hit3": {
+          "default": 0.7,
+          "ablation": 0.65,
+          "delta": 0.05,
+          "ci95": [
+            0.0,
+            0.15
+          ],
+          "wins": 1
+        },
+        "question_hit10": {
+          "default": 0.9,
+          "ablation": 0.9,
+          "delta": 0.0,
+          "ci95": [
+            -0.15,
+            0.15
+          ],
+          "wins": 1
+        }
+      },
+      "multi_hop": {
+        "n_questions": 7,
+        "macro_group_f1_default": 0.26031746031746034,
+        "macro_group_f1_ablation": 0.15873015873015875,
+        "delta": 0.10158730158730157,
+        "ci95": [
+          0.04365079365079364,
+          0.1634920634920635
+        ],
+        "wins": 5,
+        "exact_match_delta": 0.0,
+        "exact_match_ci95": [
+          0.0,
+          0.0
+        ],
+        "edge_hits1": {
+          "default": 0.1468253968253968,
+          "ablation": 0.0992063492063492,
+          "delta": 0.047619047619047616,
+          "ci95": [
+            0.011904761904761902,
+            0.09523809523809523
+          ],
+          "wins": 3
+        },
+        "edge_hits3": {
+          "default": 0.36746031746031743,
+          "ablation": 0.1873015873015873,
+          "delta": 0.18015873015873016,
+          "ci95": [
+            0.044444444444444446,
+            0.3190476190476191
+          ],
+          "wins": 5
+        },
+        "edge_hits10": {
+          "default": 0.8571428571428571,
+          "ablation": 0.7531746031746032,
+          "delta": 0.10396825396825396,
+          "ci95": [
+            -0.06349206349206349,
+            0.3238095238095238
+          ],
+          "wins": 3
+        },
+        "question_hit1": {
+          "default": 0.0,
+          "ablation": 0.0,
+          "delta": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "wins": 0
+        },
+        "question_hit3": {
+          "default": 0.14285714285714285,
+          "ablation": 0.0,
+          "delta": 0.14285714285714285,
+          "ci95": [
+            0.0,
+            0.42857142857142855
+          ],
+          "wins": 1
+        },
+        "question_hit10": {
+          "default": 0.7142857142857143,
+          "ablation": 0.7142857142857143,
+          "delta": 0.0,
+          "ci95": [
+            -0.42857142857142855,
+            0.42857142857142855
+          ],
+          "wins": 1
+        }
+      }
+    },
+    {
+      "default": "outputs/fawkes_graph_qa_v23_uniform.json",
+      "ablation": "outputs/fawkes_graph_qa_v23_uniform_no_note_ablation.json",
+      "n_questions": 20,
+      "note_effect": "checkpoint_default_minus_inference_note_ablation",
+      "all_questions": {
+        "macro_group_f1_default": 0.7230555555555556,
+        "macro_group_f1_ablation": 0.7091666666666667,
+        "delta": 0.01388888888888889,
+        "ci95": [
+          0.0,
+          0.03611111111111111
+        ],
+        "wins": 2,
+        "exact_match_delta": 0.0,
+        "exact_match_ci95": [
+          0.0,
+          0.0
+        ],
+        "edge_hits1": {
+          "default": 0.39305555555555555,
+          "ablation": 0.36666666666666664,
+          "delta": 0.02638888888888889,
+          "ci95": [
+            0.0,
+            0.05972222222222222
+          ],
+          "wins": 3
+        },
+        "edge_hits3": {
+          "default": 0.5405555555555556,
+          "ablation": 0.5666666666666667,
+          "delta": -0.026111111111111113,
+          "ci95": [
+            -0.07611111111111113,
+            0.01111111111111111
+          ],
+          "wins": 1
+        },
+        "edge_hits10": {
+          "default": 0.9208333333333332,
+          "ablation": 0.9458333333333332,
+          "delta": -0.024999999999999994,
+          "ci95": [
+            -0.11249999999999998,
+            0.0375
+          ],
+          "wins": 1
+        },
+        "question_hit1": {
+          "default": 0.65,
+          "ablation": 0.65,
+          "delta": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "wins": 0
+        },
+        "question_hit3": {
+          "default": 0.65,
+          "ablation": 0.65,
+          "delta": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "wins": 0
+        },
+        "question_hit10": {
+          "default": 0.9,
+          "ablation": 0.95,
+          "delta": -0.05,
+          "ci95": [
+            -0.15,
+            0.0
+          ],
+          "wins": 0
+        }
+      },
+      "multi_hop": {
+        "n_questions": 7,
+        "macro_group_f1_default": 0.2087301587301587,
+        "macro_group_f1_ablation": 0.16904761904761903,
+        "delta": 0.03968253968253969,
+        "ci95": [
+          0.0,
+          0.09523809523809523
+        ],
+        "wins": 2,
+        "exact_match_delta": 0.0,
+        "exact_match_ci95": [
+          0.0,
+          0.0
+        ],
+        "edge_hits1": {
+          "default": 0.18253968253968253,
+          "ablation": 0.10714285714285714,
+          "delta": 0.07539682539682539,
+          "ci95": [
+            0.015873015873015872,
+            0.1468253968253968
+          ],
+          "wins": 3
+        },
+        "edge_hits3": {
+          "default": 0.22301587301587303,
+          "ablation": 0.29761904761904756,
+          "delta": -0.0746031746031746,
+          "ci95": [
+            -0.1904761904761905,
+            0.031746031746031744
+          ],
+          "wins": 1
+        },
+        "edge_hits10": {
+          "default": 0.7738095238095238,
+          "ablation": 0.8452380952380952,
+          "delta": -0.07142857142857141,
+          "ci95": [
+            -0.32142857142857134,
+            0.10714285714285714
+          ],
+          "wins": 1
+        },
+        "question_hit1": {
+          "default": 0.0,
+          "ablation": 0.0,
+          "delta": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "wins": 0
+        },
+        "question_hit3": {
+          "default": 0.0,
+          "ablation": 0.0,
+          "delta": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "wins": 0
+        },
+        "question_hit10": {
+          "default": 0.7142857142857143,
+          "ablation": 0.8571428571428571,
+          "delta": -0.14285714285714285,
+          "ci95": [
+            -0.42857142857142855,
+            0.0
+          ],
+          "wins": 0
+        }
+      }
+    },
+    {
+      "default": "outputs/fawkes_graph_qa_v23_attention.json",
+      "ablation": "outputs/fawkes_graph_qa_v23_attention_no_note_ablation.json",
+      "n_questions": 20,
+      "note_effect": "checkpoint_default_minus_inference_note_ablation",
+      "all_questions": {
+        "macro_group_f1_default": 0.7536111111111111,
+        "macro_group_f1_ablation": 0.7230555555555556,
+        "delta": 0.03055555555555555,
+        "ci95": [
+          0.0041666666666666675,
+          0.06388888888888888
+        ],
+        "wins": 4,
+        "exact_match_delta": 0.0,
+        "exact_match_ci95": [
+          0.0,
+          0.0
+        ],
+        "edge_hits1": {
+          "default": 0.39805555555555555,
+          "ablation": 0.3680555555555555,
+          "delta": 0.03,
+          "ci95": [
+            0.004166666666666667,
+            0.06333333333333332
+          ],
+          "wins": 4
+        },
+        "edge_hits3": {
+          "default": 0.6436111111111111,
+          "ablation": 0.5830555555555555,
+          "delta": 0.060555555555555564,
+          "ci95": [
+            0.0013888888888888896,
+            0.1366666666666667
+          ],
+          "wins": 5
+        },
+        "edge_hits10": {
+          "default": 0.9491666666666667,
+          "ablation": 0.9694444444444444,
+          "delta": -0.020277777777777777,
+          "ci95": [
+            -0.05972222222222222,
+            0.013888888888888885
+          ],
+          "wins": 1
+        },
+        "question_hit1": {
+          "default": 0.65,
+          "ablation": 0.65,
+          "delta": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "wins": 0
+        },
+        "question_hit3": {
+          "default": 0.7,
+          "ablation": 0.65,
+          "delta": 0.05,
+          "ci95": [
+            0.0,
+            0.15
+          ],
+          "wins": 1
+        },
+        "question_hit10": {
+          "default": 0.9,
+          "ablation": 0.95,
+          "delta": -0.05,
+          "ci95": [
+            -0.2,
+            0.1
+          ],
+          "wins": 1
+        }
+      },
+      "multi_hop": {
+        "n_questions": 7,
+        "macro_group_f1_default": 0.296031746031746,
+        "macro_group_f1_ablation": 0.2087301587301587,
+        "delta": 0.0873015873015873,
+        "ci95": [
+          0.02380952380952381,
+          0.15476190476190474
+        ],
+        "wins": 4,
+        "exact_match_delta": 0.0,
+        "exact_match_ci95": [
+          0.0,
+          0.0
+        ],
+        "edge_hits1": {
+          "default": 0.19682539682539682,
+          "ablation": 0.11111111111111109,
+          "delta": 0.08571428571428572,
+          "ci95": [
+            0.023809523809523808,
+            0.15476190476190474
+          ],
+          "wins": 4
+        },
+        "edge_hits3": {
+          "default": 0.5174603174603174,
+          "ablation": 0.34444444444444444,
+          "delta": 0.17301587301587304,
+          "ci95": [
+            0.01587301587301588,
+            0.3444444444444445
+          ],
+          "wins": 5
+        },
+        "edge_hits10": {
+          "default": 0.8547619047619047,
+          "ablation": 0.9126984126984128,
+          "delta": -0.05793650793650794,
+          "ci95": [
+            -0.15555555555555553,
+            0.039682539682539666
+          ],
+          "wins": 1
+        },
+        "question_hit1": {
+          "default": 0.0,
+          "ablation": 0.0,
+          "delta": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "wins": 0
+        },
+        "question_hit3": {
+          "default": 0.14285714285714285,
+          "ablation": 0.0,
+          "delta": 0.14285714285714285,
+          "ci95": [
+            0.0,
+            0.42857142857142855
+          ],
+          "wins": 1
+        },
+        "question_hit10": {
+          "default": 0.7142857142857143,
+          "ablation": 0.8571428571428571,
+          "delta": -0.14285714285714285,
+          "ci95": [
+            -0.5714285714285714,
+            0.2857142857142857
+          ],
+          "wins": 1
+        }
+      }
+    },
+    {
+      "default": "outputs/fawkes_graph_qa_v24_note.json",
+      "ablation": "outputs/fawkes_graph_qa_v24_note_no_note_ablation.json",
+      "n_questions": 20,
+      "note_effect": "checkpoint_default_minus_inference_note_ablation",
+      "all_questions": {
+        "macro_group_f1_default": 0.7411111111111112,
+        "macro_group_f1_ablation": 0.7055555555555555,
+        "delta": 0.03555555555555555,
+        "ci95": [
+          0.009166666666666668,
+          0.06833333333333333
+        ],
+        "wins": 5,
+        "exact_match_delta": 0.0,
+        "exact_match_ci95": [
+          0.0,
+          0.0
+        ],
+        "edge_hits1": {
+          "default": 0.38055555555555554,
+          "ablation": 0.3638888888888889,
+          "delta": 0.016666666666666666,
+          "ci95": [
+            0.0,
+            0.03749999999999999
+          ],
+          "wins": 3
+        },
+        "edge_hits3": {
+          "default": 0.591111111111111,
+          "ablation": 0.5280555555555556,
+          "delta": 0.06305555555555556,
+          "ci95": [
+            0.008055555555555552,
+            0.13111111111111112
+          ],
+          "wins": 5
+        },
+        "edge_hits10": {
+          "default": 0.95,
+          "ablation": 0.9136111111111112,
+          "delta": 0.03638888888888889,
+          "ci95": [
+            -0.02222222222222222,
+            0.12166666666666666
+          ],
+          "wins": 3
+        },
+        "question_hit1": {
+          "default": 0.65,
+          "ablation": 0.65,
+          "delta": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "wins": 0
+        },
+        "question_hit3": {
+          "default": 0.7,
+          "ablation": 0.65,
+          "delta": 0.05,
+          "ci95": [
+            0.0,
+            0.15
+          ],
+          "wins": 1
+        },
+        "question_hit10": {
+          "default": 0.9,
+          "ablation": 0.9,
+          "delta": 0.0,
+          "ci95": [
+            -0.15,
+            0.15
+          ],
+          "wins": 1
+        }
+      },
+      "multi_hop": {
+        "n_questions": 7,
+        "macro_group_f1_default": 0.26031746031746034,
+        "macro_group_f1_ablation": 0.15873015873015875,
+        "delta": 0.10158730158730157,
+        "ci95": [
+          0.04365079365079364,
+          0.1634920634920635
+        ],
+        "wins": 5,
+        "exact_match_delta": 0.0,
+        "exact_match_ci95": [
+          0.0,
+          0.0
+        ],
+        "edge_hits1": {
+          "default": 0.1468253968253968,
+          "ablation": 0.0992063492063492,
+          "delta": 0.047619047619047616,
+          "ci95": [
+            0.011904761904761902,
+            0.09523809523809523
+          ],
+          "wins": 3
+        },
+        "edge_hits3": {
+          "default": 0.36746031746031743,
+          "ablation": 0.1873015873015873,
+          "delta": 0.18015873015873016,
+          "ci95": [
+            0.044444444444444446,
+            0.3190476190476191
+          ],
+          "wins": 5
+        },
+        "edge_hits10": {
+          "default": 0.8571428571428571,
+          "ablation": 0.7531746031746032,
+          "delta": 0.10396825396825396,
+          "ci95": [
+            -0.06349206349206349,
+            0.3238095238095238
+          ],
+          "wins": 3
+        },
+        "question_hit1": {
+          "default": 0.0,
+          "ablation": 0.0,
+          "delta": 0.0,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "wins": 0
+        },
+        "question_hit3": {
+          "default": 0.14285714285714285,
+          "ablation": 0.0,
+          "delta": 0.14285714285714285,
+          "ci95": [
+            0.0,
+            0.42857142857142855
+          ],
+          "wins": 1
+        },
+        "question_hit10": {
+          "default": 0.7142857142857143,
+          "ablation": 0.7142857142857143,
+          "delta": 0.0,
+          "ci95": [
+            -0.42857142857142855,
+            0.42857142857142855
+          ],
+          "wins": 1
+        }
+      }
+    }
+  ]
+}

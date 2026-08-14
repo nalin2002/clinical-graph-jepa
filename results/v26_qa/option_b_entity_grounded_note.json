@@ -1,0 +1,1462 @@
+{
+  "benchmark": "fawkes_graph_qa_20",
+  "checkpoint": "outputs/checkpoints_v24/fawkes_entity_note_v23_mean_sp42_s42.pt",
+  "checkpoint_config": {
+    "model": "graph_jepa_entity_note_v16",
+    "hid": 128,
+    "layers": 2,
+    "heads": 4,
+    "use_note": true,
+    "ground_by": "prov",
+    "embed_dim": 768,
+    "numeric_dim": 774,
+    "use_scores": false,
+    "prune_no_evidence": true,
+    "node_mask": 0.4,
+    "edge_mask": 0.3,
+    "mask_schedule": true,
+    "mask_lo": 0.1,
+    "mask_hi": 0.6,
+    "target_weight": 3.0,
+    "cascade_order": [
+      "MANAGED_FOR",
+      "CONFIRMS",
+      "COMPLICATED_BY",
+      "INDICATES"
+    ],
+    "loo_cap": 40000,
+    "data_repo": "wmatbooth/fawkes-training-graph-embedded-260615",
+    "seed": 42,
+    "jepa_epochs": 60,
+    "readout_epochs": 40,
+    "freeze_encoder": true,
+    "mask_strategy": "patch",
+    "jepa_patches": 8,
+    "decoder": "mlp",
+    "data_split_seed": 42
+  },
+  "option_label": "checkpoint_default",
+  "disable_note": false,
+  "n_questions": 20,
+  "macro_group_f1": 0.7411111111111112,
+  "question_exact_match": 0.65,
+  "edge_hits1": 0.38055555555555554,
+  "edge_hits3": 0.591111111111111,
+  "edge_hits10": 0.95,
+  "question_hit1": 0.65,
+  "question_hit3": 0.7,
+  "question_hit10": 0.9,
+  "multi_hop_macro_group_f1": 0.26031746031746034,
+  "multi_hop_question_exact_match": 0.0,
+  "multi_hop_edge_hits1": 0.1468253968253968,
+  "multi_hop_edge_hits3": 0.36746031746031743,
+  "multi_hop_edge_hits10": 0.8571428571428571,
+  "multi_hop_question_hit1": 0.0,
+  "multi_hop_question_hit3": 0.14285714285714285,
+  "multi_hop_question_hit10": 0.7142857142857143,
+  "items": [
+    {
+      "id": "FQ-01",
+      "template": "primary_chain",
+      "group_f1": 0.5,
+      "exact_match": false,
+      "groups": [
+        {
+          "source": 0,
+          "relation": "MANAGED_FOR",
+          "gold": [
+            23
+          ],
+          "predicted": [
+            23
+          ],
+          "group_f1": 1.0,
+          "group_exact": true,
+          "candidate_count": 1,
+          "gold_ranks": {
+            "23": 1
+          },
+          "hits1": 1.0,
+          "hits3": 1.0,
+          "hits10": 1.0,
+          "any_hit1": true,
+          "any_hit3": true,
+          "any_hit10": true
+        },
+        {
+          "source": 1,
+          "relation": "MANAGED_FOR",
+          "gold": [
+            2,
+            3,
+            4
+          ],
+          "predicted": [
+            2,
+            3,
+            4
+          ],
+          "group_f1": 1.0,
+          "group_exact": true,
+          "candidate_count": 10,
+          "gold_ranks": {
+            "2": 2,
+            "3": 1,
+            "4": 3
+          },
+          "hits1": 0.3333333333333333,
+          "hits3": 1.0,
+          "hits10": 1.0,
+          "any_hit1": true,
+          "any_hit3": true,
+          "any_hit10": true
+        },
+        {
+          "source": 13,
+          "relation": "MANAGED_FOR",
+          "gold": [
+            1
+          ],
+          "predicted": [
+            3
+          ],
+          "group_f1": 0.0,
+          "group_exact": false,
+          "candidate_count": 11,
+          "gold_ranks": {
+            "1": 3
+          },
+          "hits1": 0.0,
+          "hits3": 1.0,
+          "hits10": 1.0,
+          "any_hit1": false,
+          "any_hit3": true,
+          "any_hit10": true
+        },
+        {
+          "source": 15,
+          "relation": "MANAGED_FOR",
+          "gold": [
+            1
+          ],
+          "predicted": [
+            3
+          ],
+          "group_f1": 0.0,
+          "group_exact": false,
+          "candidate_count": 11,
+          "gold_ranks": {
+            "1": 5
+          },
+          "hits1": 0.0,
+          "hits3": 0.0,
+          "hits10": 1.0,
+          "any_hit1": false,
+          "any_hit3": false,
+          "any_hit10": true
+        }
+      ],
+      "hits1": 0.3333333333333333,
+      "hits3": 0.75,
+      "hits10": 1.0,
+      "question_hit1": false,
+      "question_hit3": false,
+      "question_hit10": true
+    },
+    {
+      "id": "FQ-02",
+      "template": "medication_chain",
+      "group_f1": 0.25,
+      "exact_match": false,
+      "groups": [
+        {
+          "source": 3,
+          "relation": "MANAGED_FOR",
+          "gold": [
+            2,
+            5
+          ],
+          "predicted": [
+            4,
+            5
+          ],
+          "group_f1": 0.5,
+          "group_exact": false,
+          "candidate_count": 14,
+          "gold_ranks": {
+            "2": 5,
+            "5": 2
+          },
+          "hits1": 0.0,
+          "hits3": 0.5,
+          "hits10": 1.0,
+          "any_hit1": false,
+          "any_hit3": true,
+          "any_hit10": true
+        },
+        {
+          "source": 19,
+          "relation": "MANAGED_FOR",
+          "gold": [
+            3
+          ],
+          "predicted": [
+            4
+          ],
+          "group_f1": 0.0,
+          "group_exact": false,
+          "candidate_count": 15,
+          "gold_ranks": {
+            "3": 2
+          },
+          "hits1": 0.0,
+          "hits3": 1.0,
+          "hits10": 1.0,
+          "any_hit1": false,
+          "any_hit3": true,
+          "any_hit10": true
+        }
+      ],
+      "hits1": 0.0,
+      "hits3": 0.75,
+      "hits10": 1.0,
+      "question_hit1": false,
+      "question_hit3": true,
+      "question_hit10": true
+    },
+    {
+      "id": "FQ-03",
+      "template": "procedure_chain",
+      "group_f1": 0.0,
+      "exact_match": false,
+      "groups": [
+        {
+          "source": 17,
+          "relation": "CONFIRMS",
+          "gold": [
+            1
+          ],
+          "predicted": [
+            13
+          ],
+          "group_f1": 0.0,
+          "group_exact": false,
+          "candidate_count": 14,
+          "gold_ranks": {
+            "1": 8
+          },
+          "hits1": 0.0,
+          "hits3": 0.0,
+          "hits10": 1.0,
+          "any_hit1": false,
+          "any_hit3": false,
+          "any_hit10": true
+        },
+        {
+          "source": 29,
+          "relation": "CONFIRMS",
+          "gold": [
+            1
+          ],
+          "predicted": [
+            13
+          ],
+          "group_f1": 0.0,
+          "group_exact": false,
+          "candidate_count": 14,
+          "gold_ranks": {
+            "1": 8
+          },
+          "hits1": 0.0,
+          "hits3": 0.0,
+          "hits10": 1.0,
+          "any_hit1": false,
+          "any_hit3": false,
+          "any_hit10": true
+        },
+        {
+          "source": 32,
+          "relation": "CONFIRMS",
+          "gold": [
+            1
+          ],
+          "predicted": [
+            13
+          ],
+          "group_f1": 0.0,
+          "group_exact": false,
+          "candidate_count": 14,
+          "gold_ranks": {
+            "1": 8
+          },
+          "hits1": 0.0,
+          "hits3": 0.0,
+          "hits10": 1.0,
+          "any_hit1": false,
+          "any_hit3": false,
+          "any_hit10": true
+        },
+        {
+          "source": 59,
+          "relation": "CONFIRMS",
+          "gold": [
+            1
+          ],
+          "predicted": [
+            7
+          ],
+          "group_f1": 0.0,
+          "group_exact": false,
+          "candidate_count": 14,
+          "gold_ranks": {
+            "1": 8
+          },
+          "hits1": 0.0,
+          "hits3": 0.0,
+          "hits10": 1.0,
+          "any_hit1": false,
+          "any_hit3": false,
+          "any_hit10": true
+        }
+      ],
+      "hits1": 0.0,
+      "hits3": 0.0,
+      "hits10": 1.0,
+      "question_hit1": false,
+      "question_hit3": false,
+      "question_hit10": true
+    },
+    {
+      "id": "FQ-04",
+      "template": "complication_chain",
+      "group_f1": 0.1,
+      "exact_match": false,
+      "groups": [
+        {
+          "source": 1,
+          "relation": "COMPLICATED_BY",
+          "gold": [
+            8,
+            15
+          ],
+          "predicted": [
+            3,
+            8
+          ],
+          "group_f1": 0.5,
+          "group_exact": false,
+          "candidate_count": 21,
+          "gold_ranks": {
+            "8": 2,
+            "15": 5
+          },
+          "hits1": 0.0,
+          "hits3": 0.5,
+          "hits10": 1.0,
+          "any_hit1": false,
+          "any_hit3": true,
+          "any_hit10": true
+        },
+        {
+          "source": 25,
+          "relation": "COMPLICATED_BY",
+          "gold": [
+            1
+          ],
+          "predicted": [
+            5
+          ],
+          "group_f1": 0.0,
+          "group_exact": false,
+          "candidate_count": 22,
+          "gold_ranks": {
+            "1": 10
+          },
+          "hits1": 0.0,
+          "hits3": 0.0,
+          "hits10": 1.0,
+          "any_hit1": false,
+          "any_hit3": false,
+          "any_hit10": true
+        },
+        {
+          "source": 26,
+          "relation": "COMPLICATED_BY",
+          "gold": [
+            1
+          ],
+          "predicted": [
+            5
+          ],
+          "group_f1": 0.0,
+          "group_exact": false,
+          "candidate_count": 22,
+          "gold_ranks": {
+            "1": 10
+          },
+          "hits1": 0.0,
+          "hits3": 0.0,
+          "hits10": 1.0,
+          "any_hit1": false,
+          "any_hit3": false,
+          "any_hit10": true
+        },
+        {
+          "source": 43,
+          "relation": "COMPLICATED_BY",
+          "gold": [
+            1
+          ],
+          "predicted": [
+            5
+          ],
+          "group_f1": 0.0,
+          "group_exact": false,
+          "candidate_count": 22,
+          "gold_ranks": {
+            "1": 6
+          },
+          "hits1": 0.0,
+          "hits3": 0.0,
+          "hits10": 1.0,
+          "any_hit1": false,
+          "any_hit3": false,
+          "any_hit10": true
+        },
+        {
+          "source": 49,
+          "relation": "COMPLICATED_BY",
+          "gold": [
+            1
+          ],
+          "predicted": [
+            5
+          ],
+          "group_f1": 0.0,
+          "group_exact": false,
+          "candidate_count": 22,
+          "gold_ranks": {
+            "1": 10
+          },
+          "hits1": 0.0,
+          "hits3": 0.0,
+          "hits10": 1.0,
+          "any_hit1": false,
+          "any_hit3": false,
+          "any_hit10": true
+        }
+      ],
+      "hits1": 0.0,
+      "hits3": 0.1,
+      "hits10": 1.0,
+      "question_hit1": false,
+      "question_hit3": false,
+      "question_hit10": true
+    },
+    {
+      "id": "FQ-05",
+      "template": "primary_chain",
+      "group_f1": 0.5555555555555555,
+      "exact_match": false,
+      "groups": [
+        {
+          "source": 0,
+          "relation": "MANAGED_FOR",
+          "gold": [
+            39
+          ],
+          "predicted": [
+            39
+          ],
+          "group_f1": 1.0,
+          "group_exact": true,
+          "candidate_count": 1,
+          "gold_ranks": {
+            "39": 1
+          },
+          "hits1": 1.0,
+          "hits3": 1.0,
+          "hits10": 1.0,
+          "any_hit1": true,
+          "any_hit3": true,
+          "any_hit10": true
+        },
+        {
+          "source": 1,
+          "relation": "MANAGED_FOR",
+          "gold": [
+            2,
+            3,
+            4
+          ],
+          "predicted": [
+            3,
+            4,
+            10
+          ],
+          "group_f1": 0.6666666666666666,
+          "group_exact": false,
+          "candidate_count": 22,
+          "gold_ranks": {
+            "2": 6,
+            "3": 1,
+            "4": 2
+          },
+          "hits1": 0.3333333333333333,
+          "hits3": 0.6666666666666666,
+          "hits10": 1.0,
+          "any_hit1": true,
+          "any_hit3": true,
+          "any_hit10": true
+        },
+        {
+          "source": 37,
+          "relation": "MANAGED_FOR",
+          "gold": [
+            1
+          ],
+          "predicted": [
+            4
+          ],
+          "group_f1": 0.0,
+          "group_exact": false,
+          "candidate_count": 23,
+          "gold_ranks": {
+            "1": 15
+          },
+          "hits1": 0.0,
+          "hits3": 0.0,
+          "hits10": 0.0,
+          "any_hit1": false,
+          "any_hit3": false,
+          "any_hit10": false
+        }
+      ],
+      "hits1": 0.4444444444444444,
+      "hits3": 0.5555555555555555,
+      "hits10": 0.6666666666666666,
+      "question_hit1": false,
+      "question_hit3": false,
+      "question_hit10": false
+    },
+    {
+      "id": "FQ-06",
+      "template": "medication_chain",
+      "group_f1": 0.16666666666666666,
+      "exact_match": false,
+      "groups": [
+        {
+          "source": 1,
+          "relation": "MANAGED_FOR",
+          "gold": [
+            2,
+            3,
+            5
+          ],
+          "predicted": [
+            2,
+            7,
+            12
+          ],
+          "group_f1": 0.3333333333333333,
+          "group_exact": false,
+          "candidate_count": 18,
+          "gold_ranks": {
+            "2": 1,
+            "3": 10,
+            "5": 17
+          },
+          "hits1": 0.3333333333333333,
+          "hits3": 0.3333333333333333,
+          "hits10": 0.6666666666666666,
+          "any_hit1": true,
+          "any_hit3": true,
+          "any_hit10": true
+        },
+        {
+          "source": 28,
+          "relation": "MANAGED_FOR",
+          "gold": [
+            1
+          ],
+          "predicted": [
+            9
+          ],
+          "group_f1": 0.0,
+          "group_exact": false,
+          "candidate_count": 19,
+          "gold_ranks": {
+            "1": 4
+          },
+          "hits1": 0.0,
+          "hits3": 0.0,
+          "hits10": 1.0,
+          "any_hit1": false,
+          "any_hit3": false,
+          "any_hit10": true
+        }
+      ],
+      "hits1": 0.16666666666666666,
+      "hits3": 0.16666666666666666,
+      "hits10": 0.8333333333333333,
+      "question_hit1": false,
+      "question_hit3": false,
+      "question_hit10": true
+    },
+    {
+      "id": "FQ-07",
+      "template": "complication_chain",
+      "group_f1": 0.25,
+      "exact_match": false,
+      "groups": [
+        {
+          "source": 2,
+          "relation": "COMPLICATED_BY",
+          "gold": [
+            3,
+            4,
+            5
+          ],
+          "predicted": [
+            3,
+            4,
+            5
+          ],
+          "group_f1": 1.0,
+          "group_exact": true,
+          "candidate_count": 25,
+          "gold_ranks": {
+            "3": 3,
+            "4": 1,
+            "5": 2
+          },
+          "hits1": 0.3333333333333333,
+          "hits3": 1.0,
+          "hits10": 1.0,
+          "any_hit1": true,
+          "any_hit3": true,
+          "any_hit10": true
+        },
+        {
+          "source": 41,
+          "relation": "COMPLICATED_BY",
+          "gold": [
+            2
+          ],
+          "predicted": [
+            20
+          ],
+          "group_f1": 0.0,
+          "group_exact": false,
+          "candidate_count": 26,
+          "gold_ranks": {
+            "2": 25
+          },
+          "hits1": 0.0,
+          "hits3": 0.0,
+          "hits10": 0.0,
+          "any_hit1": false,
+          "any_hit3": false,
+          "any_hit10": false
+        },
+        {
+          "source": 70,
+          "relation": "COMPLICATED_BY",
+          "gold": [
+            2
+          ],
+          "predicted": [
+            20
+          ],
+          "group_f1": 0.0,
+          "group_exact": false,
+          "candidate_count": 26,
+          "gold_ranks": {
+            "2": 20
+          },
+          "hits1": 0.0,
+          "hits3": 0.0,
+          "hits10": 0.0,
+          "any_hit1": false,
+          "any_hit3": false,
+          "any_hit10": false
+        },
+        {
+          "source": 72,
+          "relation": "COMPLICATED_BY",
+          "gold": [
+            2
+          ],
+          "predicted": [
+            20
+          ],
+          "group_f1": 0.0,
+          "group_exact": false,
+          "candidate_count": 26,
+          "gold_ranks": {
+            "2": 7
+          },
+          "hits1": 0.0,
+          "hits3": 0.0,
+          "hits10": 1.0,
+          "any_hit1": false,
+          "any_hit3": false,
+          "any_hit10": true
+        }
+      ],
+      "hits1": 0.08333333333333333,
+      "hits3": 0.25,
+      "hits10": 0.5,
+      "question_hit1": false,
+      "question_hit3": false,
+      "question_hit10": false
+    },
+    {
+      "id": "FQ-08",
+      "template": "metadata_chain",
+      "group_f1": 1.0,
+      "exact_match": true,
+      "groups": [
+        {
+          "source": 0,
+          "relation": "HAS_DIAGNOSIS",
+          "gold": [
+            1
+          ],
+          "predicted": [
+            1
+          ],
+          "group_f1": 1.0,
+          "group_exact": true,
+          "candidate_count": 14,
+          "gold_ranks": {
+            "1": 1
+          },
+          "hits1": 1.0,
+          "hits3": 1.0,
+          "hits10": 1.0,
+          "any_hit1": true,
+          "any_hit3": true,
+          "any_hit10": true
+        },
+        {
+          "source": 0,
+          "relation": "HAS_DIAGNOSIS",
+          "gold": [
+            15,
+            16,
+            17
+          ],
+          "predicted": [
+            15,
+            16,
+            17
+          ],
+          "group_f1": 1.0,
+          "group_exact": true,
+          "candidate_count": 18,
+          "gold_ranks": {
+            "16": 2,
+            "17": 1,
+            "15": 3
+          },
+          "hits1": 0.3333333333333333,
+          "hits3": 1.0,
+          "hits10": 1.0,
+          "any_hit1": true,
+          "any_hit3": true,
+          "any_hit10": true
+        },
+        {
+          "source": 0,
+          "relation": "HAS_DIAGNOSIS",
+          "gold": [
+            34
+          ],
+          "predicted": [
+            34
+          ],
+          "group_f1": 1.0,
+          "group_exact": true,
+          "candidate_count": 1,
+          "gold_ranks": {
+            "34": 1
+          },
+          "hits1": 1.0,
+          "hits3": 1.0,
+          "hits10": 1.0,
+          "any_hit1": true,
+          "any_hit3": true,
+          "any_hit10": true
+        }
+      ],
+      "hits1": 0.7777777777777777,
+      "hits3": 1.0,
+      "hits10": 1.0,
+      "question_hit1": true,
+      "question_hit3": true,
+      "question_hit10": true
+    },
+    {
+      "id": "FQ-09",
+      "template": "diagnosis_recall",
+      "group_f1": 1.0,
+      "exact_match": true,
+      "groups": [
+        {
+          "source": 0,
+          "relation": "HAS_DIAGNOSIS",
+          "gold": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8
+          ],
+          "predicted": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8
+          ],
+          "group_f1": 1.0,
+          "group_exact": true,
+          "candidate_count": 10,
+          "gold_ranks": {
+            "1": 4,
+            "2": 6,
+            "3": 7,
+            "4": 5,
+            "5": 2,
+            "6": 1,
+            "7": 3,
+            "8": 8
+          },
+          "hits1": 0.125,
+          "hits3": 0.375,
+          "hits10": 1.0,
+          "any_hit1": true,
+          "any_hit3": true,
+          "any_hit10": true
+        }
+      ],
+      "hits1": 0.125,
+      "hits3": 0.375,
+      "hits10": 1.0,
+      "question_hit1": true,
+      "question_hit3": true,
+      "question_hit10": true
+    },
+    {
+      "id": "FQ-10",
+      "template": "medication_recall",
+      "group_f1": 1.0,
+      "exact_match": true,
+      "groups": [
+        {
+          "source": 0,
+          "relation": "TAKES_MEDICATION",
+          "gold": [
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16
+          ],
+          "predicted": [
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16
+          ],
+          "group_f1": 1.0,
+          "group_exact": true,
+          "candidate_count": 16,
+          "gold_ranks": {
+            "9": 4,
+            "10": 1,
+            "11": 8,
+            "12": 6,
+            "13": 3,
+            "14": 7,
+            "15": 2,
+            "16": 5
+          },
+          "hits1": 0.125,
+          "hits3": 0.375,
+          "hits10": 1.0,
+          "any_hit1": true,
+          "any_hit3": true,
+          "any_hit10": true
+        }
+      ],
+      "hits1": 0.125,
+      "hits3": 0.375,
+      "hits10": 1.0,
+      "question_hit1": true,
+      "question_hit3": true,
+      "question_hit10": true
+    },
+    {
+      "id": "FQ-11",
+      "template": "procedure_recall",
+      "group_f1": 1.0,
+      "exact_match": true,
+      "groups": [
+        {
+          "source": 0,
+          "relation": "UNDERWENT_PROCEDURE",
+          "gold": [
+            49
+          ],
+          "predicted": [
+            49
+          ],
+          "group_f1": 1.0,
+          "group_exact": true,
+          "candidate_count": 1,
+          "gold_ranks": {
+            "49": 1
+          },
+          "hits1": 1.0,
+          "hits3": 1.0,
+          "hits10": 1.0,
+          "any_hit1": true,
+          "any_hit3": true,
+          "any_hit10": true
+        }
+      ],
+      "hits1": 1.0,
+      "hits3": 1.0,
+      "hits10": 1.0,
+      "question_hit1": true,
+      "question_hit3": true,
+      "question_hit10": true
+    },
+    {
+      "id": "FQ-12",
+      "template": "service_recall",
+      "group_f1": 1.0,
+      "exact_match": true,
+      "groups": [
+        {
+          "source": 0,
+          "relation": "MANAGED_BY_SERVICE",
+          "gold": [
+            44
+          ],
+          "predicted": [
+            44
+          ],
+          "group_f1": 1.0,
+          "group_exact": true,
+          "candidate_count": 1,
+          "gold_ranks": {
+            "44": 1
+          },
+          "hits1": 1.0,
+          "hits3": 1.0,
+          "hits10": 1.0,
+          "any_hit1": true,
+          "any_hit3": true,
+          "any_hit10": true
+        }
+      ],
+      "hits1": 1.0,
+      "hits3": 1.0,
+      "hits10": 1.0,
+      "question_hit1": true,
+      "question_hit3": true,
+      "question_hit10": true
+    },
+    {
+      "id": "FQ-13",
+      "template": "metadata_chain",
+      "group_f1": 1.0,
+      "exact_match": true,
+      "groups": [
+        {
+          "source": 0,
+          "relation": "HAS_DIAGNOSIS",
+          "gold": [
+            1
+          ],
+          "predicted": [
+            1
+          ],
+          "group_f1": 1.0,
+          "group_exact": true,
+          "candidate_count": 37,
+          "gold_ranks": {
+            "1": 1
+          },
+          "hits1": 1.0,
+          "hits3": 1.0,
+          "hits10": 1.0,
+          "any_hit1": true,
+          "any_hit3": true,
+          "any_hit10": true
+        },
+        {
+          "source": 0,
+          "relation": "HAS_DIAGNOSIS",
+          "gold": [
+            38,
+            39,
+            40
+          ],
+          "predicted": [
+            38,
+            39,
+            40
+          ],
+          "group_f1": 1.0,
+          "group_exact": true,
+          "candidate_count": 42,
+          "gold_ranks": {
+            "40": 2,
+            "38": 3,
+            "39": 1
+          },
+          "hits1": 0.3333333333333333,
+          "hits3": 1.0,
+          "hits10": 1.0,
+          "any_hit1": true,
+          "any_hit3": true,
+          "any_hit10": true
+        },
+        {
+          "source": 0,
+          "relation": "HAS_DIAGNOSIS",
+          "gold": [
+            81
+          ],
+          "predicted": [
+            81
+          ],
+          "group_f1": 1.0,
+          "group_exact": true,
+          "candidate_count": 1,
+          "gold_ranks": {
+            "81": 1
+          },
+          "hits1": 1.0,
+          "hits3": 1.0,
+          "hits10": 1.0,
+          "any_hit1": true,
+          "any_hit3": true,
+          "any_hit10": true
+        }
+      ],
+      "hits1": 0.7777777777777777,
+      "hits3": 1.0,
+      "hits10": 1.0,
+      "question_hit1": true,
+      "question_hit3": true,
+      "question_hit10": true
+    },
+    {
+      "id": "FQ-14",
+      "template": "diagnosis_recall",
+      "group_f1": 1.0,
+      "exact_match": true,
+      "groups": [
+        {
+          "source": 0,
+          "relation": "HAS_DIAGNOSIS",
+          "gold": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8
+          ],
+          "predicted": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8
+          ],
+          "group_f1": 1.0,
+          "group_exact": true,
+          "candidate_count": 15,
+          "gold_ranks": {
+            "1": 1,
+            "2": 5,
+            "3": 4,
+            "4": 2,
+            "5": 3,
+            "6": 7,
+            "7": 8,
+            "8": 6
+          },
+          "hits1": 0.125,
+          "hits3": 0.375,
+          "hits10": 1.0,
+          "any_hit1": true,
+          "any_hit3": true,
+          "any_hit10": true
+        }
+      ],
+      "hits1": 0.125,
+      "hits3": 0.375,
+      "hits10": 1.0,
+      "question_hit1": true,
+      "question_hit3": true,
+      "question_hit10": true
+    },
+    {
+      "id": "FQ-15",
+      "template": "medication_recall",
+      "group_f1": 1.0,
+      "exact_match": true,
+      "groups": [
+        {
+          "source": 0,
+          "relation": "TAKES_MEDICATION",
+          "gold": [
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20,
+            21
+          ],
+          "predicted": [
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20,
+            21
+          ],
+          "group_f1": 1.0,
+          "group_exact": true,
+          "candidate_count": 59,
+          "gold_ranks": {
+            "14": 5,
+            "15": 7,
+            "16": 2,
+            "17": 6,
+            "18": 8,
+            "19": 1,
+            "20": 4,
+            "21": 3
+          },
+          "hits1": 0.125,
+          "hits3": 0.375,
+          "hits10": 1.0,
+          "any_hit1": true,
+          "any_hit3": true,
+          "any_hit10": true
+        }
+      ],
+      "hits1": 0.125,
+      "hits3": 0.375,
+      "hits10": 1.0,
+      "question_hit1": true,
+      "question_hit3": true,
+      "question_hit10": true
+    },
+    {
+      "id": "FQ-16",
+      "template": "procedure_recall",
+      "group_f1": 1.0,
+      "exact_match": true,
+      "groups": [
+        {
+          "source": 0,
+          "relation": "UNDERWENT_PROCEDURE",
+          "gold": [
+            48,
+            49
+          ],
+          "predicted": [
+            48,
+            49
+          ],
+          "group_f1": 1.0,
+          "group_exact": true,
+          "candidate_count": 2,
+          "gold_ranks": {
+            "48": 2,
+            "49": 1
+          },
+          "hits1": 0.5,
+          "hits3": 1.0,
+          "hits10": 1.0,
+          "any_hit1": true,
+          "any_hit3": true,
+          "any_hit10": true
+        }
+      ],
+      "hits1": 0.5,
+      "hits3": 1.0,
+      "hits10": 1.0,
+      "question_hit1": true,
+      "question_hit3": true,
+      "question_hit10": true
+    },
+    {
+      "id": "FQ-17",
+      "template": "service_recall",
+      "group_f1": 1.0,
+      "exact_match": true,
+      "groups": [
+        {
+          "source": 0,
+          "relation": "MANAGED_BY_SERVICE",
+          "gold": [
+            30
+          ],
+          "predicted": [
+            30
+          ],
+          "group_f1": 1.0,
+          "group_exact": true,
+          "candidate_count": 1,
+          "gold_ranks": {
+            "30": 1
+          },
+          "hits1": 1.0,
+          "hits3": 1.0,
+          "hits10": 1.0,
+          "any_hit1": true,
+          "any_hit3": true,
+          "any_hit10": true
+        }
+      ],
+      "hits1": 1.0,
+      "hits3": 1.0,
+      "hits10": 1.0,
+      "question_hit1": true,
+      "question_hit3": true,
+      "question_hit10": true
+    },
+    {
+      "id": "FQ-18",
+      "template": "metadata_chain",
+      "group_f1": 1.0,
+      "exact_match": true,
+      "groups": [
+        {
+          "source": 0,
+          "relation": "HAS_DIAGNOSIS",
+          "gold": [
+            1
+          ],
+          "predicted": [
+            1
+          ],
+          "group_f1": 1.0,
+          "group_exact": true,
+          "candidate_count": 8,
+          "gold_ranks": {
+            "1": 1
+          },
+          "hits1": 1.0,
+          "hits3": 1.0,
+          "hits10": 1.0,
+          "any_hit1": true,
+          "any_hit3": true,
+          "any_hit10": true
+        },
+        {
+          "source": 0,
+          "relation": "HAS_DIAGNOSIS",
+          "gold": [
+            9,
+            10,
+            11
+          ],
+          "predicted": [
+            9,
+            10,
+            11
+          ],
+          "group_f1": 1.0,
+          "group_exact": true,
+          "candidate_count": 17,
+          "gold_ranks": {
+            "9": 3,
+            "10": 2,
+            "11": 1
+          },
+          "hits1": 0.3333333333333333,
+          "hits3": 1.0,
+          "hits10": 1.0,
+          "any_hit1": true,
+          "any_hit3": true,
+          "any_hit10": true
+        },
+        {
+          "source": 0,
+          "relation": "HAS_DIAGNOSIS",
+          "gold": [
+            27
+          ],
+          "predicted": [
+            27
+          ],
+          "group_f1": 1.0,
+          "group_exact": true,
+          "candidate_count": 1,
+          "gold_ranks": {
+            "27": 1
+          },
+          "hits1": 1.0,
+          "hits3": 1.0,
+          "hits10": 1.0,
+          "any_hit1": true,
+          "any_hit3": true,
+          "any_hit10": true
+        }
+      ],
+      "hits1": 0.7777777777777777,
+      "hits3": 1.0,
+      "hits10": 1.0,
+      "question_hit1": true,
+      "question_hit3": true,
+      "question_hit10": true
+    },
+    {
+      "id": "FQ-19",
+      "template": "diagnosis_recall",
+      "group_f1": 1.0,
+      "exact_match": true,
+      "groups": [
+        {
+          "source": 0,
+          "relation": "HAS_DIAGNOSIS",
+          "gold": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8
+          ],
+          "predicted": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8
+          ],
+          "group_f1": 1.0,
+          "group_exact": true,
+          "candidate_count": 15,
+          "gold_ranks": {
+            "1": 5,
+            "2": 2,
+            "3": 4,
+            "4": 7,
+            "5": 6,
+            "6": 8,
+            "7": 1,
+            "8": 3
+          },
+          "hits1": 0.125,
+          "hits3": 0.375,
+          "hits10": 1.0,
+          "any_hit1": true,
+          "any_hit3": true,
+          "any_hit10": true
+        }
+      ],
+      "hits1": 0.125,
+      "hits3": 0.375,
+      "hits10": 1.0,
+      "question_hit1": true,
+      "question_hit3": true,
+      "question_hit10": true
+    },
+    {
+      "id": "FQ-20",
+      "template": "medication_recall",
+      "group_f1": 1.0,
+      "exact_match": true,
+      "groups": [
+        {
+          "source": 0,
+          "relation": "TAKES_MEDICATION",
+          "gold": [
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20
+          ],
+          "predicted": [
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20
+          ],
+          "group_f1": 1.0,
+          "group_exact": true,
+          "candidate_count": 25,
+          "gold_ranks": {
+            "13": 6,
+            "14": 3,
+            "15": 1,
+            "16": 5,
+            "17": 7,
+            "18": 4,
+            "19": 8,
+            "20": 2
+          },
+          "hits1": 0.125,
+          "hits3": 0.375,
+          "hits10": 1.0,
+          "any_hit1": true,
+          "any_hit3": true,
+          "any_hit10": true
+        }
+      ],
+      "hits1": 0.125,
+      "hits3": 0.375,
+      "hits10": 1.0,
+      "question_hit1": true,
+      "question_hit3": true,
+      "question_hit10": true
+    }
+  ]
+}

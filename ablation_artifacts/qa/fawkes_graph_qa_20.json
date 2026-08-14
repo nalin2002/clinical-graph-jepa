@@ -1,0 +1,919 @@
+{
+  "benchmark": "fawkes_graph_qa_20",
+  "source_graphs": 20,
+  "question_count": 20,
+  "generation": "deterministic multi-hop templates over Fawkes graph nodes/edges",
+  "items": [
+    {
+      "subject_id": 17214442,
+      "hadm_id": 20384451,
+      "question": "For the admission whose primary diagnosis is 'Atypical atrial flutter', which diagnoses are directly managed by the documented treatment links, which additional conditions are indicated by that primary diagnosis, and which hospital service managed the admission?",
+      "answer": {
+        "managed_for": [
+          "Apixaban",
+          "CARVedilol"
+        ],
+        "indicates": [
+          "Other persistent atrial fibrillation",
+          "Supraventricular tachycardia",
+          "Hyperlipidemia, unspecified"
+        ],
+        "services": [
+          "CMED"
+        ]
+      },
+      "evidence_edges": [
+        {
+          "source": "N_013",
+          "relation": "MANAGED_FOR",
+          "target": "N_001"
+        },
+        {
+          "source": "N_015",
+          "relation": "MANAGED_FOR",
+          "target": "N_001"
+        },
+        {
+          "source": "N_001",
+          "relation": "INDICATES",
+          "target": "N_002"
+        },
+        {
+          "source": "N_001",
+          "relation": "INDICATES",
+          "target": "N_003"
+        },
+        {
+          "source": "N_001",
+          "relation": "INDICATES",
+          "target": "N_004"
+        },
+        {
+          "source": "N_000",
+          "relation": "MANAGED_BY_SERVICE",
+          "target": "N_023"
+        }
+      ],
+      "template": "primary_chain",
+      "id": "FQ-01"
+    },
+    {
+      "subject_id": 15617454,
+      "hadm_id": 29639705,
+      "question": "The medication 'Dexamethasone' appears in this admission. Which condition or conditions does the graph associate it with, and what downstream conditions are indicated or recorded as complications of the first associated condition?",
+      "answer": {
+        "medication": "Dexamethasone",
+        "managed_for": [
+          "Cerebral edema"
+        ],
+        "downstream": [
+          "Other seizures",
+          "Other hydrocephalus"
+        ]
+      },
+      "evidence_edges": [
+        {
+          "source": "N_019",
+          "relation": "MANAGED_FOR",
+          "target": "N_003"
+        },
+        {
+          "source": "N_003",
+          "relation": "COMPLICATED_BY",
+          "target": "N_002"
+        },
+        {
+          "source": "N_003",
+          "relation": "COMPLICATED_BY",
+          "target": "N_005"
+        }
+      ],
+      "template": "medication_chain",
+      "id": "FQ-02"
+    },
+    {
+      "subject_id": 12956096,
+      "hadm_id": 24484390,
+      "question": "What diagnosis or diagnoses does the procedure 'Drainage of Right Shoulder Joint, Percutaneous Approach, Diagnostic' confirm in this admission, and which medications are linked to treatment of that confirmed condition?",
+      "answer": {
+        "procedure": "Drainage of Right Shoulder Joint, Percutaneous Approach, Diagnostic",
+        "confirms": [
+          "Pyogenic arthritis, unspecified"
+        ],
+        "medications": [
+          "Dexamethasone",
+          "Acetaminophen",
+          "OxyCODONE (Immediate Release)"
+        ]
+      },
+      "evidence_edges": [
+        {
+          "source": "N_059",
+          "relation": "CONFIRMS",
+          "target": "N_001"
+        },
+        {
+          "source": "N_017",
+          "relation": "MANAGED_FOR",
+          "target": "N_001"
+        },
+        {
+          "source": "N_029",
+          "relation": "MANAGED_FOR",
+          "target": "N_001"
+        },
+        {
+          "source": "N_032",
+          "relation": "MANAGED_FOR",
+          "target": "N_001"
+        }
+      ],
+      "template": "procedure_chain",
+      "id": "FQ-03"
+    },
+    {
+      "subject_id": 14081383,
+      "hadm_id": 26950005,
+      "question": "For the diagnosis 'Other ascites', what complications are connected to it, which procedures confirm it, and which medications are linked to managing it?",
+      "answer": {
+        "diagnosis": "Other ascites",
+        "complications": [
+          "Dehydration",
+          "Hypovolemia"
+        ],
+        "confirming_procedures": [
+          "Drainage of Peritoneal Cavity, Percutaneous Approach, Diagnostic"
+        ],
+        "medications": [
+          "Furosemide",
+          "Spironolactone",
+          "Albumin 25% (12.5g / 50mL)"
+        ]
+      },
+      "evidence_edges": [
+        {
+          "source": "N_001",
+          "relation": "COMPLICATED_BY",
+          "target": "N_008"
+        },
+        {
+          "source": "N_001",
+          "relation": "COMPLICATED_BY",
+          "target": "N_015"
+        },
+        {
+          "source": "N_049",
+          "relation": "CONFIRMS",
+          "target": "N_001"
+        },
+        {
+          "source": "N_025",
+          "relation": "MANAGED_FOR",
+          "target": "N_001"
+        },
+        {
+          "source": "N_026",
+          "relation": "MANAGED_FOR",
+          "target": "N_001"
+        },
+        {
+          "source": "N_043",
+          "relation": "MANAGED_FOR",
+          "target": "N_001"
+        }
+      ],
+      "template": "complication_chain",
+      "id": "FQ-04"
+    },
+    {
+      "subject_id": 18144033,
+      "hadm_id": 27752486,
+      "question": "For the admission whose primary diagnosis is 'Hyperpotassemia', which diagnoses are directly managed by the documented treatment links, which additional conditions are indicated by that primary diagnosis, and which hospital service managed the admission?",
+      "answer": {
+        "managed_for": [
+          "Sodium Polystyrene Sulfonate"
+        ],
+        "indicates": [
+          "Hypertensive chronic kidney disease, unspecified, with chronic kidney disease stage V or end stage renal disease",
+          "Chronic diastolic heart failure",
+          "Congestive heart failure, unspecified"
+        ],
+        "services": [
+          "MED"
+        ]
+      },
+      "evidence_edges": [
+        {
+          "source": "N_037",
+          "relation": "MANAGED_FOR",
+          "target": "N_001"
+        },
+        {
+          "source": "N_001",
+          "relation": "INDICATES",
+          "target": "N_002"
+        },
+        {
+          "source": "N_001",
+          "relation": "INDICATES",
+          "target": "N_003"
+        },
+        {
+          "source": "N_001",
+          "relation": "INDICATES",
+          "target": "N_004"
+        },
+        {
+          "source": "N_000",
+          "relation": "MANAGED_BY_SERVICE",
+          "target": "N_039"
+        }
+      ],
+      "template": "primary_chain",
+      "id": "FQ-05"
+    },
+    {
+      "subject_id": 18917761,
+      "hadm_id": 21685855,
+      "question": "The medication 'Rifaximin' appears in this admission. Which condition or conditions does the graph associate it with, and what downstream conditions are indicated or recorded as complications of the first associated condition?",
+      "answer": {
+        "medication": "Rifaximin",
+        "managed_for": [
+          "Hepatic encephalopathy"
+        ],
+        "downstream": [
+          "Esophageal varices in diseases classified elsewhere, without mention of bleeding",
+          "Other and unspecified coagulation defects",
+          "Other secondary thrombocytopenia"
+        ]
+      },
+      "evidence_edges": [
+        {
+          "source": "N_028",
+          "relation": "MANAGED_FOR",
+          "target": "N_001"
+        },
+        {
+          "source": "N_001",
+          "relation": "INDICATES",
+          "target": "N_002"
+        },
+        {
+          "source": "N_001",
+          "relation": "INDICATES",
+          "target": "N_003"
+        },
+        {
+          "source": "N_001",
+          "relation": "INDICATES",
+          "target": "N_005"
+        }
+      ],
+      "template": "medication_chain",
+      "id": "FQ-06"
+    },
+    {
+      "subject_id": 15062911,
+      "hadm_id": 25393787,
+      "question": "For the diagnosis 'Blood in stool', what complications are connected to it, which procedures confirm it, and which medications are linked to managing it?",
+      "answer": {
+        "diagnosis": "Blood in stool",
+        "complications": [
+          "Acute posthemorrhagic anemia",
+          "Acute kidney failure, unspecified",
+          "Other specified hypotension"
+        ],
+        "confirming_procedures": [
+          "Laparoscopic right hemicolectomy",
+          "Endoscopic polypectomy of large intestine"
+        ],
+        "medications": [
+          "Octreotide Acetate"
+        ]
+      },
+      "evidence_edges": [
+        {
+          "source": "N_002",
+          "relation": "COMPLICATED_BY",
+          "target": "N_003"
+        },
+        {
+          "source": "N_002",
+          "relation": "COMPLICATED_BY",
+          "target": "N_004"
+        },
+        {
+          "source": "N_002",
+          "relation": "COMPLICATED_BY",
+          "target": "N_005"
+        },
+        {
+          "source": "N_070",
+          "relation": "CONFIRMS",
+          "target": "N_002"
+        },
+        {
+          "source": "N_072",
+          "relation": "CONFIRMS",
+          "target": "N_002"
+        },
+        {
+          "source": "N_041",
+          "relation": "MANAGED_FOR",
+          "target": "N_002"
+        }
+      ],
+      "template": "complication_chain",
+      "id": "FQ-07"
+    },
+    {
+      "subject_id": 10834547,
+      "hadm_id": 26896259,
+      "question": "Combine the admission metadata with the graph: what was the admission type and discharge location, what was the primary diagnosis, which service managed the patient, and name up to three recorded medications?",
+      "answer": {
+        "admission_type": "URGENT",
+        "discharge_location": "HOME",
+        "primary_diagnosis": "Bipolar I disorder, most recent episode (or current) depressed, severe, without mention of psychotic behavior",
+        "services": [
+          "PSYCH"
+        ],
+        "medications": [
+          "Omeprazole",
+          "Quetiapine Fumarate",
+          "Vitamin D"
+        ]
+      },
+      "evidence_edges": [
+        {
+          "source": "N_000",
+          "relation": "HAS_DIAGNOSIS",
+          "target": "N_001"
+        },
+        {
+          "source": "N_000",
+          "relation": "MANAGED_BY_SERVICE",
+          "target": "N_034"
+        },
+        {
+          "source": "N_000",
+          "relation": "TAKES_MEDICATION",
+          "target": "N_015"
+        },
+        {
+          "source": "N_000",
+          "relation": "TAKES_MEDICATION",
+          "target": "N_016"
+        },
+        {
+          "source": "N_000",
+          "relation": "TAKES_MEDICATION",
+          "target": "N_017"
+        }
+      ],
+      "template": "metadata_chain",
+      "id": "FQ-08"
+    },
+    {
+      "subject_id": 19018059,
+      "hadm_id": 24925478,
+      "question": "Which diagnoses are explicitly represented in this admission graph? Return the clinical diagnosis names, not the internal node identifiers.",
+      "answer": {
+        "diagnoses": [
+          "Atherosclerotic heart disease of native coronary artery with unstable angina pectoris",
+          "Hypertensive heart and chronic kidney disease with heart failure and stage 1 through stage 4 chronic kidney disease, or unspecified chronic kidney disease",
+          "Chronic diastolic (congestive) heart failure",
+          "Paroxysmal atrial fibrillation",
+          "Chronic kidney disease, stage 3 (moderate)",
+          "Acute upper respiratory infection, unspecified",
+          "Gout, unspecified",
+          "Polyarthritis, unspecified"
+        ]
+      },
+      "evidence_edges": [
+        {
+          "source": "N_000",
+          "relation": "HAS_DIAGNOSIS",
+          "target": "N_001"
+        },
+        {
+          "source": "N_000",
+          "relation": "HAS_DIAGNOSIS",
+          "target": "N_002"
+        },
+        {
+          "source": "N_000",
+          "relation": "HAS_DIAGNOSIS",
+          "target": "N_003"
+        },
+        {
+          "source": "N_000",
+          "relation": "HAS_DIAGNOSIS",
+          "target": "N_004"
+        },
+        {
+          "source": "N_000",
+          "relation": "HAS_DIAGNOSIS",
+          "target": "N_005"
+        },
+        {
+          "source": "N_000",
+          "relation": "HAS_DIAGNOSIS",
+          "target": "N_006"
+        },
+        {
+          "source": "N_000",
+          "relation": "HAS_DIAGNOSIS",
+          "target": "N_007"
+        },
+        {
+          "source": "N_000",
+          "relation": "HAS_DIAGNOSIS",
+          "target": "N_008"
+        }
+      ],
+      "template": "diagnosis_recall",
+      "id": "FQ-09"
+    },
+    {
+      "subject_id": 12726133,
+      "hadm_id": 20282845,
+      "question": "Which medications are recorded as being taken by the patient during this admission? Return up to eight medication names.",
+      "answer": {
+        "medications": [
+          "D5 1/2NS",
+          "Morphine Sulfate",
+          "Ibuprofen",
+          "Influenza Vaccine Quadrivalent",
+          "Belladonna & Opium (16.2/30mg)",
+          "Oxybutynin",
+          "OxyCODONE (Immediate Release)",
+          "Heparin"
+        ]
+      },
+      "evidence_edges": [
+        {
+          "source": "N_000",
+          "relation": "TAKES_MEDICATION",
+          "target": "N_009"
+        },
+        {
+          "source": "N_000",
+          "relation": "TAKES_MEDICATION",
+          "target": "N_010"
+        },
+        {
+          "source": "N_000",
+          "relation": "TAKES_MEDICATION",
+          "target": "N_011"
+        },
+        {
+          "source": "N_000",
+          "relation": "TAKES_MEDICATION",
+          "target": "N_012"
+        },
+        {
+          "source": "N_000",
+          "relation": "TAKES_MEDICATION",
+          "target": "N_013"
+        },
+        {
+          "source": "N_000",
+          "relation": "TAKES_MEDICATION",
+          "target": "N_014"
+        },
+        {
+          "source": "N_000",
+          "relation": "TAKES_MEDICATION",
+          "target": "N_015"
+        },
+        {
+          "source": "N_000",
+          "relation": "TAKES_MEDICATION",
+          "target": "N_016"
+        }
+      ],
+      "template": "medication_recall",
+      "id": "FQ-10"
+    },
+    {
+      "subject_id": 19581033,
+      "hadm_id": 29967030,
+      "question": "Which procedures did the patient undergo in this admission according to the graph?",
+      "answer": {
+        "procedures": [
+          "Transfusion of packed cells"
+        ]
+      },
+      "evidence_edges": [
+        {
+          "source": "N_000",
+          "relation": "UNDERWENT_PROCEDURE",
+          "target": "N_049"
+        }
+      ],
+      "template": "procedure_recall",
+      "id": "FQ-11"
+    },
+    {
+      "subject_id": 14139133,
+      "hadm_id": 20698366,
+      "question": "Which hospital service or services managed this admission?",
+      "answer": {
+        "services": [
+          "OMED"
+        ]
+      },
+      "evidence_edges": [
+        {
+          "source": "N_000",
+          "relation": "MANAGED_BY_SERVICE",
+          "target": "N_044"
+        }
+      ],
+      "template": "service_recall",
+      "id": "FQ-12"
+    },
+    {
+      "subject_id": 13031024,
+      "hadm_id": 25109445,
+      "question": "Combine the admission metadata with the graph: what was the admission type and discharge location, what was the primary diagnosis, which service managed the patient, and name up to three recorded medications?",
+      "answer": {
+        "admission_type": "OBSERVATION ADMIT",
+        "discharge_location": "SKILLED NURSING FACILITY",
+        "primary_diagnosis": "Other symptoms and signs involving the nervous system",
+        "services": [
+          "MED"
+        ],
+        "medications": [
+          "Ramelteon",
+          "Insulin",
+          "amLODIPine"
+        ]
+      },
+      "evidence_edges": [
+        {
+          "source": "N_000",
+          "relation": "HAS_DIAGNOSIS",
+          "target": "N_001"
+        },
+        {
+          "source": "N_000",
+          "relation": "MANAGED_BY_SERVICE",
+          "target": "N_081"
+        },
+        {
+          "source": "N_000",
+          "relation": "TAKES_MEDICATION",
+          "target": "N_038"
+        },
+        {
+          "source": "N_000",
+          "relation": "TAKES_MEDICATION",
+          "target": "N_039"
+        },
+        {
+          "source": "N_000",
+          "relation": "TAKES_MEDICATION",
+          "target": "N_040"
+        }
+      ],
+      "template": "metadata_chain",
+      "id": "FQ-13"
+    },
+    {
+      "subject_id": 19454978,
+      "hadm_id": 26537547,
+      "question": "Which diagnoses are explicitly represented in this admission graph? Return the clinical diagnosis names, not the internal node identifiers.",
+      "answer": {
+        "diagnoses": [
+          "Hypoxemia",
+          "Urinary incontinence, unspecified",
+          "Septicemia due to escherichia coli [E. coli]",
+          "Other secondary thrombocytopenia",
+          "Urinary tract infection, site not specified",
+          "Other anomalies of gallbladder, bile ducts, and liver",
+          "Sepsis",
+          "Osteoarthrosis, unspecified whether generalized or localized, site unspecified"
+        ]
+      },
+      "evidence_edges": [
+        {
+          "source": "N_000",
+          "relation": "HAS_DIAGNOSIS",
+          "target": "N_001"
+        },
+        {
+          "source": "N_000",
+          "relation": "HAS_DIAGNOSIS",
+          "target": "N_002"
+        },
+        {
+          "source": "N_000",
+          "relation": "HAS_DIAGNOSIS",
+          "target": "N_003"
+        },
+        {
+          "source": "N_000",
+          "relation": "HAS_DIAGNOSIS",
+          "target": "N_004"
+        },
+        {
+          "source": "N_000",
+          "relation": "HAS_DIAGNOSIS",
+          "target": "N_005"
+        },
+        {
+          "source": "N_000",
+          "relation": "HAS_DIAGNOSIS",
+          "target": "N_006"
+        },
+        {
+          "source": "N_000",
+          "relation": "HAS_DIAGNOSIS",
+          "target": "N_007"
+        },
+        {
+          "source": "N_000",
+          "relation": "HAS_DIAGNOSIS",
+          "target": "N_008"
+        }
+      ],
+      "template": "diagnosis_recall",
+      "id": "FQ-14"
+    },
+    {
+      "subject_id": 17025342,
+      "hadm_id": 29265685,
+      "question": "Which medications are recorded as being taken by the patient during this admission? Return up to eight medication names.",
+      "answer": {
+        "medications": [
+          "0.9% Sodium Chloride",
+          "Valproate Sodium",
+          "Thiamine",
+          "OxycoDONE (Immediate Release)",
+          "Senna",
+          "Acetylcysteine 20%",
+          "Morphine Sulfate",
+          "Lidocaine 5% Patch"
+        ]
+      },
+      "evidence_edges": [
+        {
+          "source": "N_000",
+          "relation": "TAKES_MEDICATION",
+          "target": "N_014"
+        },
+        {
+          "source": "N_000",
+          "relation": "TAKES_MEDICATION",
+          "target": "N_015"
+        },
+        {
+          "source": "N_000",
+          "relation": "TAKES_MEDICATION",
+          "target": "N_016"
+        },
+        {
+          "source": "N_000",
+          "relation": "TAKES_MEDICATION",
+          "target": "N_017"
+        },
+        {
+          "source": "N_000",
+          "relation": "TAKES_MEDICATION",
+          "target": "N_018"
+        },
+        {
+          "source": "N_000",
+          "relation": "TAKES_MEDICATION",
+          "target": "N_019"
+        },
+        {
+          "source": "N_000",
+          "relation": "TAKES_MEDICATION",
+          "target": "N_020"
+        },
+        {
+          "source": "N_000",
+          "relation": "TAKES_MEDICATION",
+          "target": "N_021"
+        }
+      ],
+      "template": "medication_recall",
+      "id": "FQ-15"
+    },
+    {
+      "subject_id": 13588636,
+      "hadm_id": 29985152,
+      "question": "Which procedures did the patient undergo in this admission according to the graph?",
+      "answer": {
+        "procedures": [
+          "Excision of Lower Esophagus, Via Natural or Artificial Opening Endoscopic, Diagnostic",
+          "Introduction of Nutritional Substance into Upper GI, Via Natural or Artificial Opening"
+        ]
+      },
+      "evidence_edges": [
+        {
+          "source": "N_000",
+          "relation": "UNDERWENT_PROCEDURE",
+          "target": "N_048"
+        },
+        {
+          "source": "N_000",
+          "relation": "UNDERWENT_PROCEDURE",
+          "target": "N_049"
+        }
+      ],
+      "template": "procedure_recall",
+      "id": "FQ-16"
+    },
+    {
+      "subject_id": 15874847,
+      "hadm_id": 26719413,
+      "question": "Which hospital service or services managed this admission?",
+      "answer": {
+        "services": [
+          "MED"
+        ]
+      },
+      "evidence_edges": [
+        {
+          "source": "N_000",
+          "relation": "MANAGED_BY_SERVICE",
+          "target": "N_030"
+        }
+      ],
+      "template": "service_recall",
+      "id": "FQ-17"
+    },
+    {
+      "subject_id": 15611926,
+      "hadm_id": 20069035,
+      "question": "Combine the admission metadata with the graph: what was the admission type and discharge location, what was the primary diagnosis, which service managed the patient, and name up to three recorded medications?",
+      "answer": {
+        "admission_type": "DIRECT OBSERVATION",
+        "discharge_location": "",
+        "primary_diagnosis": "Infected postoperative seroma",
+        "services": [
+          "ORTHO"
+        ],
+        "medications": [
+          "ALPRAZolam",
+          "Amlodipine",
+          "Acetaminophen"
+        ]
+      },
+      "evidence_edges": [
+        {
+          "source": "N_000",
+          "relation": "HAS_DIAGNOSIS",
+          "target": "N_001"
+        },
+        {
+          "source": "N_000",
+          "relation": "MANAGED_BY_SERVICE",
+          "target": "N_027"
+        },
+        {
+          "source": "N_000",
+          "relation": "TAKES_MEDICATION",
+          "target": "N_009"
+        },
+        {
+          "source": "N_000",
+          "relation": "TAKES_MEDICATION",
+          "target": "N_010"
+        },
+        {
+          "source": "N_000",
+          "relation": "TAKES_MEDICATION",
+          "target": "N_011"
+        }
+      ],
+      "template": "metadata_chain",
+      "id": "FQ-18"
+    },
+    {
+      "subject_id": 17290113,
+      "hadm_id": 26004125,
+      "question": "Which diagnoses are explicitly represented in this admission graph? Return the clinical diagnosis names, not the internal node identifiers.",
+      "answer": {
+        "diagnoses": [
+          "Spinal stenosis, lumbar region, with neurogenic claudication",
+          "Other named variants of lymphosarcoma and reticulosarcoma, unspecified site, extranodal and solid organ sites",
+          "Coronary atherosclerosis of native coronary artery",
+          "Other and unspecified hyperlipidemia",
+          "Asthma, unspecified type, unspecified",
+          "Pure hypercholesterolemia",
+          "Unspecified essential hypertension",
+          "Unspecified acquired hypothyroidism"
+        ]
+      },
+      "evidence_edges": [
+        {
+          "source": "N_000",
+          "relation": "HAS_DIAGNOSIS",
+          "target": "N_001"
+        },
+        {
+          "source": "N_000",
+          "relation": "HAS_DIAGNOSIS",
+          "target": "N_002"
+        },
+        {
+          "source": "N_000",
+          "relation": "HAS_DIAGNOSIS",
+          "target": "N_003"
+        },
+        {
+          "source": "N_000",
+          "relation": "HAS_DIAGNOSIS",
+          "target": "N_004"
+        },
+        {
+          "source": "N_000",
+          "relation": "HAS_DIAGNOSIS",
+          "target": "N_005"
+        },
+        {
+          "source": "N_000",
+          "relation": "HAS_DIAGNOSIS",
+          "target": "N_006"
+        },
+        {
+          "source": "N_000",
+          "relation": "HAS_DIAGNOSIS",
+          "target": "N_007"
+        },
+        {
+          "source": "N_000",
+          "relation": "HAS_DIAGNOSIS",
+          "target": "N_008"
+        }
+      ],
+      "template": "diagnosis_recall",
+      "id": "FQ-19"
+    },
+    {
+      "subject_id": 11968004,
+      "hadm_id": 27995652,
+      "question": "Which medications are recorded as being taken by the patient during this admission? Return up to eight medication names.",
+      "answer": {
+        "medications": [
+          "Rosuvastatin Calcium",
+          "Lisinopril",
+          "Sertraline",
+          "PredniSONE",
+          "Sodium Chloride 0.9%  Flush",
+          "Docusate Sodium",
+          "modafinil",
+          "OxycoDONE (Immediate Release)"
+        ]
+      },
+      "evidence_edges": [
+        {
+          "source": "N_000",
+          "relation": "TAKES_MEDICATION",
+          "target": "N_013"
+        },
+        {
+          "source": "N_000",
+          "relation": "TAKES_MEDICATION",
+          "target": "N_014"
+        },
+        {
+          "source": "N_000",
+          "relation": "TAKES_MEDICATION",
+          "target": "N_015"
+        },
+        {
+          "source": "N_000",
+          "relation": "TAKES_MEDICATION",
+          "target": "N_016"
+        },
+        {
+          "source": "N_000",
+          "relation": "TAKES_MEDICATION",
+          "target": "N_017"
+        },
+        {
+          "source": "N_000",
+          "relation": "TAKES_MEDICATION",
+          "target": "N_018"
+        },
+        {
+          "source": "N_000",
+          "relation": "TAKES_MEDICATION",
+          "target": "N_019"
+        },
+        {
+          "source": "N_000",
+          "relation": "TAKES_MEDICATION",
+          "target": "N_020"
+        }
+      ],
+      "template": "medication_recall",
+      "id": "FQ-20"
+    }
+  ]
+}

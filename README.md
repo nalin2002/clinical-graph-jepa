@@ -20,6 +20,16 @@ three discharge-note placement conditions, and the three-condition ACI-Bench
 evaluation. The runnable additions are `scripts/build_tfidf_embeddings.py`
 and `scripts/evaluate_v25_aci.py`.
 
+## v26 structured graph-QA evaluation
+
+Open [`docs/fawkes-v17-to-v26-report.html`](docs/fawkes-v17-to-v26-report.html)
+for the v26 result card and exact commands. v26 evaluates 20 structured QA
+questions with Option A (inference-time note removal) versus Option B (the
+entity-grounded note checkpoint). Option B improves macro group F1 from
+0.7056 to 0.7411 on all questions and from 0.1587 to 0.2603 on the seven
+multi-hop questions. The runnable evaluator and paired comparison are
+`scripts/evaluate_v26_graph_qa.py` and `scripts/compare_v26_graph_qa.py`.
+
 **Paper:** [OpenReview](https://openreview.net/forum?id=HXsMPubPqE) ·
 [repository PDF](paper/clinical_jepa.pdf) ·
 [paper-to-code map](docs/PAPER_CODE_MAP.md)
