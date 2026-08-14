@@ -310,6 +310,18 @@ python scripts/smoke_check.py
 python -m pytest
 ```
 
+### Clinical Graph-JEPA v23–v26 experiment documentation
+
+The complete v23–v26 documentation is included in [`docs/experiments/v23-v26/`](docs/experiments/v23-v26/). It covers the experiment process, execution steps, measured results, reproduction commands, caveats, and machine-readable artifacts:
+
+- [v23 report and note-injection results](docs/experiments/v23-v26/v23/fawkes-v16-to-v23-report.html)
+- [v24 ACI-Bench evaluation](docs/experiments/v23-v26/v24/v24-aci-evaluation.html)
+- [v25 reproducibility and ablation guide](docs/experiments/v23-v26/v25/v25-ablations.html)
+- [v25 consolidated results report](docs/experiments/v23-v26/v25/fawkes-v17-to-v25-report.html)
+- [v26 structured graph-QA report](docs/experiments/v23-v26/v26/fawkes-v17-to-v26-report.html)
+- [v23–v26 reproduction map and artifact index](docs/experiments/v23-v26/README.md)
+- [v23 execution protocol](docs/V23_NOTE_INJECTION.md)
+
 `audit_data.py` reports what a JSONL file contains and which models it can
 support; `smoke_check.py` loads all three released checkpoints and prints the
 input width each one expects (768, 1536, and the paper model's config block).
