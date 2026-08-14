@@ -330,7 +330,7 @@ python scripts/smoke_check.py
 python -m pytest
 ```
 
-### Clinical Graph-JEPA pre-v23 HTML reports
+### Clinical Graph-JEPA HTML reports
 
 The earlier experiment reports are stored on the [`patch-masking` branch](https://github.com/nalin2002/clinical-graph-jepa/tree/patch-masking/docs/presentations). They document the progression leading into v23, including the model foundation, patch masking, JEPA pretraining, seed variance, readout-head, and MLP-readout studies:
 
@@ -342,7 +342,7 @@ The earlier experiment reports are stored on the [`patch-masking` branch](https:
 - [v21 readout-head report](https://github.com/nalin2002/clinical-graph-jepa/blob/patch-masking/docs/presentations/fawkes-v21-readout-head-report.html)
 - [v22 patch-masking MLP report](https://github.com/nalin2002/clinical-graph-jepa/blob/patch-masking/docs/presentations/fawkes-v22-patch-masking-mlp-report.html)
 
-### Clinical Graph-JEPA v23–v26 experiment documentation
+### Clinical Graph-JEPA v23–v26 ablation documentation
 
 The complete v23–v26 documentation is included in [`docs/experiments/v23-v26/`](docs/experiments/v23-v26/). It covers the experiment process, execution steps, measured results, reproduction commands, caveats, and machine-readable artifacts:
 
