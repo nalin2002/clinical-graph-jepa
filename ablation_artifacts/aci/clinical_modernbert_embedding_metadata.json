@@ -1,0 +1,8 @@
+{
+  "records": 207,
+  "model": "Simonlee711/Clinical_ModernBERT",
+  "pooling": "attention_mask_mean_l2_normalized",
+  "max_length": 8192,
+  "embedding_dimension": 768,
+  "source_field": "note"
+}

@@ -1,0 +1,19 @@
+{
+  "encoder": "tfidf",
+  "vectorizer": "TfidfVectorizer",
+  "ngram_range": [
+    1,
+    2
+  ],
+  "sublinear_tf": true,
+  "min_df": 2,
+  "max_df": 0.98,
+  "max_features": 200000,
+  "projection": "TruncatedSVD + L2 normalization",
+  "fit_graphs": 3200,
+  "validation_graphs": 400,
+  "test_graphs": 400,
+  "split_seed": 42,
+  "dim": 768,
+  "explained_variance": 0.6503141686158145
+}

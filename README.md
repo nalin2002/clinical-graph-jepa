@@ -12,6 +12,14 @@ documented implementation suite for the paper, including note-free and
 note-augmented Graph-JEPA models, released checkpoints, evaluation code, and a
 400-admission graph dataset.
 
+## v25 ablation bundle
+
+Open [`V25_ABLATIONS.html`](V25_ABLATIONS.html) for the complete reproduction
+guide. It covers the TF-IDF versus Clinical-ModernBERT node-embedding arm, the
+three discharge-note placement conditions, and the three-condition ACI-Bench
+evaluation. The runnable additions are `scripts/build_tfidf_embeddings.py`
+and `scripts/evaluate_v25_aci.py`.
+
 **Paper:** [OpenReview](https://openreview.net/forum?id=HXsMPubPqE) ·
 [repository PDF](paper/clinical_jepa.pdf) ·
 [paper-to-code map](docs/PAPER_CODE_MAP.md)
