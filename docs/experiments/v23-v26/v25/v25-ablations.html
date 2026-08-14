@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Clinical Graph-JEPA v25 reproducibility bundle</title>
+<style>body{font:16px/1.55 system-ui,sans-serif;color:#202a31;background:#f4f7f8;margin:0}main{max-width:1050px;margin:32px auto;padding:0 24px}section{background:#fff;border:1px solid #d9e0e4;border-radius:12px;padding:22px;margin:18px 0}h1,h2{color:#174b61}code,pre{background:#eef3f5;border-radius:5px}code{padding:2px 5px}pre{padding:14px;overflow:auto}table{border-collapse:collapse;width:100%}th,td{padding:8px;border-bottom:1px solid #e5eaed;text-align:left}th{background:#eef3f5}.note{border-left:4px solid #2b8764;padding:10px 14px;background:#edf7f2}</style></head>
+<body><main>
+<h1>Clinical Graph-JEPA v25: ablation and reproduction bundle</h1>
+<p>This package is the v24 ACI-evaluation branch plus three reproducibility additions: node-embedding replacement (Clinical-ModernBERT versus TF-IDF), discharge-node representation placement, and the three-condition ACI-Bench transfer evaluation.</p>
+<p><b>Upstream base:</b> <code>codex/v24-aci-evaluation</code>, commit <code>d765566</code>. The v25 branch is local and is not pushed.</p>
+
+<section><h2>0. Install and verify</h2>
+<pre>cd clinical-graph-jepa-v25
+uv sync
+uv run python -c "import torch, torch_geometric, sklearn; print('dependencies OK')"
+export PYTHONPATH="$PWD/src"</pre>
+<p>Python 3.10+ is required. CPU evaluation is supported. The full TF-IDF matched training arm needs PyTorch Geometric, scikit-learn, the included training graph data, and the v24 checkpoint/training environment. No API key is needed for the included evaluations. The optional v24 smoke script also checks checkpoints that are intentionally not distributed in this release.</p></section>
+
+<section><h2>1. Node-embedding ablation</h2>
+<p>Only the 768-dimensional discharge-note representation changes. The graph, provenance mask, model width, split seed, and downstream input width remain fixed. The Clinical-ModernBERT arm is the supplied v24/v23 data; the TF-IDF arm is word unigrams+bigrams with sublinear TF, fit on the 3,200-graph training partition only, projected with 768-dimensional TruncatedSVD, then L2-normalized.</p>
+<pre>uv run python scripts/build_tfidf_embeddings.py \
+  --input ablation_artifacts/tfidf/input.jsonl \
+  --output ablation_artifacts/tfidf/graphs_tfidf.jsonl \
+  --metadata ablation_artifacts/tfidf/metadata.json</pre>
+<p>To obtain <code>input.jsonl</code> from the public dataset source before running the command:</p>
+<pre>uv run python -c "from huggingface_hub import hf_hub_download; from pathlib import Path; p=hf_hub_download('wmatbooth/fawkes-training-graph-embedded-260615','fawkes_training_graph_full_embedded_260615.jsonl',repo_type='dataset'); Path('ablation_artifacts/tfidf/input.jsonl').write_bytes(Path(p).read_bytes())"</pre>
+<p>For a matched model comparison, run the same v24/v23 training and evaluation commands with only <code>DATA_PATH</code> changed to the generated TF-IDF JSONL. Keep <code>DATA_SPLIT_SEED=42</code>, seeds 42–51, <code>JEPA_EPOCHS=60</code>, <code>READOUT_EPOCHS=40</code>, patch masking, MLP decoder, <code>NEG_K=8</code>, and <code>TARGET_WEIGHT=3</code> unchanged. Report batch-mask AUC/AP/MRR/Hits@1/3/10 and filtered LOO MRR/Hits@1/3/10 per seed, then paired TF-IDF minus Clinical-ModernBERT differences with 95% CIs.</p>
+<p class="note">The bundle includes the generated TF-IDF JSONL and its metadata. The v24 GitHub branch did not contain a matched TF-IDF retraining result file, so this package does not invent final TF-IDF model metrics; it gives the exact construction and matched-run protocol.</p></section>
+
+<section><h2>2. Discharge-node representation ablation</h2>
+<p>The same v23 mean-note checkpoint is evaluated three ways without retraining:</p>
+<table><tr><th>Condition</th><th>Implementation</th><th>Meaning</th></tr>
+<tr><td>Graph-only</td><td>Zero the 768-d note channel</td><td>Architecture is retained at 774 dimensions; no real-note signal reaches any node.</td></tr>
+<tr><td>Global note</td><td><code>GROUND_BY=all</code></td><td>Copy the note vector to every non-patient entity.</td></tr>
+<tr><td>Entity-grounded note</td><td><code>GROUND_BY=prov</code></td><td>Copy the vector only to entities grounded by note provenance.</td></tr></table>
+<p>These are feature-injection ablations on identical weights, topology, queries, and ranking protocol—not three separately trained models. The exact v24 JSON/HTML result is in <code>results/v24_aci_eval/</code>.</p></section>
+
+<section><h2>3. ACI-Bench evaluation</h2>
+<p>Run all three conditions on the included 207 encounter graphs and the v24 checkpoint:</p>
+<pre>uv run python scripts/evaluate_v25_aci.py \
+  --checkpoint results/v24_aci_eval/fawkes_entity_note_v23_mean_sp42_s42.pt \
+  --data ablation_artifacts/aci/graphs_with_clinical_modernbert_embeddings.jsonl \
+  --output results/v25_aci_eval.json</pre>
+<p>The evaluator hides one forward edge at a time, removes the other true tails for the same source/relation, ranks same-type candidates, and reports MRR and Hits@K. CPU is deterministic for this leave-one-out protocol.</p>
+<table><tr><th>Condition</th><th>Queries</th><th>MRR</th><th>Hits@1</th><th>Hits@3</th><th>Hits@10</th></tr>
+<tr><td>Graph-only</td><td>5,005</td><td>0.4746</td><td>0.3041</td><td>0.5612</td><td>0.8442</td></tr>
+<tr><td>Global note</td><td>5,005</td><td>0.4716</td><td>0.3007</td><td>0.5544</td><td>0.8547</td></tr>
+<tr><td>Entity-grounded note</td><td>5,005</td><td>0.4809</td><td>0.3049</td><td>0.5704</td><td>0.8649</td></tr></table>
+<p>These ACI graphs are out-of-distribution relative to the MIMIC graphs used to train the checkpoint. Interpret this as transfer/evaluation evidence, not clinical validation. The stored source data and checkpoint are included for exact reruns; SHA-256 values and per-relation results are recorded in <code>results/v24_aci_eval/v24_aci_eval.json</code>.</p></section>
+
+<section><h2>Bundle map</h2><ul><li><code>src/</code>, <code>tests/</code>, <code>models/</code>, <code>results/</code>: v24 source, tests, checkpoint, and prior artifacts.</li><li><code>scripts/build_tfidf_embeddings.py</code>: leakage-safe TF-IDF construction.</li><li><code>scripts/evaluate_v25_aci.py</code>: three-condition ACI runner.</li><li><code>ablation_artifacts/aci/</code>: 207-graph ACI input and embedding metadata.</li><li><code>ablation_artifacts/tfidf/metadata.json</code>: TF-IDF construction metadata; the large input/output JSONL files are generated locally from the public dataset source.</li></ul></section>
+</main></body></html>
