@@ -293,6 +293,26 @@ written by the *current* code use variant-derived names instead
 
 ## Quick start
 
+### Experiment HTML index
+
+All experiment reports are listed here in chronological order. The pre-v23
+reports live on the `patch-masking` branch; v23 onward is in the current
+`main` branch.
+
+| Version | HTML documentation |
+| --- | --- |
+| v16–v17 | [Fawkes v16–v17 report](https://github.com/nalin2002/clinical-graph-jepa/blob/patch-masking/docs/presentations/fawkes-v16-to-v17-report.html) |
+| v17–v22 | [Fawkes v17–v22 consolidated report](https://github.com/nalin2002/clinical-graph-jepa/blob/patch-masking/docs/presentations/fawkes-v17-to-v22-report.html) |
+| v18 | [Patch-masking report](https://github.com/nalin2002/clinical-graph-jepa/blob/patch-masking/docs/presentations/fawkes-v18-patch-masking-report.html) |
+| v19 | [JEPA pretraining ablation report](https://github.com/nalin2002/clinical-graph-jepa/blob/patch-masking/docs/presentations/fawkes-v19-jepa-pretrain-ablation-report.html) |
+| v20 | [Seed-variance report](https://github.com/nalin2002/clinical-graph-jepa/blob/patch-masking/docs/presentations/fawkes-v20-seed-variance-report.html) |
+| v21 | [Readout-head report](https://github.com/nalin2002/clinical-graph-jepa/blob/patch-masking/docs/presentations/fawkes-v21-readout-head-report.html) |
+| v22 | [Patch-masking MLP report](https://github.com/nalin2002/clinical-graph-jepa/blob/patch-masking/docs/presentations/fawkes-v22-patch-masking-mlp-report.html) |
+| v23 | [Note-injection report](docs/experiments/v23-v26/v23/fawkes-v16-to-v23-report.html) |
+| v24 | [ACI-Bench evaluation](docs/experiments/v23-v26/v24/v24-aci-evaluation.html) |
+| v25 | [Ablations](docs/experiments/v23-v26/v25/v25-ablations.html) · [Consolidated results](docs/experiments/v23-v26/v25/fawkes-v17-to-v25-report.html) |
+| v26 | [Structured graph-QA report](docs/experiments/v23-v26/v26/fawkes-v17-to-v26-report.html) |
+
 ### Requirements
 
 - Python 3.10 or newer
