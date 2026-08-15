@@ -18,7 +18,7 @@ from huggingface_hub import hf_hub_download
 SEEDS = (42, 43, 44, 45, 46, 47, 48, 49, 50, 51)
 SPLIT = 42
 CACHE = "data/fawkes_v23"
-OWNER = "kushagrayadv"          # nalin9 for the published v23 aggregate
+OWNER = "wmatbooth"          # nalin9 for the published v23 aggregate
 
 # name -> (pooling, repo stem)
 ARMS = {

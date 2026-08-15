@@ -128,6 +128,10 @@ def log_environment(source_root: Path) -> None:
         "NOTE_INJECTION", "NOTE_MEMORY_REPO", "NOTE_MEMORY_FILE",
         "NOTE_MEMORY_PATH", "NOTE_SPAN_TOKENS", "NOTE_MAX_SPANS",
         "NOTE_ATTN_HEADS", "DECODER", "DATA_SPLIT_SEED", "SEED",
+        # GLOBAL_NOTE_NODE is the whole of the v15-placement arm, and its failure
+        # mode is silent: unset, the job runs as an ordinary GROUND_BY=prov arm and
+        # looks identical in the log. It has to be visible there.
+        "GLOBAL_NOTE_NODE",
     })
     print(f"[FAWKES-HF] source_root={source_root}", flush=True)
     print("[FAWKES-HF] no git clone or code snapshot download is performed", flush=True)
