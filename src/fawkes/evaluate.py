@@ -161,10 +161,10 @@ def _classification_metrics(pos_batches, neg_batches, nonpat_batches):
     all_scores = np.concatenate([positives, negatives])
     auc, ap = roc_auc_score(all_labels, all_scores), average_precision_score(all_labels, all_scores)
     nonobvious_pos = positives[nonpat_mask]
-    nonobvious_neg = negatives[nonpat_mask]      # one negative per positive -> the mask indexes both
+    
     if len(nonobvious_pos) > 5:
-        nonobvious_labels = np.concatenate([np.ones_like(nonobvious_pos), np.zeros_like(nonobvious_neg)])
-        nonobvious_scores = np.concatenate([nonobvious_pos, nonobvious_neg])
+        nonobvious_labels = np.concatenate([np.ones_like(nonobvious_pos), np.zeros_like(negatives)])
+        nonobvious_scores = np.concatenate([nonobvious_pos, negatives])
         auc_nonobvious = roc_auc_score(nonobvious_labels, nonobvious_scores)
     else:
         auc_nonobvious = float('nan')
