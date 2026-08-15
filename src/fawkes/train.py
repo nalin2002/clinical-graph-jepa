@@ -27,8 +27,8 @@ import torch
 from torch_geometric.loader import DataLoader
 
 from .config import Config
-from .data import (NODE_TYPES, RELATION_ALIASES, RELATION_CANONICAL, TARGET_RELS, has_evidence,
-                   load_full_dataset, load_note_memories, resolve_rel, support_graded, to_data)
+from .data import (NODE_TYPES, RELATION_ALIASES, RELATION_CANONICAL, TARGET_RELS, add_global_note_node,
+                   has_evidence, load_full_dataset, load_note_memories, resolve_rel, support_graded, to_data)
 from .evaluate import cascade_evaluate, eir_uplift_eval, evaluate, loo_evaluate
 from .model import JEPA, build_scorer
 from .steps import jepa_step, readout_step
@@ -120,6 +120,9 @@ def _split_items(items, cfg):
 def prepare_data(cfg):
     """Load, audit, convert and split the dataset. Returns (train, val, test) pairs."""
     raw, demographics = load_full_dataset(cfg)
+    if cfg.global_note_node:
+        raw = [add_global_note_node(graph) for graph in raw]
+        logger.info(f"[NOTE-NODE] enabled: one PATIENT->NOTE node added to {len(raw)} graphs; no entity broadcast")
     note_memories = load_note_memories(cfg)
     if cfg.prune_no_evidence:
         _log_prune_stats(raw)

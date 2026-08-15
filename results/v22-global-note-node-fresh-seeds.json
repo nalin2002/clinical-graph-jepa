@@ -1,0 +1,26 @@
+{
+  "protocol": "fresh-training-v22-patch-mlp-global-note-node",
+  "graphs": 4000,
+  "split_seed": 42,
+  "training_seeds": [42, 43, 44, 45, 46, 47, 48, 49, 50, 51],
+  "note_placement": "one NOTE node per graph with PATIENT->NOTE HAS_NOTE; no entity broadcast",
+  "test_queries_per_seed": 8283,
+  "metrics": {
+    "mrr": {"mean": 0.3826219383402458, "sd": 0.060533077478838876},
+    "hits1": {"mean": 0.2013763129300978, "sd": 0.05901014408477034},
+    "hits3": {"mean": 0.44151877339128337, "sd": 0.07858714834914243},
+    "hits10": {"mean": 0.8317276349148859, "sd": 0.047220770979772786}
+  },
+  "runs": [
+    {"seed": 42, "mrr": 0.3243765011449797},
+    {"seed": 43, "mrr": 0.40584963628528203},
+    {"seed": 44, "mrr": 0.3509707540539554},
+    {"seed": 45, "mrr": 0.3934888585323212},
+    {"seed": 46, "mrr": 0.42510736648039726},
+    {"seed": 47, "mrr": 0.36424327322812666},
+    {"seed": 48, "mrr": 0.5265748738640993},
+    {"seed": 49, "mrr": 0.36911161109346796},
+    {"seed": 50, "mrr": 0.33448357437278486},
+    {"seed": 51, "mrr": 0.33201293434704393}
+  ]
+}

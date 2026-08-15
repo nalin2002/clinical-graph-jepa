@@ -81,6 +81,7 @@ class Config:
     use_scores: bool = False              # (v15) DEFAULT OFF — scores-gate was a wash (v14); structure-only encoder, the NOTE node is the new signal
     prune_no_evidence: bool = True        # (v14) drop LLM edges with zero KB/provenance evidence (keep backbone + borderline)
     use_note: bool = True                 # (v16) inject the Clinical-ModernBERT note vector onto grounded ENTITY nodes (v15 NOTE node retired)
+    global_note_node: bool = False       # (v15 ablation) add one PATIENT->NOTE node; never broadcast the vector
     embed_dim: int = 768                  # (v15) note_embedding dim (Clinical-ModernBERT hidden)
     ground_by: str = "prov"               # (v16) where the note goes: prov=entities with a prov_in_note edge | name=entities named in the note | all=every entity
     note_injection: str = "mean"          # (v23) mean=v22 path | uniform/attention=span-memory injection
@@ -181,6 +182,7 @@ class Config:
             use_scores=_flag("USE_SCORES", "0"),
             prune_no_evidence=_flag("PRUNE_NO_EVIDENCE", "1"),
             use_note=_flag("USE_NOTE", "1"),
+            global_note_node=_flag("GLOBAL_NOTE_NODE", "0"),
             embed_dim=int(os.environ.get("EMBED_DIM", 768)),
             ground_by=os.environ.get("GROUND_BY", "prov").lower(),
             note_injection=os.environ.get("NOTE_INJECTION", "mean").lower(),
@@ -255,6 +257,7 @@ class Config:
             "use_note": self.use_note, "ground_by": self.ground_by,
             "embed_dim": self.embed_dim, "numeric_dim": self.numeric_dim,
             "use_scores": self.use_scores,
+            "global_note_node": self.global_note_node,
             "prune_no_evidence": self.prune_no_evidence,
             "node_mask": self.node_mask, "edge_mask": self.edge_mask,
             "mask_schedule": self.mask_schedule, "mask_lo": self.mask_lo,

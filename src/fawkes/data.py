@@ -155,6 +155,32 @@ def load_full_dataset(cfg):
     return graphs, demographics
 
 
+def add_global_note_node(graph):
+    """Add one admission-level NOTE node and PATIENT->NOTE HAS_NOTE edge.
+
+    The note embedding is stored only on that NOTE node. This is deliberately
+    different from GROUND_BY=all, which broadcasts the vector to entities.
+    """
+    import copy
+    graph = copy.deepcopy(graph)
+    if not graph.get("note_embedding"):
+        raise ValueError(f"graph {graph.get('hadm_id')} has no note_embedding")
+    nodes = graph.setdefault("nodes", [])
+    if any(node.get("type") == "NOTE" for node in nodes):
+        raise ValueError(f"graph {graph.get('hadm_id')} already contains a NOTE node")
+    patient = next((node for node in nodes if node.get("type") == "PATIENT"), None)
+    if patient is None:
+        raise ValueError(f"graph {graph.get('hadm_id')} has no PATIENT node")
+    note_id = f"NOTE_GLOBAL_{graph.get('hadm_id')}"
+    nodes.append({"id": note_id, "type": "NOTE", "name": "DISCHARGE_NOTE"})
+    graph.setdefault("edges", []).append({
+        "source": patient["id"], "target": note_id, "relation": "HAS_NOTE",
+        "evidence": "note", "labels": {},
+    })
+    graph["_global_note_node"] = True
+    return graph
+
+
 def load_note_memories(cfg):
     """Load the v23 fixed-width Clinical ModernBERT span-memory sidecar.
 
@@ -279,6 +305,9 @@ def _node_features(graph, type_ids, grounded, demo_feats, subject_id, cfg):
         raise ValueError(f"[FAILURE] note_embedding dim {len(note_embedding)} != EMBED_DIM {cfg.embed_dim} subj {subject_id}")
     note_embedding = note_embedding or [0.0] * cfg.embed_dim
     zero_note = [0.0] * cfg.embed_dim
+    if graph.get("_global_note_node"):
+        return [demo_feats + (note_embedding if type_id == NODE_TYPES["NOTE"] else zero_note)
+                for type_id in type_ids]
     return [demo_feats + (note_embedding if i in grounded else zero_note) for i in range(len(type_ids))]
 
 
