@@ -20,8 +20,10 @@ submit() {
     scripts/fawkes_v23_hf_job.py
 }
 
+SEEDS=(42 44 45 47 49 50 51)
+
 for mode in mean uniform attention; do
-  for seed in 42 43 44 45 46 47 48 49 50 51; do
+  for seed in "${SEEDS[@]}"; do
     submit "$mode" "$seed" 5h
   done
 done
