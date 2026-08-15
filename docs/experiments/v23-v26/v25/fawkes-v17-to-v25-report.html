@@ -133,22 +133,22 @@ git checkout 1a698a9839860954786a42b7b47a4adfa014da26</pre>
 <strong>2 &middot; Build the private note-memory artifact once:</strong>
 <pre>hf jobs uv run --detach --flavor a100-large --timeout 2h \
   --secrets HF_TOKEN \
-  --env OUTPUT_REPO=nalin9/fawkes-training-note-memory-v23-260808 \
+  --env OUTPUT_REPO=wmatbooth/fawkes-training-note-memory-v23-260808 \
   scripts/build_v23_note_memory.py</pre>
-<strong>3 &middot; Make the exact source archive available to the job.</strong> The runner loads <code>&lt;SOURCE_REF&gt;.tar.gz</code> from the private dataset <code>nalin9/clinical-graph-jepa-v23-source</code>. The reported runs used <code>SOURCE_REF=1a698a9839860954786a42b7b47a4adfa014da26</code>. This private artifact and the note memory require the same MIMIC/PhysioNet-authorized data access as the original experiment.
+<strong>3 &middot; Make the exact source archive available to the job.</strong> The runner loads <code>&lt;SOURCE_REF&gt;.tar.gz</code> from the shared dataset <code>wmatbooth/clinical-graph-jepa-v23-source</code>. The reported runs used <code>SOURCE_REF=1a698a9839860954786a42b7b47a4adfa014da26</code>. This artifact and the note memory require the same MIMIC/PhysioNet-authorized data access as the original experiment.
 <br><br><strong>4 &middot; Optional smoke test:</strong>
 <pre>hf jobs uv run --detach --flavor t4-small --timeout 1h \
   --secrets HF_TOKEN \
   --env SOURCE_REF=1a698a9839860954786a42b7b47a4adfa014da26 \
-  --env SOURCE_REPO=nalin9/clinical-graph-jepa-v23-source \
-  --env NOTE_MEMORY_REPO=nalin9/fawkes-training-note-memory-v23-260808 \
+  --env SOURCE_REPO=wmatbooth/clinical-graph-jepa-v23-source \
+  --env NOTE_MEMORY_REPO=wmatbooth/fawkes-training-note-memory-v23-260808 \
   --env NOTE_INJECTION=attention \
   --env JEPA_EPOCHS=2 --env READOUT_EPOCHS=2 --env LOO_CAP=200 \
   --env PUSH=1 --env OUTPUT_REPO=&lt;user&gt;/fawkes-v23-attention-smoke \
   scripts/fawkes_v23_hf_job.py</pre>
 <strong>5 &middot; Submit the full paired experiment &mdash; 3 modes &times; 10 seeds = 30 jobs:</strong>
 <pre>SOURCE_REF=1a698a9839860954786a42b7b47a4adfa014da26 \
-NOTE_MEMORY_REPO=nalin9/fawkes-training-note-memory-v23-260808 \
+NOTE_MEMORY_REPO=wmatbooth/fawkes-training-note-memory-v23-260808 \
 FLAVOR=a10g-small \
 ./submit-v23-note-attention.sh</pre>
 <strong>6 &middot; Aggregate the pushed checkpoints into the tables above:</strong>
@@ -650,7 +650,7 @@ A JEPA world model over per-admission clinical knowledge graphs, trained in two 
 <pre>git clone --branch codex/v23-attention-note https://github.com/nalin2002/clinical-graph-jepa.git
 cd clinical-graph-jepa
 git checkout 1a698a9839860954786a42b7b47a4adfa014da26
-NOTE_MEMORY_REPO=nalin9/fawkes-training-note-memory-v23-260808 \
+NOTE_MEMORY_REPO=wmatbooth/fawkes-training-note-memory-v23-260808 \
 SOURCE_REF=1a698a9839860954786a42b7b47a4adfa014da26 \
 FLAVOR=a10g-small ./submit-v23-note-attention.sh
 python print_v23_note_attention_table.py</pre>

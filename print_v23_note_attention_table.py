@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 import statistics
 
@@ -11,10 +12,11 @@ from huggingface_hub import hf_hub_download
 
 
 SEEDS = range(42, 52)
+HF_NAMESPACE = os.environ.get("HF_NAMESPACE", "wmatbooth")
 ARMS = {
-    "v23-mean": "nalin9/fawkes-v23-mean-note-sp42-s{seed}",
-    "v23-uniform": "nalin9/fawkes-v23-uniform-note-sp42-s{seed}",
-    "v23-attention": "nalin9/fawkes-v23-attention-note-sp42-s{seed}",
+    "v23-mean": f"{HF_NAMESPACE}/fawkes-v23-mean-note-sp42-s{{seed}}",
+    "v23-uniform": f"{HF_NAMESPACE}/fawkes-v23-uniform-note-sp42-s{{seed}}",
+    "v23-attention": f"{HF_NAMESPACE}/fawkes-v23-attention-note-sp42-s{{seed}}",
 }
 LOO_METRICS = ("mrr", "hits1", "hits3", "hits10")
 BATCH_METRICS = ("auc", "ap", "mrr")

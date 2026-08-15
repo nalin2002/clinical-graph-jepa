@@ -22,7 +22,7 @@ token-count-weighted span average agrees with the stored v22 mean embedding.
 ```bash
 hf jobs uv run --detach --flavor a100-large --timeout 2h \
   --secrets HF_TOKEN \
-  --env OUTPUT_REPO=nalin9/fawkes-training-note-memory-v23-260808 \
+  --env OUTPUT_REPO=wmatbooth/fawkes-training-note-memory-v23-260808 \
   scripts/build_v23_note_memory.py
 ```
 
@@ -31,12 +31,13 @@ hf jobs uv run --detach --flavor a100-large --timeout 2h \
 Push the source commit first and substitute its full SHA:
 
 ```bash
+HF_USER=$(hf auth whoami --format json | python3 -c 'import json,sys; print(json.load(sys.stdin)["user"])')
 hf jobs uv run --detach --flavor t4-small --timeout 1h \
   --secrets HF_TOKEN \
   --env SOURCE_REF=<full-commit-sha> \
   --env NOTE_INJECTION=attention \
   --env JEPA_EPOCHS=2 --env READOUT_EPOCHS=2 --env LOO_CAP=200 \
-  --env PUSH=1 --env OUTPUT_REPO=nalin9/fawkes-v23-attention-smoke \
+  --env PUSH=1 --env OUTPUT_REPO="$HF_USER/fawkes-v23-attention-smoke" \
   scripts/fawkes_v23_hf_job.py
 ```
 

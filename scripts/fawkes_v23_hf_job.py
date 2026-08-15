@@ -33,7 +33,7 @@ DEFAULTS = {
     "NODE_MASK": "0.4",
     "DECODER": "mlp",
     "NOTE_INJECTION": "attention",
-    "NOTE_MEMORY_REPO": "nalin9/fawkes-training-note-memory-v23-260808",
+    "NOTE_MEMORY_REPO": "wmatbooth/fawkes-training-note-memory-v23-260808",
     "NOTE_MEMORY_FILE": "fawkes_note_memory_v23.safetensors",
     "NOTE_SPAN_TOKENS": "32",
     "NOTE_MAX_SPANS": "64",
@@ -55,7 +55,7 @@ def configure() -> None:
 
 
 def fetch_source() -> Path:
-    repository = os.environ.get("SOURCE_REPO", "nalin9/clinical-graph-jepa-v23-source")
+    repository = os.environ.get("SOURCE_REPO", "wmatbooth/clinical-graph-jepa-v23-source")
     revision = os.environ["SOURCE_REF"]
     filename = f"{revision}.tar.gz"
     archive_path = hf_hub_download(repository, filename, repo_type="dataset")
