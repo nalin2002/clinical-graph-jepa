@@ -37,6 +37,7 @@ fawkes-train = "fawkes.train:main"
 fawkes-eval = "fawkes.evaluate:main"
 benchmark-vs-llm = "benchmarks.vs_llm:main"
 benchmark-vs-fawkes = "benchmarks.vs_fawkes:main"
+benchmark-shared-queries = "benchmarks.shared_queries:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

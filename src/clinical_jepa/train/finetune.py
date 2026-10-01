@@ -62,6 +62,8 @@ def _apply_finetune_args(args, cfg) -> None:
     cfg.train.finetune_epochs = args.epochs
     cfg.train.epochs = cfg.train.pretrain_epochs + cfg.train.finetune_epochs
     cfg.train.lr = args.lr
+    if args.seed is not None:
+        cfg.train.seed = args.seed
     cfg.train.batch_size = args.batch_size
     cfg.train.num_workers = args.num_workers
     cfg.train.revision_weight = args.revision_weight
@@ -197,6 +199,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
     p.add_argument("--out", default="checkpoints/")
     p.add_argument("--epochs", type=int, default=40)
     p.add_argument("--lr", type=float, default=8e-4)
+    p.add_argument(
+        "--seed",
+        type=int,
+        default=None,
+        help="Override the checkpoint training seed; default preserves it",
+    )
     p.add_argument("--device", default="cpu")
     p.add_argument("--batch_size", type=int, default=16)
     p.add_argument("--num-workers", type=int, default=0)

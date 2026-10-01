@@ -100,6 +100,7 @@ def ema_decay(step: int, total_steps: int, cfg: Config) -> float:
 
 def apply_common_train_args(args, cfg: Config) -> None:
     cfg.train.lr = args.lr
+    cfg.train.seed = args.seed
     cfg.train.batch_size = args.batch_size
     cfg.train.num_workers = args.num_workers
     cfg.train.context_patches = args.context_patches
@@ -464,6 +465,7 @@ def add_runtime_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--out", default="checkpoints/")
     p.add_argument("--epochs", type=int, default=40)
     p.add_argument("--lr", type=float, default=8e-4)
+    p.add_argument("--seed", type=int, default=0)
     p.add_argument("--device", default="cpu")
     p.add_argument("--batch_size", type=int, default=16)
     p.add_argument("--num-workers", type=int, default=0)

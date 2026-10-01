@@ -35,7 +35,7 @@ import torch
 
 from conftest import BASELINE, DATA, ROOT, load_pin, requires_checkpoints, requires_data
 
-from benchmarks import vs_fawkes, vs_llm
+from benchmarks import shared_queries, vs_fawkes, vs_llm
 from clinical_jepa.encoders import MockEncoder
 from clinical_jepa.evaluate import leave_one_out_recovery
 from clinical_jepa.graph.builders import adapt_mimic_subkg
@@ -76,6 +76,57 @@ def fawkes_run():
         cap=40000,
     )
     return raw, metrics, records, cfg
+
+
+# --------------------------------------------------------------------------- #
+# Shared-query manifest construction.
+# --------------------------------------------------------------------------- #
+def test_shared_query_manifest_uses_fawkes_filtered_candidate_ids():
+    from fawkes.data import NODE_TYPES, RELATION_CANONICAL
+
+    raw = [
+        {
+            "nodes": [
+                {"id": "patient", "type": "PATIENT"},
+                {"id": "med-a", "type": "MEDICATION"},
+                {"id": "med-b", "type": "MEDICATION"},
+                {"id": "med-c", "type": "MEDICATION"},
+            ],
+            "edges": [],
+        }
+    ]
+    graph = argparse.Namespace(
+        edge_index=torch.tensor([[0, 0], [1, 2]], dtype=torch.long),
+        edge_type=torch.tensor(
+            [
+                RELATION_CANONICAL["TAKES_MEDICATION"],
+                RELATION_CANONICAL["TAKES_MEDICATION"],
+            ],
+            dtype=torch.long,
+        ),
+        node_type=torch.tensor(
+            [
+                NODE_TYPES["PATIENT"],
+                NODE_TYPES["MEDICATION"],
+                NODE_TYPES["MEDICATION"],
+                NODE_TYPES["MEDICATION"],
+            ],
+            dtype=torch.long,
+        ),
+    )
+
+    queries = shared_queries.build_query_manifest(
+        raw,
+        records=[0],
+        fawkes_graphs=[graph],
+        cap=40000,
+    )
+
+    assert [query.target_id for query in queries] == ["med-a", "med-b"]
+    assert [query.candidate_ids for query in queries] == [
+        ["med-a", "med-c"],
+        ["med-b", "med-c"],
+    ]
 
 
 # --------------------------------------------------------------------------- #
